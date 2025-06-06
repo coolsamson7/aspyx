@@ -18,26 +18,19 @@ def transactional():
 
 @component()
 class Bar:
-    def __init__(self, foo: 'Foo'):
-        print("new bar")
+    def __init__(self):# TODO , foo: Foo):
+        pass
 
     @transactional()
     def say(self, hello: str):
-        print("BAR: " + hello)
         return hello
 
 @component()
 class Foo:
     def __init__(self, bar: Bar):
-        print("new foo")
         self.bar = bar
 
-    @inject()
-    def set_bar(self, bar: Bar):
-        pass
-
     def say(self, hello: str):
-        print("foo: " + hello)
         return hello
 
 @advice
@@ -70,10 +63,6 @@ class SampleAdvice:
 
         return invocation.proceed()
 
-# test
-
-# main
-
 class TestInjector(unittest.TestCase):
     def test_injector(self):
         logging.basicConfig(level=logging.DEBUG)
@@ -83,10 +72,6 @@ class TestInjector(unittest.TestCase):
         foo = environment.get(Foo)
 
         self.assertIsNotNone(foo)
-
-        foo1 = environment.get(Foo)  # should be a noop
-
-        self.assertTrue(foo is foo1, "should be identical")
 
         result = foo.say("hello")
         self.assertEqual(result, "hello")

@@ -50,8 +50,8 @@ class ConfigurationManager:
         for source in self.sources:
             self._data = merge_dicts(self._data, source.load())
 
-    def get(self, path: str, type: Type[T], default=None) -> T | None:
-        def value(path: str, default=None) -> T | None:
+    def get(self, path: str, type: Type[T], default=None) -> T:
+        def value(path: str, default=None) -> T:
             keys = path.split(".")
             current = self._data
             for key in keys:

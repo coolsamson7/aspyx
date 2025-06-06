@@ -27,6 +27,9 @@ class SampleConfigurationSource(ConfigurationSource):
 
 @component()
 class Foo:
+    def __init__(self, manager: ConfigurationManager):
+        manager.load()
+
     @value("b.d", 0)
     def set_foo(self, value: int):
         self.value = value
