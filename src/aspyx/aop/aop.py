@@ -1,0 +1,339 @@
+from __future__ import annotations
+
+import inspect
+from dataclasses import dataclass
+from enum import auto, Enum
+from typing import Optional, Dict, Type, Callable
+
+from aspyx.reflection import Decorators, TypeDescriptor
+from aspyx.di import component, Providers, ClassInstanceProvider, Environment
+
+class AspectType(Enum):
+    """
+    AspectType defines the types of aspect-oriented advice that can be applied to methods.
+
+    The available types are:
+    - BEFORE: Advice to be executed before the method invocation.
+    - AROUND: Advice that wraps the method invocation and can control whether and how the method is called.
+    - AFTER: Advice to be executed after the method invocation, regardless of its outcome.
+    - ERROR: Advice to be executed if the method invocation raises an exception.
+
+    These types are used to categorize and apply aspect logic at different points in a method's execution lifecycle.
+    """
+    BEFORE = auto()
+    AROUND = auto()
+    AFTER = auto()
+    ERROR = auto()
+
+class AspectTarget:
+    # properties
+
+    # class
+    # _function
+    #_type : AspectType
+
+    # constructor
+
+    def __init__(self):
+        self._clazz = None
+        self._instance = None
+        self._type = AspectType.BEFORE
+
+        self.names = []
+        self.types = []
+        self.decorators = []
+
+        pass
+
+    # public
+
+    def matches(self, clazz : Type, func):
+        descriptor = TypeDescriptor.forType(clazz)
+
+        methodDescriptor = descriptor.get(func.__name__)
+
+        # type
+
+        if len(self.types) > 0:
+            if next((type for type in self.types if issubclass(clazz, type)), None) is None:
+                return False
+
+        # decorators
+
+        if len(self.decorators) > 0:
+            if next((decorator for decorator in self.decorators if methodDescriptor.hasDecorator(decorator)), None) is None:
+                return False
+
+        # names
+
+        if len(self.names) > 0:
+            if next((name for name in self.names if name == func.__name__), None) is None:
+                return False
+
+        # yipee
+
+        return True
+
+    # fluent
+
+    def function(self, func):
+        self._function = func
+        return self
+
+    def type(self, type: AspectType):
+        self._type = type
+
+        return self
+
+    def ofType(self, type: Type):
+        self.types.append(type)
+        return self
+
+    def decoratedWith(self, decorator):
+        self.decorators.append(decorator)
+        return self
+
+    def named(self, name: str):
+        self.names.append(name)
+        return self
+
+def methods():
+    return AspectTarget()
+
+##
+
+class JoinPoint:
+    # constructor
+
+    def __init__(self, next: 'JoinPoint'):
+        self.next = next
+
+    # public
+
+    def call(self, invocation: 'Invocation'):
+        pass
+
+class FunctionJoinPoint(JoinPoint):
+    def __init__(self, instance, func, next: Optional['JoinPoint']):
+        super().__init__(next)
+
+        self.instance = instance
+        self.func = func
+
+    def call(self, invocation: 'Invocation'):
+        invocation.currentJoinPoint = self
+
+        return self.func(self.instance, invocation)
+
+class MethodJoinPoint(FunctionJoinPoint):
+    def __init__(self, instance, func):
+        super().__init__(instance, func, None)
+
+    def call(self, invocation: 'Invocation'):
+        invocation.currentJoinPoint = self
+
+        return self.func(*invocation.args, **invocation.kwargs)
+
+@dataclass
+class JoinPoints:
+    before: list[JoinPoint]
+    around: list[JoinPoint]
+    error: list[JoinPoint]
+    after: list[JoinPoint]
+
+class Invocation:
+    # properties
+
+    # args
+    # kwargs
+
+    # constructor
+
+    def __init__(self,  joinPoints: JoinPoints):
+        self.args = None
+        self.kwargs = None
+        self.result = None
+        self.error = None
+        self.joinPoints = joinPoints
+        self.currentJoinPoint = None
+
+    def call(self, *args, **kwargs):
+        # remember args
+
+        self.args = args
+        self.kwargs = kwargs
+
+        # run all before
+
+        for joinPoint in self.joinPoints.before:
+            joinPoint.call(self)
+
+        # run around's with the method being the last aspect!
+
+        try:
+            self.result = self.joinPoints.around[0].call(self) # will follow the proceed chain
+
+        except Exception as e:
+            self.error = e
+            for joinPoint in self.joinPoints.error:
+                joinPoint.call(self)
+
+        # run all before
+
+        for joinPoint in self.joinPoints.after:
+            joinPoint.call(self)
+
+        if self.error is not None:
+            raise self.error
+        else:
+            return self.result
+
+    def proceed(self, *args, **kwargs):
+        # replace args if non-empty
+
+        if len(args) > 0: # TODO kwargs?
+            self.args = args
+
+        return self.currentJoinPoint.next.call(self)
+
+@component()
+class Advice:
+    # static data
+
+    targets: list[AspectTarget] = []
+
+    # constructor
+
+    def __init__(self):
+        self.cache : Dict[Type, Dict[Callable,JoinPoints]] = dict()
+        self.resolve()
+
+    # methods
+
+    def resolve(self):
+        for target in Advice.targets:
+            target._instance = Environment.instance.get(target._clazz)
+            target._advice = None
+
+    def collect(self, clazz, member, type: AspectType):
+        aspects = [FunctionJoinPoint(target._instance, target._function, None) for target in Advice.targets if target._type == type and target.matches(clazz, member)]
+
+        # link
+
+        for i in range(0, len(aspects) - 1):
+            aspects[i].next = aspects[i + 1]
+
+        # done
+
+        return aspects
+
+    def joinPoints4(self, instance) -> Dict[Callable,JoinPoints]: #todo
+        clazz = type(instance)
+
+        result = self.cache.get(clazz, None)
+        if result is None:
+            result = dict()
+
+            for name, member in inspect.getmembers(clazz, predicate=inspect.isfunction):
+                joinPoints = self.computeJoinPoints(clazz, member)
+                if joinPoints is not None:
+                    result[member] = joinPoints
+
+            self.cache[clazz] = result
+
+        # add around methods
+
+        value = dict()
+
+        for key, cjp in result.items():
+            jp = JoinPoints(
+                before=cjp.before,
+                around=cjp.around,
+                error=cjp.error,
+                after=cjp.after)
+
+            # add method to around
+
+            jp.around.append(MethodJoinPoint(instance, key))
+            if len(jp.around) > 1:
+                jp.around[len(jp.around) - 2].next = jp.around[len(jp.around) - 1]
+
+            value[key] = jp
+
+        # done
+
+        return value
+
+    def computeJoinPoints(self, clazz, member) -> Optional[JoinPoints]:
+        befores = self.collect(clazz, member, AspectType.BEFORE)
+        arounds = self.collect(clazz, member, AspectType.AROUND)
+        afters = self.collect(clazz, member, AspectType.AFTER)
+        errors = self.collect(clazz, member, AspectType.ERROR)
+
+        if len(befores) > 0 or len(arounds) > 0 or len(afters) > 0  or len(errors) > 0:
+            return JoinPoints(
+                before=befores,
+                around=arounds,
+                error=errors,
+                after=afters)
+        else:
+            return None
+
+# decorators
+
+def advice(cls):
+    Providers.register(ClassInstanceProvider(cls, True, True))
+
+    Decorators.add(cls, advice)
+
+    for name, member in inspect.getmembers(cls):
+        # if ismethod(member):
+        if not name.startswith("_") and member._advice is not None:
+            member._advice._clazz = cls
+            Advice.targets.append(member._advice)
+
+    return cls
+
+
+# decorators
+
+def before(target: AspectTarget):
+    def decorator(func):
+        target.function(func).type(AspectType.BEFORE)
+
+        Decorators.add(func, before, target)
+
+        func._advice = target
+        return func
+
+    return decorator
+
+def error(target: AspectTarget):
+    def decorator(func):
+        target.function(func).type(AspectType.ERROR)
+
+        Decorators.add(func, error, target)
+        func._advice = target
+        return func
+
+    return decorator
+
+def after(target: AspectTarget):
+    def decorator(func):
+        target.function(func).type(AspectType.AFTER)
+
+        Decorators.add(func, after, target)
+        func._advice = target
+        return func
+
+    return decorator
+
+def around(target: AspectTarget):
+    def decorator(func):
+        target.function(func).type(AspectType.AROUND)
+
+        Decorators.add(func, around, target)
+        func._advice = target
+        return func
+
+    return decorator
