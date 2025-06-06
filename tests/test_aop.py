@@ -4,7 +4,7 @@ import logging
 import unittest
 
 from aspyx.reflection import Decorators
-from aspyx.di import component, inject, Environment
+from aspyx.di import injectable, inject, Environment
 from aspyx.aop import advice, before, after, around, methods, Invocation
 
 
@@ -16,7 +16,7 @@ def transactional():
     return decorator
 
 
-@component()
+@injectable()
 class Bar:
     def __init__(self):
         pass
@@ -25,7 +25,7 @@ class Bar:
     def say(self, hello: str):
         return hello
 
-@component()
+@injectable()
 class Foo:
     def __init__(self, bar: Bar):
         self.bar = bar

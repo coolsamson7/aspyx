@@ -121,7 +121,11 @@ class TypeDescriptor:
         return False
 
     def getLocalMethod(self, name) -> MethodDescriptor:
+        m = self.localMethods.get(name, None)
+        if m is None:
+            print("kk")
+
         return self.localMethods[name]
 
     def getMethod(self, name) -> MethodDescriptor:
-        return self.methods[name]
+        return self.methods.get(name, None)

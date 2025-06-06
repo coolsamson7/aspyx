@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import unittest
 
-from aspyx.di import component, on_init, on_destroy, environmentAware, inject, Factory, create, configuration, Environment, PostProcessor, factory
+from aspyx.di import injectable, on_init, on_destroy, inject_environment, inject, Factory, create, configuration, Environment, PostProcessor, factory
 
 
 
-@component()
+@injectable()
 class SamplePostProcessor(PostProcessor):
     def process(self, instance: object):
         print(f"created a {instance}")
@@ -14,11 +14,11 @@ class SamplePostProcessor(PostProcessor):
 class Foo:
     pass
 
-#@component()
+#@injectable()
 class Baz:
     pass
 
-@component()
+@injectable()
 class Bar:
     def __init__(self, foo: Foo):
         self.foo = foo
@@ -31,7 +31,7 @@ class Bar:
     def destroy(self):
         print("destroy bar")
 
-    @environmentAware()
+    @inject_environment()
     def initEnvironment(self, env: Environment):
         print("set environment bar")
 
@@ -49,7 +49,7 @@ class TestFactory(Factory[Foo]):
         return Foo()
 
 @configuration()
-@component()
+@injectable()
 class Configuration:
     # constructor
 

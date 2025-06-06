@@ -89,7 +89,11 @@ class ClassInstanceProvider(InstanceProvider[T]):
 
             # check constructor
 
-            for param in  TypeDescriptor.forType(self.type).getLocalMethod("__init__").paramTypes:
+            init = TypeDescriptor.forType(self.type).getLocalMethod("__init__")
+            if init is None:
+                print("kk")
+
+            for param in TypeDescriptor.forType(self.type).getLocalMethod("__init__").paramTypes:
                 provider = Providers.getProvider(param)
                 self.params += 1
                 self.addDependency(provider)
@@ -268,7 +272,7 @@ class Providers:
                 return False
 
             for decorator in Decorators.get(type):
-                if decorator.decorator is component:
+                if decorator.decorator is injectable:
                     return True
 
             return False
@@ -315,9 +319,9 @@ class Providers:
 
         return provider
 
-def component(eager=True, singleton=True):
+def injectable(eager=True, singleton=True):
     def decorator(cls):
-        Decorators.add(cls, component)
+        Decorators.add(cls, injectable)
 
         Providers.register(ClassInstanceProvider(cls, eager, singleton))
 
@@ -380,9 +384,9 @@ def inject():
 
     return decorator
 
-def environmentAware():
+def inject_environment():
     def decorator(func):
-        Decorators.add(func, environmentAware)
+        Decorators.add(func, inject_environment)
         return func
 
     return decorator
@@ -458,7 +462,7 @@ class Callable:
     def args(self, decorator: DecoratorDescriptor, method: TypeDescriptor.MethodDescriptor, environment: Environment):
         return []
 
-@component()
+@injectable()
 class CallableProcessor(LifecycleProcessor):
     # local classes
 
@@ -515,25 +519,25 @@ class CallableProcessor(LifecycleProcessor):
             if callable.callable.lifecycle is lifecycle:
                 callable.execute(instance, environment)
 
-@component()
+@injectable()
 class OnInitCallable(Callable):
     def __init__(self, processor: CallableProcessor):
         super().__init__(on_init, processor, Lifecycle.ON_CREATE)
 
-@component()
+@injectable()
 class OnDestroyCallable(Callable):
     def __init__(self, processor: CallableProcessor):
         super().__init__(on_destroy, processor, Lifecycle.ON_DESTROY)
 
-@component()
+@injectable()
 class EnvironmentAwareCallable(Callable):
     def __init__(self, processor: CallableProcessor):
-        super().__init__(environmentAware, processor, Lifecycle.ON_CREATE)
+        super().__init__(inject_environment, processor, Lifecycle.ON_CREATE)
 
     def args(self, decorator: DecoratorDescriptor, method: TypeDescriptor.MethodDescriptor, environment: Environment):
         return [environment]
 
-@component()
+@injectable()
 class InjectCallable(Callable):
     def __init__(self, processor: CallableProcessor):
         super().__init__(inject, processor, Lifecycle.ON_CREATE)

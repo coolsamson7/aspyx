@@ -4,13 +4,13 @@ import os
 from typing import Type, TypeVar
 from dotenv import load_dotenv
 
-from aspyx.di import component, Environment, CallableProcessor, Callable, Lifecycle
+from aspyx.di import injectable, Environment, CallableProcessor, Callable, Lifecycle
 from aspyx.reflection import Decorators, DecoratorDescriptor, TypeDescriptor
 
 
 T = TypeVar("T")
 
-@component()
+@injectable()
 class ConfigurationManager:
     # constructor
 
@@ -81,7 +81,7 @@ class ConfigurationSource:
     def load(self) -> dict:
         pass
 
-@component()
+@injectable()
 class EnvConfigurationSource(ConfigurationSource):
     # constructor
 
@@ -133,7 +133,7 @@ def value(key: str, default=None):
 
     return decorator
 
-@component()
+@injectable()
 class ConfigurationCallable(Callable):
     def __init__(self, processor: CallableProcessor,  manager: ConfigurationManager):
         super().__init__(value, processor, Lifecycle.ON_CREATE)

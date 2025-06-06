@@ -6,7 +6,7 @@ from enum import auto, Enum
 from typing import Optional, Dict, Type, Callable
 
 from aspyx.reflection import Decorators, TypeDescriptor
-from aspyx.di import component, Providers, ClassInstanceProvider, Environment
+from aspyx.di import injectable, Providers, ClassInstanceProvider, Environment
 
 class AspectType(Enum):
     """
@@ -196,7 +196,7 @@ class Invocation:
 
         return self.currentJoinPoint.next.call(self)
 
-@component()
+@injectable()
 class Advice:
     # static data
 

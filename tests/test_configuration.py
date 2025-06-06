@@ -4,10 +4,10 @@ import unittest
 
 from aspyx.configuration import ConfigurationSource, ConfigurationManager, value
 
-from aspyx.di import component, Environment
+from aspyx.di import injectable, Environment
 
 
-@component()
+@injectable()
 class SampleConfigurationSource(ConfigurationSource):
     # constructor
 
@@ -25,7 +25,7 @@ class SampleConfigurationSource(ConfigurationSource):
                 }
             }
 
-@component()
+@injectable()
 class Foo:
     def __init__(self, manager: ConfigurationManager):
         manager.load()
