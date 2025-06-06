@@ -4,8 +4,8 @@ import os
 from typing import Type, TypeVar
 from dotenv import load_dotenv
 
-from aspyx.di import component, Decorators, DecoratorDescriptor, Callable, TypeDescriptor, Environment, \
-    CallableProcessor, Lifecycle
+from aspyx.di import component, Environment, CallableProcessor, Callable, Lifecycle
+from aspyx.reflection import Decorators, DecoratorDescriptor, TypeDescriptor
 
 
 T = TypeVar("T")

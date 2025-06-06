@@ -1,4 +1,4 @@
-from .di import Providers, Environment, ClassInstanceProvider, component, factory, configuration, inject, create, on_init, on_destroy, environmentAware, Factory, PostProcessor
+from .di import CallableProcessor, Callable, Lifecycle, Providers, Environment, ClassInstanceProvider, component, factory, configuration, inject, create, on_init, on_destroy, environmentAware, Factory, PostProcessor
 
 __all__ = [
     "ClassInstanceProvider",
@@ -14,5 +14,6 @@ __all__ = [
     "on_destroy",
     "environmentAware",
     "Factory",
-    "PostProcessor"
+    "PostProcessor",
+    "CallableProcessor", "Callable", "Lifecycle"
 ]
