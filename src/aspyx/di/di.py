@@ -89,7 +89,7 @@ class ClassInstanceProvider(InstanceProvider[T]):
 
             # check constructor
 
-            for param in  TypeDescriptor.forType(self.type).get("__init__").paramTypes:
+            for param in  TypeDescriptor.forType(self.type).getLocalMethod("__init__").paramTypes:
                 provider = Providers.getProvider(param)
                 self.params += 1
                 self.addDependency(provider)
@@ -159,7 +159,7 @@ class FactoryInstanceProvider(InstanceProvider):
 
     @classmethod
     def getFactoryType(cls, clazz):
-        return TypeDescriptor.forType(clazz).get("create").returnType
+        return TypeDescriptor.forType(clazz).getLocalMethod("create").returnType
 
     # constructor
 

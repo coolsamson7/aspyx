@@ -50,7 +50,7 @@ class AspectTarget:
     def matches(self, clazz : Type, func):
         descriptor = TypeDescriptor.forType(clazz)
 
-        methodDescriptor = descriptor.get(func.__name__)
+        methodDescriptor = descriptor.getMethod(func.__name__)
 
         # type
 
@@ -287,7 +287,7 @@ def advice(cls):
     Decorators.add(cls, advice)
 
     for name, member in inspect.getmembers(cls):
-        # if ismethod(member):
+        # if ismethod(member): # TODO WTF
         if not name.startswith("_") and member._advice is not None:
             member._advice._clazz = cls
             Advice.targets.append(member._advice)

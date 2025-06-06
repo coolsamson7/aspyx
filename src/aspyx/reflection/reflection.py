@@ -12,7 +12,7 @@ class DecoratorDescriptor:
 
 
     def __str__(self):
-        return f"@({self.decorator.__name__})" # args?
+        return f"@{self.decorator.__name__}({','.join(self.args)})"
 
 class Decorators:
     @classmethod
@@ -25,7 +25,7 @@ class Decorators:
 
     @classmethod
     def get(cls, func) -> list[DecoratorDescriptor]:
-        return  getattr(func, '__decorators__', [])
+        return getattr(func, '__decorators__', [])
 
 class TypeDescriptor:
     # inner class
@@ -35,7 +35,12 @@ class TypeDescriptor:
             self.clazz = cls
             self.method = method
             self.decorators: list[DecoratorDescriptor] = Decorators.get(method)
-            self.paramTypes = []
+            self.paramTypes : list[Type] = []
+
+            try:
+                get_type_hints(method)
+            except TypeError as e:
+                print(e)
 
             type_hints = get_type_hints(method)
             sig = signature(method)
@@ -81,13 +86,28 @@ class TypeDescriptor:
         self.cls = cls
         self.decorators = Decorators.get(cls)
         self.methods: Dict[str, TypeDescriptor.MethodDescriptor] = dict()
-        for name, member in getmembers(cls, predicate=inspect.isfunction):
-            self.methods[name] = TypeDescriptor.MethodDescriptor(cls, member)
+        self.localMethods: Dict[str, TypeDescriptor.MethodDescriptor] = dict()
 
-    def get_local_members(cls):  # TODO
+        # check superclasses
+
+        self.superTypes = [TypeDescriptor.forType(x) for x in cls.__bases__ if not x is object]
+
+        for superType in self.superTypes:
+            self.methods = self.methods | superType.methods
+
+        # methods
+
+        for name, member in self._get_local_members(cls):
+            method = TypeDescriptor.MethodDescriptor(cls, member)
+            self.localMethods[name] = method
+            self.methods[name] = method
+
+    # internal
+
+    def _get_local_members(self, cls):
         return [
             (name, value)
-            for name, value in inspect.getmembers(cls)
+            for name, value in getmembers(cls, predicate=inspect.isfunction)
             if name in cls.__dict__
         ]
 
@@ -100,5 +120,8 @@ class TypeDescriptor:
 
         return False
 
-    def get(self, name) -> MethodDescriptor:
+    def getLocalMethod(self, name) -> MethodDescriptor:
+        return self.localMethods[name]
+
+    def getMethod(self, name) -> MethodDescriptor:
         return self.methods[name]

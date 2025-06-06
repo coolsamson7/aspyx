@@ -1,16 +1,35 @@
 from __future__ import annotations
 
-import inspect
-from inspect import signature, getmembers
-from typing import Callable, get_type_hints, Type, Dict
-
-
-import logging
 import unittest
 
+from aspyx.reflection import TypeDescriptor
+
+
+class Base:
+    def __init__(self):
+        pass
+
+    def base(self, message: str) -> str:
+        pass
+
+    def noTypeHints(self, message):
+        pass
+
+class Derived(Base):
+    def __init__(self):
+        super().__init__()
+
+    def derived(self, message: str) -> str:
+        pass
+
 class TestReflection(unittest.TestCase):
-    def test_1(self):
-       self.assertEqual("hello", "hello")
+    def test(self):
+        derivedDescriptor = TypeDescriptor.forType(Derived)
+
+        self.assertIsNotNone(derivedDescriptor.getMethod("derived").returnType, str)
+
+
+        print(derivedDescriptor)
 
 
 if __name__ == '__main__':
