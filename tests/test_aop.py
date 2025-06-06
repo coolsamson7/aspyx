@@ -18,7 +18,7 @@ def transactional():
 
 @component()
 class Bar:
-    def __init__(self):# TODO , foo: Foo):
+    def __init__(self):
         pass
 
     @transactional()

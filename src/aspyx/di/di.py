@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import inspect
 from abc import abstractmethod, ABC
 from enum import Enum, auto
-from typing import Type, Dict, TypeVar, Generic, get_type_hints, Optional
+from typing import Type, Dict, TypeVar, Generic, Optional
 
 from aspyx.reflection import Decorators, TypeDescriptor, DecoratorDescriptor
 
@@ -54,11 +53,17 @@ class SingletonProvider(InstanceProvider):
         self.value = None
 
     def resolve(self, context: Providers.Context) -> InstanceProvider:
-        self.provider.resolve(context)
+        if self.dependencies is None:
+            self.provider.resolve(context)
 
-        self.dependencies = self.provider.dependencies
+            self.dependencies = self.provider.dependencies
+        else:  # check if the dependencies crate a cycle
+            context.add(*self.dependencies)
 
         return self
+
+    def __str__(self):
+        return f"SingletonProvider({self.provider})"
 
     def create(self, environment: Environment):
         if self.value is None:
@@ -84,14 +89,11 @@ class ClassInstanceProvider(InstanceProvider[T]):
 
             # check constructor
 
-            type_hints = get_type_hints(self.type.__init__)
-            sig = inspect.signature(self.type.__init__)
-
-            for name, param in sig.parameters.items():
-                if name != 'self':
-                    provider = Providers.getProvider(type_hints[name])
-                    self.params += 1
-                    self.addDependency(provider.resolve(context))
+            for param in  TypeDescriptor.forType(self.type).get("__init__").paramTypes:
+                provider = Providers.getProvider(param)
+                self.params += 1
+                self.addDependency(provider)
+                provider.resolve(context)
 
             # check @inject
 
@@ -100,10 +102,10 @@ class ClassInstanceProvider(InstanceProvider[T]):
                     # todo error handling
                     provider = Providers.getProvider(method.paramTypes[0])
 
-                    self.addDependency(provider.resolve(context))
+                    self.addDependency(provider)
+                    provider.resolve(context)
                     pass
-        else:
-            # check if the dependencies create a cycle
+        else: # check if the dependencies create a cycle
             context.add(*self.dependencies)
 
         return self
@@ -134,10 +136,10 @@ class FunctionInstanceProvider(InstanceProvider[T]):
 
             context.add(self)
 
-            self.addDependency(Providers.getProvider(self.clazz).resolve(context))
-        else:
-            # check if the dependencies crate a cycle
-
+            provider = Providers.getProvider(self.clazz)
+            self.addDependency(provider)
+            provider.resolve(context)
+        else: # check if the dependencies crate a cycle
             context.add(*self.dependencies)
 
         return self
@@ -148,6 +150,9 @@ class FunctionInstanceProvider(InstanceProvider[T]):
         instance = self.method(configuration)
 
         return environment.created(instance)
+
+    def __str__(self):
+        return f"FunctionInstanceProvider({self.clazz.__name__}.{self.method.__name__} -> {self.type.__name__})"
 
 class FactoryInstanceProvider(InstanceProvider):
     # class method
@@ -171,16 +176,20 @@ class FactoryInstanceProvider(InstanceProvider):
 
             context.add(self)
 
-            self.addDependency(Providers.getProvider(self.factory).resolve(context))
-        else:
-            # check if the dependencies crate a cycle
-
+            provider = Providers.getProvider(self.factory)
+            self.addDependency(provider)
+            provider.resolve(context)
+        else: # check if the dependencies crate a cycle
             context.add(*self.dependencies)
 
         return self
 
     def create(self, environment: Environment):
         return environment.created(self.getArguments(environment)[0].create())
+
+    def __str__(self):
+        return f"FactoryInstanceProvider({self.factory.__name__} -> {self.type.__name__})"
+
 
 class Lifecycle(Enum):
     ON_CREATE = auto()
@@ -221,16 +230,34 @@ class Providers:
 
         def add(self, *providers: InstanceProvider):
             for provider in providers:
-                if provider in self.dependencies:
-                    raise InjectorError("circular dependency detected")
+                if next((p for p in self.dependencies if p.type is provider.type), None) is not None:
+                    raise InjectorError(self.cycleReport(provider))
 
                 self.dependencies.append(provider)
+
+        def cycleReport(self, provider: InstanceProvider):
+            cycle = ""
+
+            first = True
+            for p in self.dependencies:
+                if not first:
+                    cycle += " -> "
+
+                first = False
+
+                cycle += f"{p.type.__name__}"
+
+            cycle += f" -> {provider.type.__name__}"
+
+            return cycle
 
 
     # class properties
 
     providers : Dict[Type,InstanceProvider] = dict()
     cache: Dict[Type, InstanceProvider] = dict()
+
+    resolved = False
 
     @classmethod
     def register(cls, provider: InstanceProvider):
@@ -274,8 +301,11 @@ class Providers:
 
     @classmethod
     def resolve(cls):
-        for provider in Providers.providers.values():
-            provider.resolve(Providers.Context())
+        if not Providers.resolved:
+            Providers.resolved = True
+
+            for provider in Providers.providers.values():
+                provider.resolve(Providers.Context())
 
     @classmethod
     def getProvider(cls, type: Type) -> InstanceProvider:
