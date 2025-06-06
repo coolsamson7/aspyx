@@ -227,7 +227,7 @@ class Advice:
 
         return aspects
 
-    def joinPoints4(self, instance) -> Dict[Callable,JoinPoints]: #todo
+    def joinPoints4(self, instance) -> Dict[Callable,JoinPoints]:
         clazz = type(instance)
 
         result = self.cache.get(clazz, None)
@@ -279,6 +279,11 @@ class Advice:
         else:
             return None
 
+def sanityCheck(clazz: Type, name: str):
+    m = TypeDescriptor.forType(clazz).getMethod(name)
+    if len(m.paramTypes) != 1 or m.paramTypes[0] != Invocation:
+        raise Exception(f"Method {clazz.__name__}.{name} expected to have one parameter of type Invocation")
+
 # decorators
 
 def advice(cls):
@@ -287,9 +292,9 @@ def advice(cls):
     Decorators.add(cls, advice)
 
     for name, member in inspect.getmembers(cls):
-        # if ismethod(member): # TODO WTF
         if not name.startswith("_") and member._advice is not None:
             member._advice._clazz = cls
+            sanityCheck(cls, name)
             Advice.targets.append(member._advice)
 
     return cls

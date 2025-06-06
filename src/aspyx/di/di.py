@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+import threading
 from abc import abstractmethod, ABC
 from enum import Enum, auto
 from typing import Type, Dict, TypeVar, Generic, Optional
@@ -51,6 +53,7 @@ class SingletonProvider(InstanceProvider):
 
         self.provider = provider
         self.value = None
+        self._lock = threading.Lock()
 
     def resolve(self, context: Providers.Context) -> InstanceProvider:
         if self.dependencies is None:
@@ -67,7 +70,8 @@ class SingletonProvider(InstanceProvider):
 
     def create(self, environment: Environment):
         if self.value is None:
-            self.value = self.provider.create(environment)
+            with self._lock:
+                self.value = self.provider.create(environment)
 
         return self.value
 
@@ -115,6 +119,8 @@ class ClassInstanceProvider(InstanceProvider[T]):
         return self
 
     def create(self, environment: Environment):
+        Environment.logger.debug(f"create class {self.type.__qualname__}")
+
         args = self.getArguments(environment)[:self.params]
         return environment.created(self.type(*args))
 
@@ -149,6 +155,8 @@ class FunctionInstanceProvider(InstanceProvider[T]):
         return self
 
     def create(self, environment: Environment):
+        Environment.logger.debug(f"create class {self.type.__qualname__}")
+
         configuration = self.getArguments(environment)[0]
 
         instance = self.method(configuration)
@@ -189,6 +197,8 @@ class FactoryInstanceProvider(InstanceProvider):
         return self
 
     def create(self, environment: Environment):
+        Environment.logger.debug(f"create class {self.type.__qualname__}")
+
         return environment.created(self.getArguments(environment)[0].create())
 
     def __str__(self):
@@ -265,6 +275,8 @@ class Providers:
 
     @classmethod
     def register(cls, provider: InstanceProvider):
+        Environment.logger.debug(f"register {provider.type.__qualname__}")
+
         # local functions
 
         def isInjectable(type: Type) -> bool:
@@ -313,7 +325,7 @@ class Providers:
 
     @classmethod
     def getProvider(cls, type: Type) -> InstanceProvider:
-        provider = Providers.cache.get(type)
+        provider = Providers.cache.get(type, None)
         if provider is None:
             raise InjectorError(f"{type.__name__} not registered as injectable")
 
@@ -400,6 +412,10 @@ class Environment:
 
         def __str__(self):
             return f"Instance({self.instance.__class__})"
+
+    # static data
+
+    logger = logging.getLogger(__name__)  # __name__ = module name
 
     instance : 'Environment' = None
 

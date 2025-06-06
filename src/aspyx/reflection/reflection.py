@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import inspect
 from inspect import signature, getmembers
-from typing import Callable, get_type_hints, Type, Dict
+from typing import Callable, get_type_hints, Type, Dict, Optional
 from weakref import WeakKeyDictionary
 
 
@@ -120,8 +120,8 @@ class TypeDescriptor:
 
         return False
 
-    def getLocalMethod(self, name) -> MethodDescriptor:
+    def getLocalMethod(self, name) -> Optional[MethodDescriptor]:
         return self.localMethods.get(name, None)
 
-    def getMethod(self, name) -> MethodDescriptor:
+    def getMethod(self, name) -> Optional[MethodDescriptor]:
         return self.methods.get(name, None)
