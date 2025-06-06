@@ -42,7 +42,7 @@ class Bar:
 
 @factory()
 class TestFactory(Factory[Foo]):
-    def __init__(self): # TODO will it break without it?
+    def __init__(self):
         pass
 
     def create(self) -> Foo:
@@ -53,7 +53,7 @@ class TestFactory(Factory[Foo]):
 class Configuration:
     # constructor
 
-    def __init__(self): # TODO will it break without it?
+    def __init__(self):
         pass
 
     # create some beans

@@ -3,6 +3,7 @@ from __future__ import annotations
 import inspect
 from inspect import signature, getmembers
 from typing import Callable, get_type_hints, Type, Dict
+from weakref import WeakKeyDictionary
 
 
 class DecoratorDescriptor:
@@ -37,11 +38,6 @@ class TypeDescriptor:
             self.decorators: list[DecoratorDescriptor] = Decorators.get(method)
             self.paramTypes : list[Type] = []
 
-            try:
-                get_type_hints(method)
-            except TypeError as e:
-                print(e)
-
             type_hints = get_type_hints(method)
             sig = signature(method)
 
@@ -70,14 +66,18 @@ class TypeDescriptor:
 
     # class methods
 
+    # class properties
+
+    _cache = WeakKeyDictionary()
+
+    # class methods
+
     @classmethod
     def forType(cls, clazz: Type) -> TypeDescriptor:
-        descriptor = getattr(clazz, '_descriptor', None)
-
+        descriptor = cls._cache.get(clazz)
         if descriptor is None:
             descriptor = TypeDescriptor(clazz)
-            clazz._descriptor = descriptor
-
+            cls._cache[clazz] = descriptor
         return descriptor
 
     # constructor
@@ -121,11 +121,7 @@ class TypeDescriptor:
         return False
 
     def getLocalMethod(self, name) -> MethodDescriptor:
-        m = self.localMethods.get(name, None)
-        if m is None:
-            print("kk")
-
-        return self.localMethods[name]
+        return self.localMethods.get(name, None)
 
     def getMethod(self, name) -> MethodDescriptor:
         return self.methods.get(name, None)

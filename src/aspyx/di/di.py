@@ -89,11 +89,11 @@ class ClassInstanceProvider(InstanceProvider[T]):
 
             # check constructor
 
-            init = TypeDescriptor.forType(self.type).getLocalMethod("__init__")
+            init = TypeDescriptor.forType(self.type).getMethod("__init__")
             if init is None:
-                print("kk")
+                raise InjectorError(f"{self.type.__name__} does not implement __init__")
 
-            for param in TypeDescriptor.forType(self.type).getLocalMethod("__init__").paramTypes:
+            for param in init.paramTypes:
                 provider = Providers.getProvider(param)
                 self.params += 1
                 self.addDependency(provider)
@@ -315,7 +315,7 @@ class Providers:
     def getProvider(cls, type: Type) -> InstanceProvider:
         provider = Providers.cache.get(type)
         if provider is None:
-            raise InjectorError(f"{type} not registered")
+            raise InjectorError(f"{type.__name__} not registered as injectable")
 
         return provider
 

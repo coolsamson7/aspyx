@@ -4,7 +4,6 @@ import unittest
 
 from aspyx.reflection import TypeDescriptor
 
-
 class Base:
     def __init__(self):
         pass
