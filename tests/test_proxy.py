@@ -20,15 +20,6 @@ class TestProxy(unittest.TestCase):
         answer = proxy.say("hello")
         self.assertEqual(answer, "hello")
 
-def suite():
-    suite = unittest.TestSuite()
-
-    suite.addTest(unittest.makeSuite(TestProxy))
-
-    return suite
-
 
 if __name__ == '__main__':
-    #unittest.main()
-    runner = unittest.TextTestRunner()
-    runner.run(suite())
+    unittest.main()

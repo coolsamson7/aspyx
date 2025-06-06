@@ -33,17 +33,10 @@ class Foo:
 
 class TestConfiguration(unittest.TestCase):
     def testInjection(self):
-       env = Environment()
-
-def suite():
-    suite = unittest.TestSuite()
-
-    suite.addTest(unittest.makeSuite(TestConfiguration))
-
-    return suite
+        env = Environment()
+        foo = env.get(Foo)
+        self.assertEqual(foo.value, 2)
 
 
 if __name__ == '__main__':
-    #unittest.main()
-    runner = unittest.TextTestRunner()
-    runner.run(suite())
+    unittest.main()
