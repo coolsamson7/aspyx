@@ -5,7 +5,7 @@ from abc import abstractmethod, ABC
 from enum import Enum, auto
 from typing import Type, Dict, TypeVar, Generic, get_type_hints, Optional
 
-from test.core.reflection import Decorators, TypeDescriptor, DecoratorDescriptor
+from aspyx.reflection import Decorators, TypeDescriptor, DecoratorDescriptor
 
 T = TypeVar("T")
 

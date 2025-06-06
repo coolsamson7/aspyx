@@ -1,11 +1,9 @@
-from .proxy import DynamicProxy, InvocationHandler, Invocation
-from.reflection import Decorators, TypeDescriptor
+from .proxy import DynamicProxy
+from .reflection import Decorators, TypeDescriptor, DecoratorDescriptor
 
 __all__ = [
     "DynamicProxy",
-    "InvocationHandler",
-    "Invocation",
-
-    "Decorators"
+    "Decorators",
+    "DecoratorDescriptor"
     "TypeDescriptor"
 ]

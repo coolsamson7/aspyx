@@ -1,7 +1,10 @@
-from .aop import before, after, error, advice
+from .aop import before, after, around, error, advice, methods, Invocation
 __all__ = [
     "before",
     "after",
+    "around",
     "error",
-    "advice"
+    "advice",
+    "methods",
+    "Invocation"
 ]
