@@ -23,7 +23,7 @@ class Derived(Base):
 
 class TestReflection(unittest.TestCase):
     def test(self):
-        derivedDescriptor = TypeDescriptor.forType(Derived)
+        derivedDescriptor = TypeDescriptor.for_type(Derived)
 
         self.assertIsNotNone(derivedDescriptor.get_method("derived").returnType, str)
 

@@ -5,9 +5,6 @@ from inspect import signature, getmembers
 from typing import Callable, get_type_hints, Type, Dict, Optional
 from weakref import WeakKeyDictionary
 
-from pydantic._internal._decorators import Decorator
-
-
 class DecoratorDescriptor:
     def __init__(self, decorator, *args):
         self.decorator = decorator
@@ -75,7 +72,7 @@ class TypeDescriptor:
     # class methods
 
     @classmethod
-    def forType(cls, clazz: Type) -> TypeDescriptor:
+    def for_type(cls, clazz: Type) -> TypeDescriptor:
         descriptor = cls._cache.get(clazz)
         if descriptor is None:
             descriptor = TypeDescriptor(clazz)
@@ -92,7 +89,7 @@ class TypeDescriptor:
 
         # check superclasses
 
-        self.superTypes = [TypeDescriptor.forType(x) for x in cls.__bases__ if not x is object]
+        self.superTypes = [TypeDescriptor.for_type(x) for x in cls.__bases__ if not x is object]
 
         for superType in self.superTypes:
             self.methods = self.methods | superType.methods

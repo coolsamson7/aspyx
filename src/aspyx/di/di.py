@@ -122,7 +122,7 @@ class ClassInstanceProvider(InstanceProvider[T]):
 
             # check constructor
 
-            init = TypeDescriptor.forType(self.type).get_method("__init__")
+            init = TypeDescriptor.for_type(self.type).get_method("__init__")
             if init is None:
                 raise InjectorError(f"{self.type.__name__} does not implement __init__")
 
@@ -134,7 +134,7 @@ class ClassInstanceProvider(InstanceProvider[T]):
 
             # check @inject
 
-            for method in TypeDescriptor.forType(self.type).methods.values():
+            for method in TypeDescriptor.for_type(self.type).methods.values():
                 if method.has_decorator(inject):
                     for param in method.paramTypes:
                         provider = Providers.getProvider(param)
@@ -204,7 +204,7 @@ class FactoryInstanceProvider(InstanceProvider):
 
     @classmethod
     def getFactoryType(cls, clazz):
-        return TypeDescriptor.forType(clazz).get_local_method("create").returnType
+        return TypeDescriptor.for_type(clazz).get_local_method("create").returnType
 
     # constructor
 
@@ -377,7 +377,7 @@ class Providers:
         return provider
 
 def registerFactories(cls: Type):
-    descriptor = TypeDescriptor.forType(cls)
+    descriptor = TypeDescriptor.for_type(cls)
 
     for method in descriptor.methods.values():
         if method.has_decorator(create):
@@ -477,6 +477,7 @@ class Environment:
     __slots__ = [
         "providers",
         "lifecycleProcessors",
+        "parent",
         "instances"
     ]
 
@@ -485,8 +486,14 @@ class Environment:
     def __init__(self, conf: Type, parent : Optional[Environment] = None):
         # initialize
 
+        self.parent = parent
         self.providers: Dict[Type, InstanceProvider] = dict()
         self.lifecycleProcessors: list[LifecycleProcessor] = []
+
+        if self.parent is not None:
+            self.providers |= self.parent.providers
+            self.lifecycleProcessors += self.parent.lifecycleProcessors
+
         self.instances: list[Environment.Instance] = []
 
         Environment.instance = self
@@ -510,7 +517,7 @@ class Environment:
 
                 # sanity check
 
-                decorator = TypeDescriptor.forType(conf).get_decorator(configuration)
+                decorator = TypeDescriptor.for_type(conf).get_decorator(configuration)
                 if decorator is None:
                     raise InjectorError(f"{conf.__name__} is not a configuration class")
 
@@ -529,7 +536,9 @@ class Environment:
 
         # load configurations
 
-        loadConfiguration(DIConfiguration) # internal stuff
+        if parent is None:
+            loadConfiguration(DIConfiguration) # internal stuff
+
         loadConfiguration(conf)
 
         # construct eager objects
@@ -573,7 +582,7 @@ class Environment:
     def get(self, type: Type[T]) -> T:
         return self.providers[type].create(self) # TODO cache, etc.
 
-class Callable:
+class LifecycleCallable:
     __slots__ = ["decorator", "lifecycle"]
 
     def __init__(self, decorator, processor: CallableProcessor, lifecycle: Lifecycle):
@@ -590,17 +599,21 @@ class CallableProcessor(LifecycleProcessor):
     # local classes
 
     class MethodCall:
-        __slots__ = ["decorator", "method", "callable"]
+        __slots__ = [
+            "decorator",
+            "method",
+            "lifecycleCallable"
+        ]
 
         # constructor
 
-        def __init__(self, method: TypeDescriptor.MethodDescriptor, decorator: DecoratorDescriptor, callable: Callable):
+        def __init__(self, method: TypeDescriptor.MethodDescriptor, decorator: DecoratorDescriptor, lifecycleCallable: LifecycleCallable):
             self.decorator = decorator
             self.method = method
-            self.callable = callable
+            self.lifecycleCallable = lifecycleCallable
 
         def execute(self, instance, environment: Environment):
-            self.method.method(instance, *self.callable.args(self.decorator, self.method, environment))
+            self.method.method(instance, *self.lifecycleCallable.args(self.decorator, self.method, environment))
 
         def __str__(self):
             return f"MethodCall({self.method.method.__name__})"
@@ -610,11 +623,11 @@ class CallableProcessor(LifecycleProcessor):
     def __init__(self):
         super().__init__()
 
-        self.callables : Dict[object,Callable] = dict()
+        self.callables : Dict[object,LifecycleCallable] = dict()
         self.cache : Dict[Type,list[CallableProcessor.MethodCall]]  = dict()
 
     def computeCallables(self, type: Type) -> list[CallableProcessor.MethodCall] :
-        descriptor = TypeDescriptor.forType(type)
+        descriptor = TypeDescriptor.for_type(type)
 
         result = []
 
@@ -633,7 +646,7 @@ class CallableProcessor(LifecycleProcessor):
 
         return callables
 
-    def register(self, callable: Callable):
+    def register(self, callable: LifecycleCallable):
         self.callables[callable.decorator] = callable
 
     # implement
@@ -641,25 +654,25 @@ class CallableProcessor(LifecycleProcessor):
     def processLifecycle(self, lifecycle: Lifecycle, instance: object, environment: Environment) -> object:
         callables = self.callablesFor(type(instance))
         for callable in callables:
-            if callable.callable.lifecycle is lifecycle:
+            if callable.lifecycleCallable.lifecycle is lifecycle:
                 callable.execute(instance, environment)
 
 @injectable()
-class OnInitCallable(Callable):
+class OnInitLifecycleCallable(LifecycleCallable):
     __slots__ = []
 
     def __init__(self, processor: CallableProcessor):
         super().__init__(on_init, processor, Lifecycle.ON_CREATE)
 
 @injectable()
-class OnDestroyCallable(Callable):
+class OnDestroyLifecycleCallable(LifecycleCallable):
     __slots__ = []
 
     def __init__(self, processor: CallableProcessor):
         super().__init__(on_destroy, processor, Lifecycle.ON_DESTROY)
 
 @injectable()
-class EnvironmentAwareCallable(Callable):
+class EnvironmentAwareLifecycleCallable(LifecycleCallable):
     __slots__ = []
 
     def __init__(self, processor: CallableProcessor):
@@ -669,7 +682,7 @@ class EnvironmentAwareCallable(Callable):
         return [environment]
 
 @injectable()
-class InjectCallable(Callable):
+class InjectLifecycleCallable(LifecycleCallable):
     __slots__ = []
 
     def __init__(self, processor: CallableProcessor):

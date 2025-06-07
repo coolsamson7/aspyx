@@ -6,7 +6,7 @@ from typing import Dict
 
 from aspyx.di import injectable, on_init, on_destroy, inject_environment, inject, Factory, create, configuration, Environment, PostProcessor, factory
 from di_import import ImportConfiguration, ImportedClass
-from sub_import import SubImportConfiguration
+from sub_import import SubImportConfiguration, Sub
 
 # not here
 
@@ -95,6 +95,8 @@ class TestInject(unittest.TestCase):
         foo = env.get(Foo)
 
         env2 = Environment(SubImportConfiguration, parent=env)
+
+        sub = env2.get(Sub)
 
         env.shutdown()
 

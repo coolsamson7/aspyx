@@ -4,7 +4,7 @@ import os
 from typing import Type, TypeVar
 from dotenv import load_dotenv
 
-from aspyx.di import injectable, Environment, CallableProcessor, Callable, Lifecycle, configuration
+from aspyx.di import injectable, Environment, CallableProcessor, LifecycleCallable, Lifecycle, configuration
 from aspyx.reflection import Decorators, DecoratorDescriptor, TypeDescriptor
 
 
@@ -134,7 +134,7 @@ def value(key: str, default=None):
     return decorator
 
 @injectable()
-class ConfigurationCallable(Callable):
+class ConfigurationLifecycleCallable(LifecycleCallable):
     def __init__(self, processor: CallableProcessor,  manager: ConfigurationManager):
         super().__init__(value, processor, Lifecycle.ON_CREATE)
 
