@@ -21,7 +21,7 @@ class Factory(ABC, Generic[T]):
     def create(self) -> T:
         pass
 
-class InjectorError(Exception):
+class InjectorException(Exception):
     """
     Exception raised for errors in the injector."""
     pass
@@ -139,7 +139,7 @@ class ClassInstanceProvider(InstanceProvider[T]):
 
             init = TypeDescriptor.for_type(self.type).get_method("__init__")
             if init is None:
-                raise InjectorError(f"{self.type.__name__} does not implement __init__")
+                raise InjectorException(f"{self.type.__name__} does not implement __init__")
 
             for param in init.paramTypes:
                 provider = Providers.getProvider(param)
@@ -162,7 +162,7 @@ class ClassInstanceProvider(InstanceProvider[T]):
         return self
 
     def create(self, environment: Environment):
-        Environment.logger.debug(f"create class {self.type.__qualname__}")
+        Environment.logger.debug(f"{self} create class {self.type.__qualname__}")
 
         args = self.getArguments(environment)[:self.params]
         return environment.created(self.type(*args))
@@ -205,7 +205,7 @@ class FunctionInstanceProvider(InstanceProvider[T]):
         return self
 
     def create(self, environment: Environment):
-        Environment.logger.debug(f"create class {self.type.__qualname__}")
+        Environment.logger.debug(f"{self} create class {self.type.__qualname__}")
 
         configuration = self.getArguments(environment)[0]
 
@@ -252,7 +252,7 @@ class FactoryInstanceProvider(InstanceProvider):
         return self
 
     def create(self, environment: Environment):
-        Environment.logger.debug(f"create class {self.type.__qualname__}")
+        Environment.logger.debug(f"{self} create class {self.type.__qualname__}")
 
         return environment.created(self.getArguments(environment)[0].create())
 
@@ -267,12 +267,12 @@ class Lifecycle(Enum):
 
     __slots__ = []
 
-    ON_CREATE = auto()
+    ON_INIT = auto()
     ON_DESTROY = auto()
 
 class LifecycleProcessor(ABC):
     """
-    A LifecycleProcessor i used to perform any side effects on managed objects druing their lifecycle.
+    A LifecycleProcessor is used to perform any side effects on managed objects during their lifecycle.
     """
     __slots__ = []
 
@@ -289,7 +289,7 @@ class LifecycleProcessor(ABC):
 
 class PostProcessor(LifecycleProcessor):
     """
-    Base class for custom post processors that are executeed after object creation.
+    Base class for custom post processors that are executed after object creation.
     """
     __slots__ = []
 
@@ -302,7 +302,7 @@ class PostProcessor(LifecycleProcessor):
         pass
 
     def processLifecycle(self, lifecycle: Lifecycle, instance: object, environment: Environment) -> object:
-        if lifecycle == Lifecycle.ON_CREATE:
+        if lifecycle == Lifecycle.ON_INIT:
             self.process(instance)
 
 
@@ -321,7 +321,7 @@ class Providers:
         def add(self, *providers: InstanceProvider):
             for provider in providers:
                 if next((p for p in self.dependencies if p.type is provider.type), None) is not None:
-                    raise InjectorError(self.cycleReport(provider))
+                    raise InjectorException(self.cycleReport(provider))
 
                 self.dependencies.append(provider)
 
@@ -351,7 +351,7 @@ class Providers:
 
     @classmethod
     def register(cls, provider: InstanceProvider):
-        Environment.logger.debug(f"register {provider.type.__qualname__}")
+        Environment.logger.debug(f"register provider {provider.type.__qualname__}({provider.type.__name__})")
 
         # local functions
 
@@ -370,7 +370,7 @@ class Providers:
                 Providers.cache[type] = provider
 
             else:
-                raise InjectorError(f"{type} already registered")
+                raise InjectorException(f"{type} already registered")
 
             # recursion
 
@@ -410,7 +410,7 @@ class Providers:
     def getProvider(cls, type: Type) -> InstanceProvider:
         provider = Providers.cache.get(type, None)
         if provider is None:
-            raise InjectorError(f"{type.__name__} not registered as injectable")
+            raise InjectorException(f"{type.__name__} not registered as injectable")
 
         return provider
 
@@ -440,7 +440,7 @@ def injectable(eager=True, singleton=True):
 
 def factory(eager=True, singleton=True):
     """
-    Dcorator that needs to be used on a class that implements the Factory interface.
+    Decorator that needs to be used on a class that implements the Factory interface.
     """
     def decorator(cls):
         Decorators.add(cls, factory)
@@ -454,7 +454,7 @@ def factory(eager=True, singleton=True):
 
 def create(eager=True, singleton=True):
     """
-    Any method that is annotated with @create will be registered as a factory method.
+    Any method annotated with @create will be registered as a factory method.
     """
     def decorator(func):
         Decorators.add(func, create, eager, singleton)
@@ -577,7 +577,7 @@ class Environment:
         loaded = set()
 
         def addProvider(provider: InstanceProvider):
-            Environment.logger.debug(f"\tadd provider {provider.host.__qualname__}")
+            Environment.logger.debug(f"\tadd provider {provider.host.__qualname__}({provider.type.__name__})")
 
             self.providers[provider.type] = Providers.getProvider(provider.type)
 
@@ -591,7 +591,7 @@ class Environment:
 
                 decorator = TypeDescriptor.for_type(conf).get_decorator(configuration)
                 if decorator is None:
-                    raise InjectorError(f"{conf.__name__} is not a configuration class")
+                    raise InjectorException(f"{conf.__name__} is not a configuration class")
 
                 scan = conf.__module__  # maybe add parameters as well
 
@@ -638,13 +638,18 @@ class Environment:
 
         # execute processors
 
-        return self.executeProcessors(Lifecycle.ON_CREATE, instance)
+        return self.executeProcessors(Lifecycle.ON_INIT, instance)
 
     # public
 
-    def shutdown(self):
+    def destroy(self):
+        """
+        destroy all managed instances by calling the appropriate lifecycle methods
+        """
         for instance in self.instances:
             self.executeProcessors(Lifecycle.ON_DESTROY, instance.instance)
+
+        self.instances.clear() # make the cy happy
 
     def get(self, type: Type[T]) -> T:
         """
@@ -658,12 +663,15 @@ class Environment:
         provider = self.providers.get(type, None) # TODO cache, etc.
         if provider is None:
             Environment.logger.error(f"{type} is not supported")
-            raise InjectorError(f"{type} is not supported")
+            raise InjectorException(f"{type} is not supported")
 
         return provider.create(self)
 
 class LifecycleCallable:
-    __slots__ = ["decorator", "lifecycle"]
+    __slots__ = [
+        "decorator",
+        "lifecycle"
+    ]
 
     def __init__(self, decorator, processor: CallableProcessor, lifecycle: Lifecycle):
         self.decorator = decorator
@@ -742,7 +750,7 @@ class OnInitLifecycleCallable(LifecycleCallable):
     __slots__ = []
 
     def __init__(self, processor: CallableProcessor):
-        super().__init__(on_init, processor, Lifecycle.ON_CREATE)
+        super().__init__(on_init, processor, Lifecycle.ON_INIT)
 
 @injectable()
 class OnDestroyLifecycleCallable(LifecycleCallable):
@@ -756,7 +764,7 @@ class EnvironmentAwareLifecycleCallable(LifecycleCallable):
     __slots__ = []
 
     def __init__(self, processor: CallableProcessor):
-        super().__init__(inject_environment, processor, Lifecycle.ON_CREATE)
+        super().__init__(inject_environment, processor, Lifecycle.ON_INIT)
 
     def args(self, decorator: DecoratorDescriptor, method: TypeDescriptor.MethodDescriptor, environment: Environment):
         return [environment]
@@ -766,7 +774,7 @@ class InjectLifecycleCallable(LifecycleCallable):
     __slots__ = []
 
     def __init__(self, processor: CallableProcessor):
-        super().__init__(inject, processor, Lifecycle.ON_CREATE)
+        super().__init__(inject, processor, Lifecycle.ON_INIT)
 
     # override
 

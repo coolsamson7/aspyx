@@ -1,16 +1,19 @@
 from __future__ import annotations
 
+import time
 import logging
 import unittest
 from typing import Dict
 
 from aspyx.di import injectable, on_init, on_destroy, inject_environment, inject, Factory, create, configuration, Environment, PostProcessor, factory
 from di_import import ImportConfiguration, ImportedClass
-from sub_import import SubImportConfiguration, Sub
 
 # not here
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(asctime)s] %(levelname)s in %(filename)s:%(lineno)d - %(message)s'
+)
 
 def configure_logging(levels: Dict[str, int]) -> None:
     for name in levels:
@@ -88,18 +91,12 @@ class SimpleConfiguration:
     def create(self) -> Baz:
         return Baz()
 
-@configuration(imports=[ImportConfiguration])
+@configuration(imports=[SimpleConfiguration, ImportConfiguration])
 class Configuration:
     # constructor
 
     def __init__(self):
         pass
-
-    # create some beans
-
-    @create()
-    def create(self) -> Baz:
-        return Baz()
 
 class TestInject(unittest.TestCase):
 
@@ -137,9 +134,20 @@ class TestInject(unittest.TestCase):
 
         bar = env.get(Bar)
 
-        env.shutdown()
+        env.destroy()
 
         self.assertEqual(bar.destroyed, True)
+
+    def test_perfomance(self):
+        env = Environment(SimpleConfiguration)
+
+        start = time.perf_counter()
+        for _ in range(1000000):
+            bar = env.get(Bar)
+        end = time.perf_counter()
+
+        avg_ms = ((end - start) / 1000000) * 1000
+        print(f"Average time per Bar creation: {avg_ms:.3f} ms")
 
 
 if __name__ == '__main__':

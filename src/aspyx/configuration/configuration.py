@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 import os
 from typing import Type, TypeVar
 from dotenv import load_dotenv
@@ -7,14 +8,22 @@ from dotenv import load_dotenv
 from aspyx.di import injectable, Environment, CallableProcessor, LifecycleCallable, Lifecycle, configuration
 from aspyx.reflection import Decorators, DecoratorDescriptor, TypeDescriptor
 
-
 T = TypeVar("T")
+
+class ConfigurationException(Exception):
+    """
+    Exception raised for errors in the configuration logic.
+    """
+    pass
 
 @injectable()
 class ConfigurationManager:
     """
     ConfigurationManager is responsible for managing configuration sources and loading configuration data.
     """
+
+    __slots__ = ["sources", "_data", "coercions"]
+
     # constructor
 
     def __init__(self):
@@ -54,7 +63,7 @@ class ConfigurationManager:
             self._data = merge_dicts(self._data, source.load())
 
     def get(self, path: str, type: Type[T], default=None) -> T:
-        def value(path: str, default=None) -> T:
+        def resolve_value(path: str, default=None) -> T:
             keys = path.split(".")
             current = self._data
             for key in keys:
@@ -64,7 +73,7 @@ class ConfigurationManager:
 
             return current
         
-        v = value(path, default)
+        v = resolve_value(path, default)
 
         if isinstance(v, type):
             return v
@@ -73,17 +82,23 @@ class ConfigurationManager:
             try:
                 return self.coercions[type](v)
             except Exception:
-                raise Exception(f"unknown coercion to {type}")
+                raise ConfigurationException(f"error during coercion to {type}")
+        else:
+            raise ConfigurationException(f"unknown coercion to {type}")
 
 
-class ConfigurationSource:
+class ConfigurationSource(ABC):
     """
     A configuration source is a provider of configuration data.
     """
+
+    __slots__ = []
+
     def __init__(self, manager: ConfigurationManager):
         manager._register(self)
         pass
 
+    @abstractmethod
     def load(self) -> dict:
         pass
 
@@ -92,6 +107,9 @@ class EnvConfigurationSource(ConfigurationSource):
     """
     EnvConfigurationSource loads configuration from environment variables.
     """
+
+    __slots__ = []
+
     # constructor
 
     def __init__(self, manager: ConfigurationManager):
@@ -153,7 +171,7 @@ def value(key: str, default=None):
 @injectable()
 class ConfigurationLifecycleCallable(LifecycleCallable):
     def __init__(self, processor: CallableProcessor,  manager: ConfigurationManager):
-        super().__init__(value, processor, Lifecycle.ON_CREATE)
+        super().__init__(value, processor, Lifecycle.ON_INIT)
 
         self.manager = manager
 
