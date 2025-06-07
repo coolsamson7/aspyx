@@ -12,6 +12,9 @@ T = TypeVar("T")
 
 @injectable()
 class ConfigurationManager:
+    """
+    ConfigurationManager is responsible for managing configuration sources and loading configuration data.
+    """
     # constructor
 
     def __init__(self):
@@ -74,6 +77,9 @@ class ConfigurationManager:
 
 
 class ConfigurationSource:
+    """
+    A configuration source is a provider of configuration data.
+    """
     def __init__(self, manager: ConfigurationManager):
         manager._register(self)
         pass
@@ -83,6 +89,9 @@ class ConfigurationSource:
 
 @injectable()
 class EnvConfigurationSource(ConfigurationSource):
+    """
+    EnvConfigurationSource loads configuration from environment variables.
+    """
     # constructor
 
     def __init__(self, manager: ConfigurationManager):
@@ -126,6 +135,14 @@ class EnvConfigurationSource(ConfigurationSource):
 # decorator
 
 def value(key: str, default=None):
+    """
+    Decorator to inject a configuration value into a method.
+
+    Arguments:
+        key (str): The configuration key to inject.
+        default: The default value to use if the key is not found.
+
+    """
     def decorator(func):
         Decorators.add(func, value, key, default)
 

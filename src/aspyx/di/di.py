@@ -11,6 +11,10 @@ from aspyx.reflection import Decorators, TypeDescriptor, DecoratorDescriptor
 T = TypeVar("T")
 
 class Factory(ABC, Generic[T]):
+    """
+    Abstract base class for factories that create insatnces of type T.
+    """
+
     __slots__ = []
 
     @abstractmethod
@@ -18,9 +22,14 @@ class Factory(ABC, Generic[T]):
         pass
 
 class InjectorError(Exception):
+    """
+    Exception raised for errors in the injector."""
     pass
 
 class InstanceProvider(ABC, Generic[T]):
+    """
+    An InstanceProvider is able to create instances of type T.
+    """
     __slots__ = [
         "host",
         "type",
@@ -65,6 +74,8 @@ class InstanceProvider(ABC, Generic[T]):
         pass
 
 class SingletonProvider(InstanceProvider):
+    """
+    A SingletonProvider wraps another InstanceProvider and ensures that only one instance is created."""
     __slots__ = [
         "provider",
         "value",
@@ -101,6 +112,10 @@ class SingletonProvider(InstanceProvider):
         return self.value
 
 class ClassInstanceProvider(InstanceProvider[T]):
+    """
+    A ClassInstanceProvider is able to create instances of type T by calling the class constructor.
+    """
+
     __slots__ = [
         "params"
     ]
@@ -158,6 +173,10 @@ class ClassInstanceProvider(InstanceProvider[T]):
         return f"ClassInstanceProvider({self.type.__name__})"
 
 class FunctionInstanceProvider(InstanceProvider[T]):
+    """
+    A FunctionInstanceProvider is able to create instances of type T by calling specific methods annotated with 'create".
+    """
+
     __slots__ = [
         "method"
     ]
@@ -198,6 +217,10 @@ class FunctionInstanceProvider(InstanceProvider[T]):
         return f"FunctionInstanceProvider({self.host.__name__}.{self.method.__name__} -> {self.type.__name__})"
 
 class FactoryInstanceProvider(InstanceProvider):
+    """
+    A FactoryInstanceProvider is able to create instances of type T by calling registered Factory instances.
+    """
+
     __slots__ = []
 
     # class method
@@ -238,10 +261,19 @@ class FactoryInstanceProvider(InstanceProvider):
 
 
 class Lifecycle(Enum):
+    """
+    This enum defines the lifecycle events that can be processed by lifecycle processors.
+    """
+
+    __slots__ = []
+
     ON_CREATE = auto()
     ON_DESTROY = auto()
 
 class LifecycleProcessor(ABC):
+    """
+    A LifecycleProcessor i used to perform any side effects on managed objects druing their lifecycle.
+    """
     __slots__ = []
 
     # constructor
@@ -256,6 +288,9 @@ class LifecycleProcessor(ABC):
         pass
 
 class PostProcessor(LifecycleProcessor):
+    """
+    Base class for custom post processors that are executeed after object creation.
+    """
     __slots__ = []
 
     # constructor
@@ -272,6 +307,9 @@ class PostProcessor(LifecycleProcessor):
 
 
 class Providers:
+    """
+    The Providers class is a static class that manages the registration and resolution of InstanceProviders.
+    """
     # local class
 
     class Context:
@@ -386,6 +424,9 @@ def registerFactories(cls: Type):
                                                         create_decorator.args[1]))
 
 def injectable(eager=True, singleton=True):
+    """
+    Instances of classes that are annotated with @injectable can be created by an Environment.
+    """
     def decorator(cls):
         Decorators.add(cls, injectable)
 
@@ -398,6 +439,9 @@ def injectable(eager=True, singleton=True):
     return decorator
 
 def factory(eager=True, singleton=True):
+    """
+    Dcorator that needs to be used on a class that implements the Factory interface.
+    """
     def decorator(cls):
         Decorators.add(cls, factory)
 
@@ -409,6 +453,9 @@ def factory(eager=True, singleton=True):
     return decorator
 
 def create(eager=True, singleton=True):
+    """
+    Any method that is annotated with @create will be registered as a factory method.
+    """
     def decorator(func):
         Decorators.add(func, create, eager, singleton)
         return func
@@ -416,6 +463,8 @@ def create(eager=True, singleton=True):
     return decorator
 
 def on_init():
+    """
+    Methods annotated with @on_init will be called when the instance is created."""
     def decorator(func):
         Decorators.add(func, on_init)
         return func
@@ -423,6 +472,9 @@ def on_init():
     return decorator
 
 def on_destroy():
+    """
+    Methods annotated with @on_destroy will be called when the instance is destroyed.
+    """
     def decorator(func):
         Decorators.add(func, on_destroy)
         return func
@@ -430,6 +482,11 @@ def on_destroy():
     return decorator
 
 def configuration(imports: Optional[list[Type]] = None):
+    """
+    This annotation is used to mark configuration classes.
+    Arguments:
+        imports (Optional[list[Type]]): Optional list of imported configuration types
+    """
     def decorator(cls):
         Providers.register(ClassInstanceProvider(cls, True, True))
 
@@ -443,6 +500,9 @@ def configuration(imports: Optional[list[Type]] = None):
     return decorator
 
 def inject():
+    """
+    Methods annotated with @inject will be called with the required dependencies injected.
+    """
     def decorator(func):
         Decorators.add(func, inject)
         return func
@@ -450,6 +510,9 @@ def inject():
     return decorator
 
 def inject_environment():
+    """
+    Methods annotated with @inject_environment will be called with the Environment instance injected.
+    """
     def decorator(func):
         Decorators.add(func, inject_environment)
         return func
@@ -457,6 +520,9 @@ def inject_environment():
     return decorator
 
 class Environment:
+    """
+    Central class that manages the lifecycle of instances and their dependencies.
+    """
     # local class
 
     class Instance:
@@ -482,8 +548,14 @@ class Environment:
     ]
 
     # constructor
-
     def __init__(self, conf: Type, parent : Optional[Environment] = None):
+        """
+        Creates a new Environment instance.
+
+        Args:
+            conf (Type): The configuration class that controls the scanning of managed objects.
+            parent (Optional[Environment]): Optional parent environment, whose objects are inherited.
+        """
         # initialize
 
         self.parent = parent
@@ -546,11 +618,6 @@ class Environment:
         for provider in self.providers.values():
             if provider.eager:
                 provider.create(self)
-
-        #for provider in Providers.providers.values():
-        #    if provider.eager:
-        #        Providers.getProvider(provider.type).create(self) # here we need the singletons...
-
     # internal
 
     def executeProcessors(self, lifecycle: Lifecycle, instance: T) -> T:
@@ -580,7 +647,20 @@ class Environment:
             self.executeProcessors(Lifecycle.ON_DESTROY, instance.instance)
 
     def get(self, type: Type[T]) -> T:
-        return self.providers[type].create(self) # TODO cache, etc.
+        """
+        Return and possibly create a new instance of the given type.
+
+        Arguments:
+            type (Type): The desired type
+
+        Returns: The requested instance
+        """
+        provider = self.providers.get(type, None) # TODO cache, etc.
+        if provider is None:
+            Environment.logger.error(f"{type} is not supported")
+            raise InjectorError(f"{type} is not supported")
+
+        return provider.create(self)
 
 class LifecycleCallable:
     __slots__ = ["decorator", "lifecycle"]

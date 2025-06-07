@@ -103,9 +103,11 @@ class AspectTarget:
         return self
 
 def methods():
+    """
+    Create a new AspectTarget instance to define method aspect targets.
+    """
     return AspectTarget()
 
-##
 
 class JoinPoint:
     __slots__ = [
@@ -158,6 +160,10 @@ class JoinPoints:
     after: list[JoinPoint]
 
 class Invocation:
+    """
+    Invocation stores the relevant data of a single method invocation.
+    It holds the arguments, keyword arguments, result, error, and the join points that define the aspect behavior.
+    """
     # properties
 
     __slots__ = [
@@ -313,6 +319,10 @@ def sanityCheck(clazz: Type, name: str):
 # decorators
 
 def advice(cls):
+    """
+    Classes decoarted with @advice are treated as aspect classes.
+    They can contain methods decorated with @before, @after, @around, or @error to define aspects.
+    """
     Providers.register(ClassInstanceProvider(cls, True, True))
 
     Decorators.add(cls, advice)
@@ -329,6 +339,9 @@ def advice(cls):
 # decorators
 
 def before(target: AspectTarget):
+    """
+    Methods decorated with @before will be executed before the target method is invoked.
+    """
     def decorator(func):
         target.function(func).type(AspectType.BEFORE)
 
@@ -340,6 +353,8 @@ def before(target: AspectTarget):
     return decorator
 
 def error(target: AspectTarget):
+    """
+    Methods decorated with @error will be executed if the target method raises an exception."""
     def decorator(func):
         target.function(func).type(AspectType.ERROR)
 
@@ -350,6 +365,9 @@ def error(target: AspectTarget):
     return decorator
 
 def after(target: AspectTarget):
+    """
+    Methods decorated with @after will be executed after the target method is invoked.
+    """
     def decorator(func):
         target.function(func).type(AspectType.AFTER)
 
@@ -360,6 +378,11 @@ def after(target: AspectTarget):
     return decorator
 
 def around(target: AspectTarget):
+    """
+    Methods decorated with @around will be executed around the target method.
+    Every around method must accept a single parameter of type Invocation and needs to call proceed
+    on this parameter in order to proceed to the next around method.
+    """
     def decorator(func):
         target.function(func).type(AspectType.AROUND)
 

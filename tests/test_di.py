@@ -44,23 +44,26 @@ class Bazong:
 class Bar:
     def __init__(self, foo: Foo):
         self.foo = foo
+        self.inited = False
+        self.destroyed = False
+        self.evironment = None
 
     @on_init()
     def init(self):
-        print("init bar")
+        self.inited = True
 
     @on_destroy()
     def destroy(self):
-        print("destroy bar")
+        self.destroyed = True
 
     @inject_environment()
     def initEnvironment(self, env: Environment):
-        print("set environment bar")
+        self.evironment = env
 
     @inject()
     def set(self, baz: Baz, bazong: Bazong) -> None:
-        print("set bar.baz")
-        pass
+        self.baz = baz
+        self.bazong = bazong
 
 @factory()
 class TestFactory(Factory[Foo]):
@@ -71,6 +74,19 @@ class TestFactory(Factory[Foo]):
 
     def create(self) -> Foo:
         return Foo()
+
+@configuration()
+class SimpleConfiguration:
+    # constructor
+
+    def __init__(self):
+        pass
+
+    # create some beans
+
+    @create()
+    def create(self) -> Baz:
+        return Baz()
 
 @configuration(imports=[ImportConfiguration])
 class Configuration:
@@ -86,19 +102,44 @@ class Configuration:
         return Baz()
 
 class TestInject(unittest.TestCase):
-    def test_1(self):
+
+    def test_create(self):
+        env = Environment(SimpleConfiguration)
+
+        bar = env.get(Bar)
+        baz = env.get(Baz)
+        bazong = env.get(Bazong)
+        foo = env.get(Foo)
+
+        self.assertIsNotNone(bar)
+        self.assertEqual(bar.inited, True)
+        self.assertIs(bar.foo, foo)
+        self.assertIs(bar.baz, baz)
+        self.assertIs(bar.bazong, bazong)
+
+    def test_singleton(self):
+        env = Environment(SimpleConfiguration)
+
+        bar = env.get(Bar)
+        bar1 = env.get(Bar)
+
+        self.assertIs(bar, bar1)
+
+    def test_import_configurations(self):
         env = Environment(Configuration)
 
         imported = env.get(ImportedClass)
 
+        self.assertIsNotNone(imported)
+
+    def test_destroy(self):
+        env = Environment(SimpleConfiguration)
+
         bar = env.get(Bar)
-        foo = env.get(Foo)
-
-        env2 = Environment(SubImportConfiguration, parent=env)
-
-        sub = env2.get(Sub)
 
         env.shutdown()
+
+        self.assertEqual(bar.destroyed, True)
 
 
 if __name__ == '__main__':
