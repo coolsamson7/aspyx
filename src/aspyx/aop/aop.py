@@ -50,7 +50,7 @@ class AspectTarget:
     def matches(self, clazz : Type, func):
         descriptor = TypeDescriptor.forType(clazz)
 
-        methodDescriptor = descriptor.getMethod(func.__name__)
+        methodDescriptor = descriptor.get_method(func.__name__)
 
         # type
 
@@ -280,7 +280,7 @@ class Advice:
             return None
 
 def sanityCheck(clazz: Type, name: str):
-    m = TypeDescriptor.forType(clazz).getMethod(name)
+    m = TypeDescriptor.forType(clazz).get_method(name)
     if len(m.paramTypes) != 1 or m.paramTypes[0] != Invocation:
         raise Exception(f"Method {clazz.__name__}.{name} expected to have one parameter of type Invocation")
 

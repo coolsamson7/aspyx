@@ -5,6 +5,8 @@ from inspect import signature, getmembers
 from typing import Callable, get_type_hints, Type, Dict, Optional
 from weakref import WeakKeyDictionary
 
+from pydantic._internal._decorators import Decorator
+
 
 class DecoratorDescriptor:
     def __init__(self, decorator, *args):
@@ -47,14 +49,14 @@ class TypeDescriptor:
 
             self.returnType = type_hints.get('return', None)
 
-        def getDecorator(self, decorator):
+        def get_decorator(self, decorator):
             for dec in self.decorators:
                 if dec.decorator == decorator:
                     return dec
 
             return None
 
-        def hasDecorator(self, decorator):
+        def has_decorator(self, decorator):
             for dec in self.decorators:
                 if dec.decorator == decorator:
                     return True
@@ -113,15 +115,22 @@ class TypeDescriptor:
 
     # public
 
-    def hasDecorator(self, decorator):
+    def get_decorator(self, decorator) -> Optional[DecoratorDescriptor]:
         for dec in self.decorators:
-            if dec.decorator == decorator:
+            if dec.decorator is decorator:
+                return dec
+
+        return None
+
+    def has_decorator(self, decorator) -> bool:
+        for dec in self.decorators:
+            if dec.decorator is decorator:
                 return True
 
         return False
 
-    def getLocalMethod(self, name) -> Optional[MethodDescriptor]:
+    def get_local_method(self, name) -> Optional[MethodDescriptor]:
         return self.localMethods.get(name, None)
 
-    def getMethod(self, name) -> Optional[MethodDescriptor]:
+    def get_method(self, name) -> Optional[MethodDescriptor]:
         return self.methods.get(name, None)

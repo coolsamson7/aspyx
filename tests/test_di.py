@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 
 from aspyx.di import injectable, on_init, on_destroy, inject_environment, inject, Factory, create, configuration, Environment, PostProcessor, factory
-
+from di_import import ImportConfiguration, ImportedClass
 
 
 @injectable()
@@ -53,8 +53,7 @@ class TestFactory(Factory[Foo]):
     def create(self) -> Foo:
         return Foo()
 
-@configuration()
-@injectable()
+@configuration(imports=[ImportConfiguration])
 class Configuration:
     # constructor
 
@@ -69,7 +68,9 @@ class Configuration:
 
 class TestInject(unittest.TestCase):
     def test_1(self):
-        env = Environment()
+        env = Environment(Configuration)
+
+        imported = env.get(ImportedClass)
 
         bar = env.get(Bar)
         foo = env.get(Foo)

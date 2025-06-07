@@ -4,7 +4,7 @@ import logging
 import unittest
 
 from aspyx.reflection import Decorators
-from aspyx.di import injectable, inject, Environment
+from aspyx.di import injectable, inject, Environment, configuration
 from aspyx.aop import advice, before, after, around, methods, Invocation
 
 
@@ -14,6 +14,11 @@ def transactional():
         return func
 
     return decorator
+
+@configuration()
+class Configuration:
+    def __init__(self):
+        pass
 
 
 @injectable()
@@ -67,7 +72,7 @@ class TestInjector(unittest.TestCase):
     def test_injector(self):
         logging.basicConfig(level=logging.DEBUG)
 
-        environment = Environment()  # creates eagerly!
+        environment = Environment(Configuration)  # creates eagerly!
 
         foo = environment.get(Foo)
 

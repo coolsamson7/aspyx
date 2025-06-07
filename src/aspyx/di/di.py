@@ -21,12 +21,15 @@ class InjectorError(Exception):
 class InstanceProvider(ABC, Generic[T]):
     # constructor
 
-    def __init__(self, t: Type[T], eager: bool, singleton: bool):
+    def __init__(self, host: Type, t: Type[T], eager: bool, singleton: bool):
+        self.host = host
         self.type = t
         self.eager = eager
         self.singleton = singleton
         self.dependencies : Optional[list[InstanceProvider]] = None
 
+    def module(self):
+        return self.host.__module__
 
     def addDependency(self, provider: InstanceProvider):
         if any(issubclass(provider.type, dependency.type) for dependency in self.dependencies):
@@ -55,7 +58,7 @@ class SingletonProvider(InstanceProvider):
     # constructor
 
     def __init__(self, provider: InstanceProvider):
-        super().__init__(provider.type, provider.eager, provider.singleton)
+        super().__init__(provider.host, provider.type, provider.eager, provider.singleton)
 
         self.provider = provider
         self.value = None
@@ -85,7 +88,7 @@ class ClassInstanceProvider(InstanceProvider[T]):
     # constructor
 
     def __init__(self, t: Type[T], eager: bool, singleton: bool):
-        super().__init__(t, eager, singleton)
+        super().__init__(t, t, eager, singleton)
 
         self.params = 0
 
@@ -99,7 +102,7 @@ class ClassInstanceProvider(InstanceProvider[T]):
 
             # check constructor
 
-            init = TypeDescriptor.forType(self.type).getMethod("__init__")
+            init = TypeDescriptor.forType(self.type).get_method("__init__")
             if init is None:
                 raise InjectorError(f"{self.type.__name__} does not implement __init__")
 
@@ -112,7 +115,7 @@ class ClassInstanceProvider(InstanceProvider[T]):
             # check @inject
 
             for method in TypeDescriptor.forType(self.type).methods.values():
-                if method.hasDecorator(inject):
+                if method.has_decorator(inject):
                     for param in method.paramTypes:
                         provider = Providers.getProvider(param)
 
@@ -138,9 +141,8 @@ class FunctionInstanceProvider(InstanceProvider[T]):
     # constructor
 
     def __init__(self, clazz : Type, method, return_type : Type[T], eager = True, singleton = True):
-        super().__init__(return_type, eager, singleton)
+        super().__init__(clazz, return_type, eager, singleton)
 
-        self.clazz = clazz
         self.method = method
 
     # implement
@@ -151,7 +153,7 @@ class FunctionInstanceProvider(InstanceProvider[T]):
 
             context.add(self)
 
-            provider = Providers.getProvider(self.clazz)
+            provider = Providers.getProvider(self.host)
             if self.addDependency(provider):
                 provider.resolve(context)
         else: # check if the dependencies crate a cycle
@@ -169,21 +171,19 @@ class FunctionInstanceProvider(InstanceProvider[T]):
         return environment.created(instance)
 
     def __str__(self):
-        return f"FunctionInstanceProvider({self.clazz.__name__}.{self.method.__name__} -> {self.type.__name__})"
+        return f"FunctionInstanceProvider({self.host.__name__}.{self.method.__name__} -> {self.type.__name__})"
 
 class FactoryInstanceProvider(InstanceProvider):
     # class method
 
     @classmethod
     def getFactoryType(cls, clazz):
-        return TypeDescriptor.forType(clazz).getLocalMethod("create").returnType
+        return TypeDescriptor.forType(clazz).get_local_method("create").returnType
 
     # constructor
 
     def __init__(self, factory: Type, eager: bool, singleton: bool):
-        super().__init__(FactoryInstanceProvider.getFactoryType(factory), eager, singleton)
-
-        self.factory = factory
+        super().__init__(factory, FactoryInstanceProvider.getFactoryType(factory), eager, singleton)
 
     # implement
 
@@ -193,7 +193,7 @@ class FactoryInstanceProvider(InstanceProvider):
 
             context.add(self)
 
-            provider = Providers.getProvider(self.factory)
+            provider = Providers.getProvider(self.host)
             if self.addDependency(provider):
                 provider.resolve(context)
 
@@ -208,7 +208,7 @@ class FactoryInstanceProvider(InstanceProvider):
         return environment.created(self.getArguments(environment)[0].create())
 
     def __str__(self):
-        return f"FactoryInstanceProvider({self.factory.__name__} -> {self.type.__name__})"
+        return f"FactoryInstanceProvider({self.host.__name__} -> {self.type.__name__})"
 
 
 class Lifecycle(Enum):
@@ -306,7 +306,7 @@ class Providers:
 
             for superClass in type.__bases__:
                 if isInjectable(superClass):
-                    cacheProviderForType(provider, superClass)
+                    cacheProviderForType(provider, superClass) # TODO ?????
 
         # go
 
@@ -329,6 +329,13 @@ class Providers:
             for provider in Providers.providers.values():
                 provider.resolve(Providers.Context())
 
+        Providers.report()
+
+    @classmethod
+    def report(cls):
+        for provider in Providers.providers.values():
+            print(f"provider {provider.type.__qualname__}")
+
     @classmethod
     def getProvider(cls, type: Type) -> InstanceProvider:
         provider = Providers.cache.get(type, None)
@@ -337,11 +344,22 @@ class Providers:
 
         return provider
 
+def registerFactories(cls: Type):
+    descriptor = TypeDescriptor.forType(cls)
+
+    for method in descriptor.methods.values():
+        if method.has_decorator(create):
+            create_decorator = method.get_decorator(create)
+            Providers.register(FunctionInstanceProvider(cls, method.method, method.returnType, create_decorator.args[0],
+                                                        create_decorator.args[1]))
+
 def injectable(eager=True, singleton=True):
     def decorator(cls):
         Decorators.add(cls, injectable)
 
         Providers.register(ClassInstanceProvider(cls, eager, singleton))
+
+        #TODOregisterFactories(cls)
 
         return cls
 
@@ -379,17 +397,14 @@ def on_destroy():
 
     return decorator
 
-def configuration():
+def configuration(imports: Optional[list[Type]] = None):
     def decorator(cls):
-        Decorators.add(cls, configuration)
-        #Decorators.add(cls, component)
+        Providers.register(ClassInstanceProvider(cls, True, True))
 
-        descriptor = TypeDescriptor.forType(cls)
+        Decorators.add(cls, configuration, imports)
+        Decorators.add(cls, injectable) # do we need that?
 
-        for method in descriptor.methods.values():
-            if method.hasDecorator(create):
-                create_decorator = method.getDecorator(create)
-                Providers.register(FunctionInstanceProvider(cls, method.method, method.returnType, create_decorator.args[0], create_decorator.args[1]))
+        registerFactories(cls)
 
         return cls
 
@@ -427,21 +442,67 @@ class Environment:
 
     # constructor
 
-    def __init__(self):
+    def __init__(self, conf: Type, parent : Optional[Environment] = None):
+        # initialize
+
+        self.providers: Dict[Type, InstanceProvider] = dict()
         self.lifecycleProcessors: list[LifecycleProcessor] = []
         self.instances: list[Environment.Instance] = []
 
         Environment.instance = self
 
-        # resolve
+        # resolve providers on a static basis. This is only executed once!
 
         Providers.resolve()
 
+        # TEST
+
+        loaded = set()
+
+        def addProvider(provider: InstanceProvider):
+            print(f"provider {provider.host.__qualname__} is a valid provider")
+
+            self.providers[provider.type] = Providers.getProvider(provider.type)
+
+        def loadConfiguration(conf: Type):
+            if conf not in loaded:
+                Environment.logger.debug(f"load configuration {conf.__qualname__}")
+
+                loaded.add(conf)
+
+                # sanity check
+
+                decorator = TypeDescriptor.forType(conf).get_decorator(configuration)
+                if decorator is None:
+                    raise InjectorError(f"{conf.__name__} is not a configuration class")
+
+                scan = conf.__module__  # maybe add parameters as well
+
+                # recursion
+
+                for importConfiguration in decorator.args[0] or []:
+                    loadConfiguration(importConfiguration)
+
+                # load providers
+
+                for provider in Providers.providers.values():
+                    if provider.module().startswith(scan):
+                        addProvider(provider)
+
+        # load configurations
+
+        loadConfiguration(DIConfiguration) # internal stuff
+        loadConfiguration(conf)
+
         # construct eager objects
 
-        for provider in Providers.providers.values():
+        for provider in self.providers.values():
             if provider.eager:
-                Providers.getProvider(provider.type).create(self) # here we need the singletons...
+                provider.create(self)
+
+        #for provider in Providers.providers.values():
+        #    if provider.eager:
+        #        Providers.getProvider(provider.type).create(self) # here we need the singletons...
 
     # internal
 
@@ -472,7 +533,7 @@ class Environment:
             self.executeProcessors(Lifecycle.ON_DESTROY, instance.instance)
 
     def get(self, type: Type[T]) -> T:
-        return Providers.getProvider(type).create(self)
+        return self.providers[type].create(self) # TODO cache, etc.
 
 class Callable:
     def __init__(self, decorator, processor: CallableProcessor, lifecycle: Lifecycle):
@@ -568,3 +629,10 @@ class InjectCallable(Callable):
 
     def args(self, decorator: DecoratorDescriptor,  method: TypeDescriptor.MethodDescriptor, environment: Environment):
         return [environment.get(type) for type in method.paramTypes]
+
+# internal class that is required to import technical instance providers
+
+@configuration()
+class DIConfiguration:
+    def __init__(self):
+        pass
