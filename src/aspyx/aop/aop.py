@@ -28,9 +28,14 @@ class AspectType(Enum):
 class AspectTarget:
     # properties
 
-    # class
-    # _function
-    #_type : AspectType
+    __slots__ = [
+        "_clazz",
+        "_instance",
+        "_type",
+        "names",
+        "types",
+        "decorators",
+    ]
 
     # constructor
 
@@ -103,6 +108,10 @@ def methods():
 ##
 
 class JoinPoint:
+    __slots__ = [
+        "next",
+    ]
+
     # constructor
 
     def __init__(self, next: 'JoinPoint'):
@@ -114,6 +123,11 @@ class JoinPoint:
         pass
 
 class FunctionJoinPoint(JoinPoint):
+    __slots__ = [
+        "instance",
+        "func",
+    ]
+
     def __init__(self, instance, func, next: Optional['JoinPoint']):
         super().__init__(next)
 
@@ -126,6 +140,8 @@ class FunctionJoinPoint(JoinPoint):
         return self.func(self.instance, invocation)
 
 class MethodJoinPoint(FunctionJoinPoint):
+    __slots__ = []
+
     def __init__(self, instance, func):
         super().__init__(instance, func, None)
 
@@ -144,8 +160,14 @@ class JoinPoints:
 class Invocation:
     # properties
 
-    # args
-    # kwargs
+    __slots__ = [
+        "args",
+        "kwargs",
+        "result",
+        "error",
+        "joinPoints",
+        "currentJoinPoint",
+    ]
 
     # constructor
 
@@ -201,6 +223,10 @@ class Advice:
     # static data
 
     targets: list[AspectTarget] = []
+
+    __slots__ = [
+        "cache",
+    ]
 
     # constructor
 

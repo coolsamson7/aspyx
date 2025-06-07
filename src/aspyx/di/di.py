@@ -11,6 +11,8 @@ from aspyx.reflection import Decorators, TypeDescriptor, DecoratorDescriptor
 T = TypeVar("T")
 
 class Factory(ABC, Generic[T]):
+    __slots__ = []
+
     @abstractmethod
     def create(self) -> T:
         pass
@@ -19,6 +21,14 @@ class InjectorError(Exception):
     pass
 
 class InstanceProvider(ABC, Generic[T]):
+    __slots__ = [
+        "host",
+        "type",
+        "eager",
+        "singleton",
+        "dependencies"
+    ]
+
     # constructor
 
     def __init__(self, host: Type, t: Type[T], eager: bool, singleton: bool):
@@ -55,6 +65,12 @@ class InstanceProvider(ABC, Generic[T]):
         pass
 
 class SingletonProvider(InstanceProvider):
+    __slots__ = [
+        "provider",
+        "value",
+        "_lock"
+    ]
+
     # constructor
 
     def __init__(self, provider: InstanceProvider):
@@ -85,6 +101,10 @@ class SingletonProvider(InstanceProvider):
         return self.value
 
 class ClassInstanceProvider(InstanceProvider[T]):
+    __slots__ = [
+        "params"
+    ]
+
     # constructor
 
     def __init__(self, t: Type[T], eager: bool, singleton: bool):
@@ -138,6 +158,10 @@ class ClassInstanceProvider(InstanceProvider[T]):
         return f"ClassInstanceProvider({self.type.__name__})"
 
 class FunctionInstanceProvider(InstanceProvider[T]):
+    __slots__ = [
+        "method"
+    ]
+
     # constructor
 
     def __init__(self, clazz : Type, method, return_type : Type[T], eager = True, singleton = True):
@@ -174,6 +198,8 @@ class FunctionInstanceProvider(InstanceProvider[T]):
         return f"FunctionInstanceProvider({self.host.__name__}.{self.method.__name__} -> {self.type.__name__})"
 
 class FactoryInstanceProvider(InstanceProvider):
+    __slots__ = []
+
     # class method
 
     @classmethod
@@ -216,6 +242,8 @@ class Lifecycle(Enum):
     ON_DESTROY = auto()
 
 class LifecycleProcessor(ABC):
+    __slots__ = []
+
     # constructor
 
     def __init__(self):
@@ -228,6 +256,8 @@ class LifecycleProcessor(ABC):
         pass
 
 class PostProcessor(LifecycleProcessor):
+    __slots__ = []
+
     # constructor
 
     def __init__(self):
@@ -245,6 +275,8 @@ class Providers:
     # local class
 
     class Context:
+        __slots__ = ["dependencies"]
+
         def __init__(self):
             self.dependencies : list[InstanceProvider] = []
 
@@ -329,7 +361,7 @@ class Providers:
             for provider in Providers.providers.values():
                 provider.resolve(Providers.Context())
 
-        Providers.report()
+        #Providers.report()
 
     @classmethod
     def report(cls):
@@ -428,6 +460,8 @@ class Environment:
     # local class
 
     class Instance:
+        __slots__ = ["instance"]
+
         def __init__(self, instance):
             self.instance = instance
 
@@ -439,6 +473,12 @@ class Environment:
     logger = logging.getLogger(__name__)  # __name__ = module name
 
     instance : 'Environment' = None
+
+    __slots__ = [
+        "providers",
+        "lifecycleProcessors",
+        "instances"
+    ]
 
     # constructor
 
@@ -455,12 +495,10 @@ class Environment:
 
         Providers.resolve()
 
-        # TEST
-
         loaded = set()
 
         def addProvider(provider: InstanceProvider):
-            print(f"provider {provider.host.__qualname__} is a valid provider")
+            Environment.logger.debug(f"\tadd provider {provider.host.__qualname__}")
 
             self.providers[provider.type] = Providers.getProvider(provider.type)
 
@@ -536,6 +574,8 @@ class Environment:
         return self.providers[type].create(self) # TODO cache, etc.
 
 class Callable:
+    __slots__ = ["decorator", "lifecycle"]
+
     def __init__(self, decorator, processor: CallableProcessor, lifecycle: Lifecycle):
         self.decorator = decorator
         self.lifecycle = lifecycle
@@ -550,6 +590,8 @@ class CallableProcessor(LifecycleProcessor):
     # local classes
 
     class MethodCall:
+        __slots__ = ["decorator", "method", "callable"]
+
         # constructor
 
         def __init__(self, method: TypeDescriptor.MethodDescriptor, decorator: DecoratorDescriptor, callable: Callable):
@@ -604,16 +646,22 @@ class CallableProcessor(LifecycleProcessor):
 
 @injectable()
 class OnInitCallable(Callable):
+    __slots__ = []
+
     def __init__(self, processor: CallableProcessor):
         super().__init__(on_init, processor, Lifecycle.ON_CREATE)
 
 @injectable()
 class OnDestroyCallable(Callable):
+    __slots__ = []
+
     def __init__(self, processor: CallableProcessor):
         super().__init__(on_destroy, processor, Lifecycle.ON_DESTROY)
 
 @injectable()
 class EnvironmentAwareCallable(Callable):
+    __slots__ = []
+
     def __init__(self, processor: CallableProcessor):
         super().__init__(inject_environment, processor, Lifecycle.ON_CREATE)
 
@@ -622,6 +670,8 @@ class EnvironmentAwareCallable(Callable):
 
 @injectable()
 class InjectCallable(Callable):
+    __slots__ = []
+
     def __init__(self, processor: CallableProcessor):
         super().__init__(inject, processor, Lifecycle.ON_CREATE)
 
@@ -634,5 +684,7 @@ class InjectCallable(Callable):
 
 @configuration()
 class DIConfiguration:
+    __slots__ = []
+
     def __init__(self):
         pass

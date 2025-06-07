@@ -1,15 +1,32 @@
 from __future__ import annotations
 
+import logging
 import unittest
+from typing import Dict
 
 from aspyx.di import injectable, on_init, on_destroy, inject_environment, inject, Factory, create, configuration, Environment, PostProcessor, factory
 from di_import import ImportConfiguration, ImportedClass
+from sub_import import SubImportConfiguration
+
+# not here
+
+logging.basicConfig(level=logging.INFO)
+
+def configure_logging(levels: Dict[str, int]) -> None:
+    for name in levels:
+        logging.getLogger(name).setLevel(levels[name])
+
+configure_logging({
+    "aspyx": logging.DEBUG
+})
+
+# not here
 
 
 @injectable()
 class SamplePostProcessor(PostProcessor):
     def process(self, instance: object):
-        print(f"created a {instance}")
+        pass #print(f"created a {instance}")
 
 class Foo:
     pass
@@ -47,6 +64,8 @@ class Bar:
 
 @factory()
 class TestFactory(Factory[Foo]):
+    __slots__ = []
+
     def __init__(self):
         pass
 
@@ -74,6 +93,8 @@ class TestInject(unittest.TestCase):
 
         bar = env.get(Bar)
         foo = env.get(Foo)
+
+        env2 = Environment(SubImportConfiguration, parent=env)
 
         env.shutdown()
 
