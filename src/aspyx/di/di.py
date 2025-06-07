@@ -27,8 +27,14 @@ class InstanceProvider(ABC, Generic[T]):
         self.singleton = singleton
         self.dependencies : Optional[list[InstanceProvider]] = None
 
+
     def addDependency(self, provider: InstanceProvider):
+        if any(issubclass(provider.type, dependency.type) for dependency in self.dependencies):
+            return False
+
         self.dependencies.append(provider)
+
+        return True
 
     def getArguments(self,  environment: Environment):
         return [provider.create(environment) for provider in self.dependencies]
@@ -100,19 +106,18 @@ class ClassInstanceProvider(InstanceProvider[T]):
             for param in init.paramTypes:
                 provider = Providers.getProvider(param)
                 self.params += 1
-                self.addDependency(provider)
-                provider.resolve(context)
+                if self.addDependency(provider):
+                    provider.resolve(context)
 
             # check @inject
 
             for method in TypeDescriptor.forType(self.type).methods.values():
                 if method.hasDecorator(inject):
-                    # todo error handling
-                    provider = Providers.getProvider(method.paramTypes[0])
+                    for param in method.paramTypes:
+                        provider = Providers.getProvider(param)
 
-                    self.addDependency(provider)
-                    provider.resolve(context)
-                    pass
+                        if self.addDependency(provider):
+                            provider.resolve(context)
         else: # check if the dependencies create a cycle
             context.add(*self.dependencies)
 
@@ -147,8 +152,8 @@ class FunctionInstanceProvider(InstanceProvider[T]):
             context.add(self)
 
             provider = Providers.getProvider(self.clazz)
-            self.addDependency(provider)
-            provider.resolve(context)
+            if self.addDependency(provider):
+                provider.resolve(context)
         else: # check if the dependencies crate a cycle
             context.add(*self.dependencies)
 
@@ -189,8 +194,9 @@ class FactoryInstanceProvider(InstanceProvider):
             context.add(self)
 
             provider = Providers.getProvider(self.factory)
-            self.addDependency(provider)
-            provider.resolve(context)
+            if self.addDependency(provider):
+                provider.resolve(context)
+
         else: # check if the dependencies crate a cycle
             context.add(*self.dependencies)
 
@@ -561,9 +567,4 @@ class InjectCallable(Callable):
     # override
 
     def args(self, decorator: DecoratorDescriptor,  method: TypeDescriptor.MethodDescriptor, environment: Environment):
-        return [environment.get(method.paramTypes[0])]
-
-
-# TODO
-
-# configuration & component?
+        return [environment.get(type) for type in method.paramTypes]

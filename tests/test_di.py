@@ -19,6 +19,11 @@ class Baz:
     pass
 
 @injectable()
+class Bazong:
+    def __init__(self, foo: Foo):
+        pass
+
+@injectable()
 class Bar:
     def __init__(self, foo: Foo):
         self.foo = foo
@@ -36,7 +41,7 @@ class Bar:
         print("set environment bar")
 
     @inject()
-    def set_baz(self, baz: Baz) -> None:
+    def set(self, baz: Baz, bazong: Bazong) -> None:
         print("set bar.baz")
         pass
 
