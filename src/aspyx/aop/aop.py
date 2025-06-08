@@ -1,12 +1,23 @@
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 import inspect
+import re
+import types
 from dataclasses import dataclass
 from enum import auto, Enum
 from typing import Optional, Dict, Type, Callable
 
+from sympy.solvers.diophantine.diophantine import descent
+
 from aspyx.reflection import Decorators, TypeDescriptor
-from aspyx.di import injectable, Providers, ClassInstanceProvider, Environment
+from aspyx.di import injectable, configuration, Providers, ClassInstanceProvider, Environment, PostProcessor
+
+
+class AOPException(Exception):
+    """
+    Exception raised for errors in the aop logic."""
+    pass
 
 class AspectType(Enum):
     """
@@ -14,7 +25,7 @@ class AspectType(Enum):
 
     The available types are:
     - BEFORE: Advice to be executed before the method invocation.
-    - AROUND: Advice that wraps the method invocation and can control whether and how the method is called.
+    - AROUND: Advice that intercepts the method invocation.
     - AFTER: Advice to be executed after the method invocation, regardless of its outcome.
     - ERROR: Advice to be executed if the method invocation raises an exception.
 
@@ -25,14 +36,22 @@ class AspectType(Enum):
     AFTER = auto()
     ERROR = auto()
 
-class AspectTarget:
+class AspectTarget(ABC):
+    """
+    AspectTarget defines the target for an aspect. It can be used to specify the class, method, and conditions under which the aspect should be applied.
+    It supports matching by class type, method name, patterns, decorators, and more.
+    """
+
     # properties
 
     __slots__ = [
+        "_function",
+        "_type",
+
         "_clazz",
         "_instance",
-        "_type",
         "names",
+        "patterns",
         "types",
         "decorators",
     ]
@@ -42,17 +61,122 @@ class AspectTarget:
     def __init__(self):
         self._clazz = None
         self._instance = None
-        self._type = AspectType.BEFORE
 
+        self.patterns = []
         self.names = []
         self.types = []
         self.decorators = []
 
         pass
 
+    # abstract
+
+    @abstractmethod
+    def _matches(self, clazz : Type, func):
+        pass
+
+     # fluent
+
+    def function(self, func):
+        self._function = func
+        return self
+
+    def type(self, type: AspectType):
+        self._type = type
+
+        return self
+    
+    def ofType(self, type: Type):
+        self.types.append(type)
+        return self
+
+    def decoratedWith(self, decorator):
+        self.decorators.append(decorator)
+        return self
+    
+    def matches(self, pattern: str):
+        """
+        Matches the target against a pattern.
+        """
+        self.patterns.append(re.compile(pattern))
+        return self
+
+    def named(self, name: str):
+        self.names.append(name)
+        return self
+
+class ClassAspectTarget(AspectTarget):
+    # properties
+
+    __slots__ = [
+    ]
+
+    # constructor
+
+    def __init__(self):
+        super().__init__()
+
+        pass
+
     # public
 
-    def matches(self, clazz : Type, func):
+    def _matches(self, clazz : Type, func):
+        descriptor = TypeDescriptor.for_type(clazz)
+
+        # type
+
+        if len(self.types) > 0:
+            if next((type for type in self.types if issubclass(clazz, type)), None) is None:
+                return False
+
+        # decorators
+
+        if len(self.decorators) > 0:
+            if next((decorator for decorator in self.decorators if descriptor.has_decorator(decorator)), None) is None:
+                return False
+
+        # names
+
+        if len(self.names) > 0:
+            if next((name for name in self.names if name == clazz.__name__), None) is None:
+                return False
+            
+        # patterns
+
+        if len(self.patterns) > 0:
+            if next((pattern for pattern in self.patterns if re.fullmatch(pattern, clazz.__name__) is not None), None) is None:
+                return False
+   
+        # yipee
+
+        return True
+    
+    # fluent
+
+
+    
+class MethodAspectTarget(AspectTarget):
+    # properties
+
+    __slots__ = [
+        "_clazz",
+        "_instance",
+        "_type",
+        "_function",
+        "names",
+        "patterns",
+        "types",
+        "decorators",
+    ]
+
+    # constructor
+
+    def __init__(self):
+       super().__init__()
+
+    # public
+
+    def _matches(self, clazz : Type, func):
         descriptor = TypeDescriptor.for_type(clazz)
 
         methodDescriptor = descriptor.get_method(func.__name__)
@@ -66,7 +190,7 @@ class AspectTarget:
         # decorators
 
         if len(self.decorators) > 0:
-            if next((decorator for decorator in self.decorators if methodDescriptor.hasDecorator(decorator)), None) is None:
+            if next((decorator for decorator in self.decorators if methodDescriptor.has_decorator(decorator)), None) is None:
                 return False
 
         # names
@@ -74,39 +198,28 @@ class AspectTarget:
         if len(self.names) > 0:
             if next((name for name in self.names if name == func.__name__), None) is None:
                 return False
+            
+        # patterns
 
+        if len(self.patterns) > 0:
+            if next((pattern for pattern in self.patterns if re.fullmatch(pattern, func.__name__) is not None), None) is None:
+                return False
+   
         # yipee
 
         return True
-
-    # fluent
-
-    def function(self, func):
-        self._function = func
-        return self
-
-    def type(self, type: AspectType):
-        self._type = type
-
-        return self
-
-    def ofType(self, type: Type):
-        self.types.append(type)
-        return self
-
-    def decoratedWith(self, decorator):
-        self.decorators.append(decorator)
-        return self
-
-    def named(self, name: str):
-        self.names.append(name)
-        return self
 
 def methods():
     """
     Create a new AspectTarget instance to define method aspect targets.
     """
-    return AspectTarget()
+    return MethodAspectTarget()
+
+def classes():
+    """
+    Create a new AspectTarget instance to define class aspect targets.
+    """
+    return ClassAspectTarget()
 
 
 class JoinPoint:
@@ -167,6 +280,7 @@ class Invocation:
     # properties
 
     __slots__ = [
+        "func",
         "args",
         "kwargs",
         "result",
@@ -177,7 +291,8 @@ class Invocation:
 
     # constructor
 
-    def __init__(self,  joinPoints: JoinPoints):
+    def __init__(self,  func, joinPoints: JoinPoints):
+        self.func = func
         self.args = None
         self.kwargs = None
         self.result = None
@@ -212,15 +327,19 @@ class Invocation:
             joinPoint.call(self)
 
         if self.error is not None:
-            raise self.error
+            raise self.error # rethrow the error
         else:
             return self.result
 
     def proceed(self, *args, **kwargs):
-        # replace args if non-empty
-
-        if len(args) > 0: # TODO kwargs?
+        """
+        Proceed to the next join point in the around chain up to the original method.
+        """
+        if len(args) > 0 or len(kwargs) > 0:  # as soon as we have args, we replace the current ones
             self.args = args
+            self.kwargs = kwargs
+
+        # next one please...
 
         return self.currentJoinPoint.next.call(self)
 
@@ -244,11 +363,10 @@ class Advice:
 
     def resolve(self):
         for target in Advice.targets:
-            target._instance = Environment.instance.get(target._clazz)
-            target._advice = None
+            target._instance = Environment.instance.get(target._clazz) # TODO
 
     def collect(self, clazz, member, type: AspectType):
-        aspects = [FunctionJoinPoint(target._instance, target._function, None) for target in Advice.targets if target._type == type and target.matches(clazz, member)]
+        aspects = [FunctionJoinPoint(target._instance, target._function, None) for target in Advice.targets if target._type == type and target._matches(clazz, member)]
 
         # link
 
@@ -259,6 +377,7 @@ class Advice:
 
         return aspects
 
+    # TODO thread-safe
     def joinPoints4(self, instance) -> Dict[Callable,JoinPoints]:
         clazz = type(instance)
 
@@ -307,47 +426,52 @@ class Advice:
                 before=befores,
                 around=arounds,
                 error=errors,
-                after=afters)
+                after=afters
+            )
         else:
             return None
 
 def sanityCheck(clazz: Type, name: str):
     m = TypeDescriptor.for_type(clazz).get_method(name)
     if len(m.paramTypes) != 1 or m.paramTypes[0] != Invocation:
-        raise Exception(f"Method {clazz.__name__}.{name} expected to have one parameter of type Invocation")
+        raise AOPException(f"Method {clazz.__name__}.{name} expected to have one parameter of type Invocation")
 
 # decorators
 
 def advice(cls):
     """
-    Classes decoarted with @advice are treated as aspect classes.
+    Classes decorated with @advice are treated as aspect classes.
     They can contain methods decorated with @before, @after, @around, or @error to define aspects.
     """
     Providers.register(ClassInstanceProvider(cls, True, True))
 
     Decorators.add(cls, advice)
 
-    for name, member in inspect.getmembers(cls):
-        if not name.startswith("_") and member._advice is not None:
-            member._advice._clazz = cls
+    for name, member in TypeDescriptor.for_type(cls).methods.items():
+        decorator = next((decorator for decorator in member.decorators if decorator.decorator in [before, after, around, error]), None)
+        if decorator is not None:
+            target = decorator.args[0]
+            target._clazz = cls
             sanityCheck(cls, name)
-            Advice.targets.append(member._advice)
+            Advice.targets.append(target)
 
     return cls
 
 
 # decorators
 
+def _register(decorator, target: AspectTarget, func, aspectType: AspectType):
+    target.function(func).type(aspectType)
+
+    Decorators.add(func, decorator, target)
+
 def before(target: AspectTarget):
     """
     Methods decorated with @before will be executed before the target method is invoked.
     """
     def decorator(func):
-        target.function(func).type(AspectType.BEFORE)
+        _register(before, target, func, AspectType.BEFORE)
 
-        Decorators.add(func, before, target)
-
-        func._advice = target
         return func
 
     return decorator
@@ -356,10 +480,8 @@ def error(target: AspectTarget):
     """
     Methods decorated with @error will be executed if the target method raises an exception."""
     def decorator(func):
-        target.function(func).type(AspectType.ERROR)
+        _register(error, target, func, AspectType.ERROR)
 
-        Decorators.add(func, error, target)
-        func._advice = target
         return func
 
     return decorator
@@ -369,10 +491,8 @@ def after(target: AspectTarget):
     Methods decorated with @after will be executed after the target method is invoked.
     """
     def decorator(func):
-        target.function(func).type(AspectType.AFTER)
+        _register(after, target, func, AspectType.AFTER)
 
-        Decorators.add(func, after, target)
-        func._advice = target
         return func
 
     return decorator
@@ -381,13 +501,44 @@ def around(target: AspectTarget):
     """
     Methods decorated with @around will be executed around the target method.
     Every around method must accept a single parameter of type Invocation and needs to call proceed
-    on this parameter in order to proceed to the next around method.
+    on this parameter to proceed to the next around method.
     """
     def decorator(func):
-        target.function(func).type(AspectType.AROUND)
+        _register(around, target, func, AspectType.AROUND)
 
-        Decorators.add(func, around, target)
-        func._advice = target
         return func
 
     return decorator
+
+@injectable()
+class AdviceProcessor(PostProcessor):
+    # properties
+
+    __slots__ = [
+        "advice",
+    ]
+
+    # constructor
+
+    def __init__(self, advice: Advice):
+        super().__init__()
+
+        self.advice = advice
+
+    # implement
+
+    def process(self, instance: object):
+        joinPointDict = self.advice.joinPoints4(instance)
+
+        for member, joinPoints in joinPointDict.items():
+            Environment.logger.debug(f"add aspects for {type(instance)}:{member.__name__}")
+
+            def wrap(jp):
+                return lambda *args, **kwargs: Invocation(member, jp).call(*args, **kwargs)
+
+            setattr(instance, member.__name__, types.MethodType(wrap(joinPoints), instance))
+
+@configuration()
+class AOPConfiguration:
+    def __init__(self):
+        pass

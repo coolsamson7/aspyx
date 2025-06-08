@@ -5,6 +5,8 @@ __all__ = [
     "around",
     "error",
     "advice",
+    "classes",
     "methods",
-    "Invocation"
+    "Invocation",
+    "AOPConfiguration"
 ]

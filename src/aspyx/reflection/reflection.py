@@ -10,7 +10,6 @@ class DecoratorDescriptor:
         self.decorator = decorator
         self.args = args
 
-
     def __str__(self):
         return f"@{self.decorator.__name__}({','.join(self.args)})"
 

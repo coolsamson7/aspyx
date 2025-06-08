@@ -15,5 +15,7 @@ __all__ = [
     "inject_environment",
     "Factory",
     "PostProcessor",
-    "CallableProcessor", "LifecycleCallable", "Lifecycle"
+    "CallableProcessor",
+    "LifecycleCallable",
+    "Lifecycle"
 ]

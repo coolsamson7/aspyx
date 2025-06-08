@@ -6,4 +6,5 @@ __all__ = [
     "EnvConfigurationSource",
     "ConfigurationConfiguration"
     "value",
+    "ConfigurationConfiguration"
 ]

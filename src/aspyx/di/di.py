@@ -660,7 +660,7 @@ class Environment:
 
         Returns: The requested instance
         """
-        provider = self.providers.get(type, None) # TODO cache, etc.
+        provider = self.providers.get(type, None)
         if provider is None:
             Environment.logger.error(f"{type} is not supported")
             raise InjectorException(f"{type} is not supported")
@@ -780,6 +780,8 @@ class InjectLifecycleCallable(LifecycleCallable):
 
     def args(self, decorator: DecoratorDescriptor,  method: TypeDescriptor.MethodDescriptor, environment: Environment):
         return [environment.get(type) for type in method.paramTypes]
+
+##
 
 # internal class that is required to import technical instance providers
 
