@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import unittest
 
+from aspyx.aop.aop import AOPConfiguration, classes
 from aspyx.reflection import Decorators
 from aspyx.di import injectable, inject, Environment, configuration
 from aspyx.aop import advice, before, after, around, methods, Invocation
@@ -15,7 +16,7 @@ def transactional():
 
     return decorator
 
-@configuration()
+@configuration(imports=[AOPConfiguration])
 class Configuration:
     def __init__(self):
         pass
@@ -40,31 +41,53 @@ class Foo:
 
 @advice
 class SampleAdvice:
+    # constructor
+
     def __init__(self):
         self.name = "SampleAdvice"
-        pass
 
-    @before(methods().named("say").ofType(Foo))
+        self.before_calls = 0
+        self.after_calls = 0
+        self.around_calls = 0
+        self.error_calls = 0
+
+    # public
+
+    def reset(self):
+        self.before_calls = 0
+        self.after_calls = 0
+        self.around_calls = 0
+        self.error_calls = 0
+
+    # aspects
+
+    @before(methods().named("say").ofType(Foo).matches(".*"))
     def callBeforeFoo(self, invocation: Invocation):
-        print("Before foo method execution")
+        self.before_calls += 1
 
     @before(methods().named("say").ofType(Bar))
     def callBeforeBar(self, invocation: Invocation):
-        print("Before bar method execution")
+        self.before_calls += 1
 
     @after(methods().named("say"))
     def callAfter(self, invocation: Invocation):
-        print("after method execution")
+        self.after_calls += 1
 
     @around(methods().named("say"))
     def callAround(self, invocation: Invocation):
-        print("around method execution")
+        self.around_calls += 1
 
         return invocation.proceed()
 
     @around(methods().decoratedWith(transactional))
+    def callTransactional1(self, invocation: Invocation):
+        self.around_calls += 1
+
+        return invocation.proceed()
+    
+    #@around(classes().decoratedWith(transactional))
     def callTransactional(self, invocation: Invocation):
-        print("around transactional methods")
+        self.around_calls += 1
 
         return invocation.proceed()
 
@@ -74,15 +97,33 @@ class TestInjector(unittest.TestCase):
 
         environment = Environment(Configuration)  # creates eagerly!
 
+        advice = environment.get(SampleAdvice)
+
         foo = environment.get(Foo)
 
         self.assertIsNotNone(foo)
 
+        # foo
+
         result = foo.say("hello")
+
         self.assertEqual(result, "hello")
 
+        self.assertEqual(advice.before_calls, 1)
+        self.assertEqual(advice.around_calls, 1)
+        self.assertEqual(advice.after_calls, 1)
+
+        advice.reset()
+
+        # bar
+
         result = foo.bar.say("hello")
+
         self.assertEqual(result, "hello")
+
+        self.assertEqual(advice.before_calls, 1)
+        self.assertEqual(advice.around_calls, 2)
+        self.assertEqual(advice.after_calls, 1)
 
 
 if __name__ == '__main__':
