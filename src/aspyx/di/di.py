@@ -286,6 +286,8 @@ class EnvironmentInstanceProvider(AbstractInstanceProvider):
     def create(self, env: Environment, *args):
         return self.scope.get(self.provider, self.environment, lambda: [provider.create(env) for provider in self.dependencies] ) # already scope property!
 
+    def __str__(self):
+        return f"EnvironmentInstanceProvider({self.provider})"
 
 class ClassInstanceProvider(InstanceProvider):
     """
@@ -583,7 +585,7 @@ class Providers:
 
     @classmethod
     def report(cls):
-        for provider in Providers.providers.values():
+        for provider in Providers.cache.values():
             print(f"provider {provider.get_type().__qualname__}")
 
     @classmethod
@@ -774,17 +776,19 @@ class Environment:
 
                 # load providers
 
-                localProviders = [provider for provider in Providers.cache.values() if provider.get_module().startswith(scan)]
+                #{k: v for k, v in my_dict.items() if v % 2 == 0}
+
+                localProviders = {type: provider for type, provider in Providers.cache.items() if provider.get_module().startswith(scan)}
 
                 # register providers
 
-                for provider in localProviders:
-                    self.providers[provider.get_type()] = EnvironmentInstanceProvider(self, provider)
+                for type, provider in localProviders.items():
+                    self.providers[type] = EnvironmentInstanceProvider(self, provider)
 
                 # tweak dependencies
 
-                for provider in localProviders:
-                    cast(EnvironmentInstanceProvider, self.providers[provider.get_type()]).tweakDependencies(self.providers)
+                for type, provider in localProviders.items():
+                    cast(EnvironmentInstanceProvider, self.providers[type]).tweakDependencies(self.providers)
 
         # load environments
 
