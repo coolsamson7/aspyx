@@ -95,7 +95,7 @@ class TestInjector(unittest.TestCase):
     def test_injector(self):
         logging.basicConfig(level=logging.DEBUG)
 
-        environment = Environment(Configuration)  # creates eagerly!
+        environment = Environment(TestEnvironment)  # creates eagerly!
 
         advice = environment.get(SampleAdvice)
 

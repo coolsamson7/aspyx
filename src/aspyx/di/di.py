@@ -5,7 +5,8 @@ import logging
 import threading
 from abc import abstractmethod, ABC
 from enum import Enum, auto
-from typing import Type, Dict, TypeVar, Generic, Optional, cast
+from types import FunctionType
+from typing import Type, Dict, TypeVar, Generic, Optional, cast, Callable
 
 from aspyx.reflection import Decorators, TypeDescriptor, DecoratorDescriptor
 
@@ -52,7 +53,7 @@ class AbstractInstanceProvider(ABC, Generic[T]):
         pass
 
     @abstractmethod
-    def create(self, env: Environment):
+    def create(self, env: Environment, *args):
         pass
 
     @abstractmethod
@@ -111,63 +112,9 @@ class InstanceProvider(AbstractInstanceProvider):
 
         return True
 
-    def getArguments(self,  environment: Environment):
-        return [provider.create(environment) for provider in self.dependencies]
-
     @abstractmethod
-    def create(self, environment: Environment):
+    def create(self, environment: Environment, *args):
         pass
-
-class SingletonProvider(AbstractInstanceProvider):
-    """
-    A SingletonProvider wraps another InstanceProvider and ensures that only one instance is created."""
-    __slots__ = [
-        "provider",
-        "value",
-        "_lock"
-    ]
-
-    # constructor
-
-    def __init__(self, provider: AbstractInstanceProvider):
-        super().__init__()
-
-        self.provider = provider
-        self.value = None
-        self._lock = threading.Lock()
-
-    # implement
-
-    def get_module(self) -> str:
-        return self.provider.get_module()
-
-    def get_type(self) -> Type[T]:
-        return self.provider.get_type()
-
-    def is_eager(self) -> bool:
-        return self.provider.is_eager()
-
-    def is_singleton(self) -> bool:
-        return True
-
-    def get_dependencies(self) -> list[AbstractInstanceProvider]:
-        return self.provider.get_dependencies()
-
-    def resolve(self, context: Providers.Context) -> AbstractInstanceProvider:
-        self.provider.resolve(context)
-
-        return self
-
-    def __str__(self):
-        return f"SingletonProvider({self.provider})"
-
-    def create(self, environment: Environment):
-        if self.value is None:
-            with self._lock:
-                self.value = self.provider.create(environment)
-
-        return self.value
-
 
 class AmbiguousProvider(AbstractInstanceProvider):
     """
@@ -212,11 +159,132 @@ class AmbiguousProvider(AbstractInstanceProvider):
     def resolve(self, context: Providers.Context) -> AbstractInstanceProvider:
         return self
 
-    def create(self, environment: Environment):
-        raise InjectorException(f"mulitple candidates for type {self.type}")
+    def create(self, environment: Environment, *args):
+        raise InjectorException(f"multiple candidates for type {self.type}")
 
     def __str__(self):
         return f"AmbiguousProvider({self.type})"
+
+####### TEST
+
+class Scopes:
+    # static data
+
+    scopes : Dict[str, Type] = {}
+
+    # class methods
+
+    @classmethod
+    def register(cls, scopeClass: Type, name: str):
+        Scopes.scopes[name] = scopeClass
+
+def scope(name: str):
+    def decorator(cls):
+        Scopes.register(cls, name)
+
+        return cls
+
+    return decorator
+
+class Scope:
+    # properties
+
+    __slots__ = [
+    ]
+
+    # constructor
+
+    def __init__(self):
+        pass
+
+    # public
+
+    def get(self, provider: AbstractInstanceProvider, environment: Environment, argProvider: Callable[[],list]):
+        return provider.create(environment, *argProvider())
+
+@scope("singleton")
+class SingletonScope(Scope):
+    # properties
+
+    __slots__ = [
+        "value"
+    ]
+
+    # constructor
+
+    def __init__(self):
+        super().__init__()
+
+        self.value = None
+
+    # override
+
+    def get(self, provider: AbstractInstanceProvider, environment: Environment, argProvider: Callable[[],list]):
+        if self.value is None:
+            self.value = provider.create(environment, *argProvider())
+
+        return self.value
+
+class EnvironmentInstanceProvider(AbstractInstanceProvider):
+    # properties
+
+    __slots__ = [
+        "environment",
+        "scope",
+        "provider",
+        "dependencies",
+    ]
+
+    # constructor
+
+    def __init__(self, environment: Environment, provider: AbstractInstanceProvider):
+        super().__init__()
+
+        self.environment = environment
+        self.provider = provider
+        self.dependencies : list[AbstractInstanceProvider] = []
+
+        # compute scope TODO -> registry
+
+        if provider.is_singleton():
+            self.scope = SingletonScope()
+        else:
+            self.scope = Scope()
+
+    # implement
+
+    def resolve(self, context: Providers.Context) -> AbstractInstanceProvider:
+        pass # noop
+
+    def get_module(self) -> str:
+        return self.provider.get_module()
+
+    def get_type(self) -> Type[T]:
+        return self.provider.get_type()
+
+    def is_eager(self) -> bool:
+        return self.provider.is_eager()
+
+    def is_singleton(self) -> bool:
+        return self.provider.is_singleton()
+
+    # custom logic
+
+    def tweakDependencies(self, providers: dict[Type, AbstractInstanceProvider]):
+        for dependency in self.provider.get_dependencies():
+            instanceProvider = providers.get(dependency.get_type(), None)
+            if instanceProvider is None:
+                raise InjectorException(f"missing import for {dependency.get_type()} ")
+
+            self.dependencies.append(instanceProvider)
+            pass
+        pass
+
+    def get_dependencies(self) -> list[AbstractInstanceProvider]:
+        return self.provider.get_dependencies()
+
+    def create(self, env: Environment, *args):
+        return self.scope.get(self.provider, self.environment, lambda: [provider.create(env) for provider in self.dependencies] ) # already scope property!
 
 
 class ClassInstanceProvider(InstanceProvider):
@@ -269,11 +337,10 @@ class ClassInstanceProvider(InstanceProvider):
 
         return self
 
-    def create(self, environment: Environment):
+    def create(self, environment: Environment, *args):
         Environment.logger.debug(f"{self} create class {self.type.__qualname__}")
 
-        args = self.getArguments(environment)[:self.params]
-        return environment.created(self.type(*args))
+        return environment.created(self.type(*args[:self.params]))
 
     # object
 
@@ -312,12 +379,10 @@ class FunctionInstanceProvider(InstanceProvider):
 
         return self
 
-    def create(self, environment: Environment):
+    def create(self, environment: Environment, *args):
         Environment.logger.debug(f"{self} create class {self.type.__qualname__}")
 
-        configuration = self.getArguments(environment)[0]
-
-        instance = self.method(configuration)
+        instance = self.method(*args)
 
         return environment.created(instance)
 
@@ -359,10 +424,10 @@ class FactoryInstanceProvider(InstanceProvider):
 
         return self
 
-    def create(self, environment: Environment):
+    def create(self, environment: Environment, *args):
         Environment.logger.debug(f"{self} create class {self.type.__qualname__}")
 
-        return environment.created(self.getArguments(environment)[0].create())
+        return environment.created(args[0].create())
 
     def __str__(self):
         return f"FactoryInstanceProvider({self.host.__name__} -> {self.type.__name__})"
@@ -501,11 +566,6 @@ class Providers:
         # go
 
         Providers.providers[provider.get_type()] = provider
-
-        # singleton handling
-
-        if provider.is_singleton():
-            provider = SingletonProvider(provider)
 
         # cache providers
 
@@ -714,9 +774,17 @@ class Environment:
 
                 # load providers
 
-                for type, provider in Providers.cache.items():
-                    if provider.get_module().startswith(scan):
-                        add_provider(type, provider)
+                localProviders = [provider for provider in Providers.cache.values() if provider.get_module().startswith(scan)]
+
+                # register providers
+
+                for provider in localProviders:
+                    self.providers[provider.get_type()] = EnvironmentInstanceProvider(self, provider)
+
+                # tweak dependencies
+
+                for provider in localProviders:
+                    cast(EnvironmentInstanceProvider, self.providers[provider.get_type()]).tweakDependencies(self.providers)
 
         # load environments
 
