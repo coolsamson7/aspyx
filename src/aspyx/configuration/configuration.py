@@ -5,7 +5,7 @@ import os
 from typing import Type, TypeVar
 from dotenv import load_dotenv
 
-from aspyx.di import injectable, Environment, CallableProcessor, LifecycleCallable, Lifecycle, configuration
+from aspyx.di import injectable, Environment, CallableProcessor, LifecycleCallable, Lifecycle, environment
 from aspyx.reflection import Decorators, DecoratorDescriptor, TypeDescriptor
 
 T = TypeVar("T")
@@ -178,7 +178,7 @@ class ConfigurationLifecycleCallable(LifecycleCallable):
     def args(self, decorator: DecoratorDescriptor, method: TypeDescriptor.MethodDescriptor, environment: Environment):
         return [self.manager.get(decorator.args[0], method.paramTypes[0])]
 
-@configuration()
-class ConfigurationConfiguration:
+@environment()
+class ConfigurationEnvironment:
     def __init__(self):
         pass

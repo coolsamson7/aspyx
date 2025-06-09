@@ -16,7 +16,8 @@ The following features are supported
 Let's look at a simple example
 
 ```python
-from aspyx.di import injectable, on_init, on_destroy, configuration, Environment
+from aspyx.di import injectable, on_init, on_destroy, environment, Environment
+
 
 @injectable(singleton=False)
 class Foo:
@@ -26,7 +27,8 @@ class Foo:
     def hello(msg: str):
         print(f"hello {msg}")
 
-@injectable() # eager and singleton by default
+
+@injectable()  # eager and singleton by default
 class Bar:
     def __init__(self, foo: Foo):
         self.foo = foo
@@ -39,15 +41,17 @@ class Bar:
     def destroy(self):
         ...
 
+
 # this class will register all - specifically decorated - classes and factories in the own module
 # In this case Foo and Bar
 
-@configuration()
+@environment()
 class Configuration:
     # constructor
 
     def __init__(self):
         pass
+
 
 # go, forrest
 

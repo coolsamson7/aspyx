@@ -1,4 +1,4 @@
-from .configuration import ConfigurationManager, ConfigurationSource, EnvConfigurationSource, ConfigurationConfiguration, value
+from .configuration import ConfigurationManager, ConfigurationSource, EnvConfigurationSource, ConfigurationEnvironment, value
 
 __all__ = [
     "ConfigurationManager",
@@ -6,5 +6,5 @@ __all__ = [
     "EnvConfigurationSource",
     "ConfigurationConfiguration"
     "value",
-    "ConfigurationConfiguration"
+    "ConfigurationEnvironment"
 ]

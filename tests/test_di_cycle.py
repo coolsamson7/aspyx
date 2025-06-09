@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from aspyx.di import injectable, configuration, Environment
+from aspyx.di import injectable, environment, Environment
 from aspyx.di.di import InjectorException
 
 
@@ -17,8 +17,8 @@ class Bar:
     def __init__(self, foo: Foo):
         pass
 
-@configuration()
-class Configuration:
+@environment()
+class TestEnvironment:
     # constructor
 
     def __init__(self):
@@ -27,7 +27,7 @@ class Configuration:
 class TestCycle(unittest.TestCase):
     def test_cycle(self):
         with self.assertRaises(InjectorException):
-            env = Environment(Configuration)
+            env = Environment(TestEnvironment)
 
 
 if __name__ == '__main__':

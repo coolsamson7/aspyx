@@ -102,6 +102,8 @@ class TypeDescriptor:
 
     # internal
 
+    #isinstance(attr, classmethod)
+
     def _get_local_members(self, cls):
         return [
             (name, value)

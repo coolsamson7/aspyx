@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import unittest
 
-from aspyx.configuration import ConfigurationSource, ConfigurationManager, value, ConfigurationConfiguration
+from aspyx.configuration import ConfigurationSource, ConfigurationManager, value, ConfigurationEnvironment
 
-from aspyx.di import injectable, Environment, configuration, CallableProcessor
+from aspyx.di import injectable, Environment, environment, CallableProcessor
 
 
-@configuration(imports=[ConfigurationConfiguration])
+@environment(imports=[ConfigurationEnvironment])
 class Configuration:
     def __init__(self):
         pass

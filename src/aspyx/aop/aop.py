@@ -11,7 +11,7 @@ from typing import Optional, Dict, Type, Callable
 from sympy.solvers.diophantine.diophantine import descent
 
 from aspyx.reflection import Decorators, TypeDescriptor
-from aspyx.di import injectable, configuration, Providers, ClassInstanceProvider, Environment, PostProcessor
+from aspyx.di import injectable, environment, Providers, ClassInstanceProvider, Environment, PostProcessor
 
 
 class AOPException(Exception):
@@ -538,7 +538,7 @@ class AdviceProcessor(PostProcessor):
 
             setattr(instance, member.__name__, types.MethodType(wrap(joinPoints), instance))
 
-@configuration()
-class AOPConfiguration:
+@environment()
+class AOPEnvironment:
     def __init__(self):
         pass

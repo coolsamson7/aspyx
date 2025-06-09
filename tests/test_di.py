@@ -5,8 +5,9 @@ import logging
 import unittest
 from typing import Dict
 
-from aspyx.di import injectable, on_init, on_destroy, inject_environment, inject, Factory, create, configuration, Environment, PostProcessor, factory
-from di_import import ImportConfiguration, ImportedClass
+from aspyx.di import injectable, on_init, on_destroy, inject_environment, inject, Factory, create, environment, Environment, PostProcessor, factory
+from aspyx.di.di import InjectorException
+from di_import import ImportedEnvironment, ImportedClass
 
 # not here
 
@@ -32,10 +33,21 @@ class SamplePostProcessor(PostProcessor):
         pass #print(f"created a {instance}")
 
 class Foo:
-    pass
+    def __init__(self):
+        self.inited = False
 
-#@injectable()
+    @on_init()
+    def init(self):
+        self.inited = True
+
 class Baz:
+    def __init__(self):
+        self.inited = False
+
+    @on_init()
+    def init(self):
+        self.inited = True
+
     pass
 
 @injectable()
@@ -43,13 +55,44 @@ class Bazong:
     def __init__(self, foo: Foo):
         pass
 
+class Base:
+    def __init__(self):
+        pass
+
+class Ambiguous:
+    def __init__(self):
+        pass
+
+class Unknown:
+    def __init__(self):
+        pass#
+
+@injectable(singleton=False)
+class NonSingleton:
+    def __init__(self):
+        super().__init__()
+
 @injectable()
-class Bar:
+class Derived(Ambiguous):
+    def __init__(self):
+        super().__init__()
+
+@injectable()
+class Derived1(Ambiguous):
+    def __init__(self):
+        super().__init__()
+
+@injectable()
+class Bar(Base):
     def __init__(self, foo: Foo):
+        super().__init__()
+
+        self.bazong = None
+        self.baz = None
         self.foo = foo
         self.inited = False
         self.destroyed = False
-        self.evironment = None
+        self.environment = None
 
     @on_init()
     def init(self):
@@ -61,7 +104,7 @@ class Bar:
 
     @inject_environment()
     def initEnvironment(self, env: Environment):
-        self.evironment = env
+        self.environment = env
 
     @inject()
     def set(self, baz: Baz, bazong: Bazong) -> None:
@@ -78,8 +121,8 @@ class TestFactory(Factory[Foo]):
     def create(self) -> Foo:
         return Foo()
 
-@configuration()
-class SimpleConfiguration:
+@environment()
+class SimpleEnvironment:
     # constructor
 
     def __init__(self):
@@ -91,17 +134,40 @@ class SimpleConfiguration:
     def create(self) -> Baz:
         return Baz()
 
-@configuration(imports=[SimpleConfiguration, ImportConfiguration])
-class Configuration:
+@environment(imports=[SimpleEnvironment, ImportedEnvironment])
+class TestEnvironment:
     # constructor
 
     def __init__(self):
         pass
 
 class TestInject(unittest.TestCase):
+    def test_process_factory_instances(self):
+        env = Environment(SimpleEnvironment)
 
-    def test_create(self):
-        env = Environment(SimpleConfiguration)
+        baz = env.get(Baz)
+        foo = env.get(Foo)
+        self.assertEqual(baz.inited, True)
+        self.assertEqual(foo.inited, True)
+
+    def test_inject_base_class(self):
+        env = Environment(SimpleEnvironment)
+
+        base = env.get(Base)
+        self.assertEqual(type(base), Bar)
+
+    def test_inject_ambiguous_class(self):
+        with self.assertRaises(InjectorException):
+            env = Environment(TestEnvironment)
+            env.get(Ambiguous)
+
+    def test_create_unknown(self):
+        with self.assertRaises(InjectorException):
+            env = Environment(TestEnvironment)
+            env.get(Unknown)
+
+    def test_inject_constructor(self):
+        env = Environment(SimpleEnvironment)
 
         bar = env.get(Bar)
         baz = env.get(Baz)
@@ -109,28 +175,65 @@ class TestInject(unittest.TestCase):
         foo = env.get(Foo)
 
         self.assertIsNotNone(bar)
-        self.assertEqual(bar.inited, True)
         self.assertIs(bar.foo, foo)
         self.assertIs(bar.baz, baz)
         self.assertIs(bar.bazong, bazong)
 
+    def test_factory(self):
+        env = Environment(SimpleEnvironment)
+        foo = env.get(Foo)
+        self.assertIsNotNone(foo)
+
+    def test_create_factory(self):
+        env = Environment(SimpleEnvironment)
+        baz = env.get(Baz)
+        self.assertIsNotNone(baz)
+
     def test_singleton(self):
-        env = Environment(SimpleConfiguration)
+        env = Environment(SimpleEnvironment)
+
+        # injectable
 
         bar = env.get(Bar)
         bar1 = env.get(Bar)
-
         self.assertIs(bar, bar1)
 
+        # factory
+
+        foo = env.get(Foo)
+        foo1 = env.get(Foo)
+        self.assertIs(foo,foo1)
+
+        # create
+
+        baz  = env.get(Baz)
+        baz1 = env.get(Baz)
+        self.assertIs(baz, baz1)
+
+    def test_non_singleton(self):
+        env = Environment(SimpleEnvironment)
+
+        ns = env.get(NonSingleton)
+        ns1 = env.get(NonSingleton)
+
+        self.assertIsNot(ns, ns1)
+
     def test_import_configurations(self):
-        env = Environment(Configuration)
+        env = Environment(TestEnvironment)
 
         imported = env.get(ImportedClass)
 
         self.assertIsNotNone(imported)
 
+    def test_init(self):
+        env = Environment(SimpleEnvironment)
+
+        bar = env.get(Bar)
+
+        self.assertEqual(bar.inited, True)
+
     def test_destroy(self):
-        env = Environment(SimpleConfiguration)
+        env = Environment(SimpleEnvironment)
 
         bar = env.get(Bar)
 
@@ -138,8 +241,8 @@ class TestInject(unittest.TestCase):
 
         self.assertEqual(bar.destroyed, True)
 
-    def test_perfomance(self):
-        env = Environment(SimpleConfiguration)
+    def test_performance(self):
+        env = Environment(SimpleEnvironment)
 
         start = time.perf_counter()
         for _ in range(1000000):

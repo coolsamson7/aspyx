@@ -3,9 +3,9 @@ from __future__ import annotations
 import logging
 import unittest
 
-from aspyx.aop.aop import AOPConfiguration, classes
+from aspyx.aop.aop import AOPEnvironment, classes
 from aspyx.reflection import Decorators
-from aspyx.di import injectable, inject, Environment, configuration
+from aspyx.di import injectable, inject, Environment, environment
 from aspyx.aop import advice, before, after, around, methods, Invocation
 
 
@@ -16,8 +16,8 @@ def transactional():
 
     return decorator
 
-@configuration(imports=[AOPConfiguration])
-class Configuration:
+@environment(imports=[AOPEnvironment])
+class TestEnvironment:
     def __init__(self):
         pass
 

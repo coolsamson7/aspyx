@@ -432,7 +432,7 @@ def injectable(eager=True, singleton=True):
 
         Providers.register(ClassInstanceProvider(cls, eager, singleton))
 
-        #TODOregisterFactories(cls)
+        #TODO registerFactories(cls)
 
         return cls
 
@@ -481,16 +481,18 @@ def on_destroy():
 
     return decorator
 
-def configuration(imports: Optional[list[Type]] = None):
+def environment(imports: Optional[list[Type]] = None):
     """
-    This annotation is used to mark configuration classes.
+    This annotation is used to mark classes that control the set of injectables that will be managed based on their location
+    relative to the module of the class. All @injectable s and @factory s that are located in the same or any sub-module will
+    be registered and managed accordingly.
     Arguments:
-        imports (Optional[list[Type]]): Optional list of imported configuration types
+        imports (Optional[list[Type]]): Optional list of imported environment types
     """
     def decorator(cls):
         Providers.register(ClassInstanceProvider(cls, True, True))
 
-        Decorators.add(cls, configuration, imports)
+        Decorators.add(cls, environment, imports)
         Decorators.add(cls, injectable) # do we need that?
 
         registerFactories(cls)
@@ -523,16 +525,6 @@ class Environment:
     """
     Central class that manages the lifecycle of instances and their dependencies.
     """
-    # local class
-
-    class Instance:
-        __slots__ = ["instance"]
-
-        def __init__(self, instance):
-            self.instance = instance
-
-        def __str__(self):
-            return f"Instance({self.instance.__class__})"
 
     # static data
 
@@ -581,24 +573,24 @@ class Environment:
 
             self.providers[provider.type] = Providers.getProvider(provider.type)
 
-        def loadConfiguration(conf: Type):
+        def load_environment(conf: Type):
             if conf not in loaded:
-                Environment.logger.debug(f"load configuration {conf.__qualname__}")
+                Environment.logger.debug(f"load environment {conf.__qualname__}")
 
                 loaded.add(conf)
 
                 # sanity check
 
-                decorator = TypeDescriptor.for_type(conf).get_decorator(configuration)
+                decorator = TypeDescriptor.for_type(conf).get_decorator(environment)
                 if decorator is None:
-                    raise InjectorException(f"{conf.__name__} is not a configuration class")
+                    raise InjectorException(f"{conf.__name__} is not an environment class")
 
                 scan = conf.__module__  # maybe add parameters as well
 
                 # recursion
 
-                for importConfiguration in decorator.args[0] or []:
-                    loadConfiguration(importConfiguration)
+                for import_environment in decorator.args[0] or []:
+                    load_environment(import_environment)
 
                 # load providers
 
@@ -606,12 +598,12 @@ class Environment:
                     if provider.module().startswith(scan):
                         addProvider(provider)
 
-        # load configurations
+        # load environments
 
         if parent is None:
-            loadConfiguration(DIConfiguration) # internal stuff
+            load_environment(DIEnvironment) # internal stuff
 
-        loadConfiguration(conf)
+        load_environment(conf)
 
         # construct eager objects
 
@@ -634,7 +626,7 @@ class Environment:
 
         # remember instance
 
-        self.instances.append(Environment.Instance(instance))
+        self.instances.append(instance)
 
         # execute processors
 
@@ -647,7 +639,7 @@ class Environment:
         destroy all managed instances by calling the appropriate lifecycle methods
         """
         for instance in self.instances:
-            self.executeProcessors(Lifecycle.ON_DESTROY, instance.instance)
+            self.executeProcessors(Lifecycle.ON_DESTROY, instance)
 
         self.instances.clear() # make the cy happy
 
@@ -785,8 +777,8 @@ class InjectLifecycleCallable(LifecycleCallable):
 
 # internal class that is required to import technical instance providers
 
-@configuration()
-class DIConfiguration:
+@environment()
+class DIEnvironment:
     __slots__ = []
 
     def __init__(self):

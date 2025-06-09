@@ -1,6 +1,6 @@
-from aspyx.di import configuration, injectable
+from aspyx.di import environment, injectable
 
-@configuration()
+@environment()
 class SubImportConfiguration:
     def __init__(self):
         pass
