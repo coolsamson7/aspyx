@@ -160,14 +160,16 @@ class Foo:
 
 ## Definition
 
-An Environment is the container that manages the lifecycle of objects. It keeps track of all created instances.
+An `Environment` is the container that manages the lifecycle of objects. The set of classes and instances is determined by a constructor argument that controls the class registry.
 
 **Example**: 
 ```python
-@Environment()
+@environment()
 class SampleEnvironment:
     def __init__(self):
         pass
+
+environment = Environment(SampleEnvironment)
 ```
 
 The default is that all eligible classes, that are implemented in the containing module or in any submodule will be managed.
@@ -176,7 +178,7 @@ By adding an `imports: list[Type]` parameter, specifying other environment types
 
 **Example**: 
 ```python
-@Environment()
+@environment()
 class SampleEnvironmen(imports=[OtherEnvironment])):
     def __init__(self):
         pass
