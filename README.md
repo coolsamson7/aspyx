@@ -1,5 +1,23 @@
 # aspyx
 
+## Table of Contents
+
+- [Introduction](#aspyx)
+- [Registration](#registration)
+  - [Class](#class)
+  - [Class Factory](#class-factory)
+  - [Method](#method)
+- [Environment](#environment)
+  - [Definition](#definition)
+  - [Retrieval](#retrieval)
+- [Lifecycle methods](#lifecycle-methods)
+- [Post Processors](#post-processors)
+- [Custom scopes](#custom-scopes)
+- [AOP](#aop)
+- [Configuration](#configuration)
+
+# Introduction
+
 Aspyx is a small python libary, that adds support for both dependency injection and aop.
 
 The following features are supported 
@@ -196,9 +214,9 @@ The difference is, that in the first case, class instances of imported modules w
 
 The method
 
-```shutdown()````
+```shutdown()```
 
-is used when a conatienr is not needed anymore. It will call any `on_detroy()` of managed objects.
+is used when a container is not needed anymore. It will call any `on_destroy()` of all created instances.
 
 ## Retrieval
 
@@ -206,19 +224,19 @@ is used when a conatienr is not needed anymore. It will call any `on_detroy()` o
 def get(type: Type[T]) -> T
 ```
 
-is used to retrieve object instances. Depending on the according scope it will return cached insatcnes pr may need to create them on the fly.
+is used to retrieve object instances. Depending on the respective scope it will return either cached instances or newly instantiated objects.
 
 The container knows about class hierarchies and is able to `get` base classes, as long as there is only one implementation. 
 
 In case of ambiguities, it will throw an exception.
 
-Please be aware, that a base class are not required to be annotated with `@injectable`, as this would mean, that it could be created on its own as well. ( Which is possible as well, btw. ) 
+Please be aware, that a base class are not _required_ to be annotated with `@injectable`, as this would mean, that it could be created on its own as well. ( Which is possible as well, btw. ) 
 
 # Lifecycle methods
 
-It is possible to declare methods that will be called from the conatiner
+It is possible to declare methods that will be called from the container
 - `@on_init()` called after the constructor and all other injections.
-- `@on_destroy()` called after the container has shutdown
+- `@on_destroy()` called after the container has been shut down
 
 # Post Processors
 
@@ -229,7 +247,7 @@ As part of the instantiation logic it is possible to define post processors that
 @injectable()
 class SamplePostProcessor(PostProcessor):
     def process(self, instance: object, environment: Environment):
-        pass #print(f"created a {instance}")
+        print(f"created a {instance}")
 ```
 
 Any implementing class of `PostProcessor` that is eligible for injection will be called by passing the new instance.
@@ -276,7 +294,7 @@ class SingletonScope(Scope):
 
 # AOP
 
-It is possible to define different Aspects, that will be part of method calling flow. This login fits nicely in the library, since the DI framework controls the instantiation logic and can handle aspects within a regular post processor. 
+It is possible to define different Aspects, that will be part of method calling flow. This logic fits nicely in the library, since the DI framework controls the instantiation logic and can handle aspects within a regular post processor. 
 
 Advice classes need to be part of classes that add a `@advice()` decorator and can define methods that add aspects.
 
@@ -305,13 +323,13 @@ class SampleAdvice:
 
 Different aspects - with the appropriate decorator - are possible:
 - `before` methods that will be executed _prior_ to the original method
-- `around` methods that will be executed _around_ to the original method givin it the possibility add side effects or even change the parameters.
+- `around` methods that will be executed _around_ to the original method giving it the possibility add side effects or even change the parameters.
 - `after` methods that will be executed _after_ to the original method
 - `error` methods that will be executed in case of a caught exception, which can be retrieved by `invocation.exception`
 
 All methods are expected to hava single `Invocation` parameter, that stores, the function, args and kwargs, the return value and possible exceptions.
 
-It is essential for àround`methods to call `proceed()` on the invocation, which will call the next around method in the chain or last but not least the original method.
+It is essential for àround`methods to call `proceed()` on the invocation, which will call the next around method in the chain and finally the original method.
 If the `proceed` is called with parameters, they will replace the original parameters! 
 
 The arguments to the corresponding decorators control, how aspects are associated with which methods.
@@ -324,7 +342,7 @@ Both add the fluent methods:
 - `matches(re: str)` defines regular expressions for methods or classes
 - `decorated_with(type: Type)` defines decorators on methods or classes
 
-The fluent methods `named`, `matches` and `of_type` can be called multiple timesAs !
+The fluent methods `named`, `matches` and `of_type` can be called multiple timess!
 
 # Configuration 
 
@@ -354,7 +372,7 @@ class ConfigurationSource(ABC):
         pass
 ```
 
-The `load` method is able to return a tree-like structure by returnin a `dict`.
+The `load` method is able to return a tree-like structure by returning a `dict`.
 
 As a default environment variables are already supported.
 
