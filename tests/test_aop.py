@@ -11,7 +11,7 @@ from aspyx.di.aop import advice, before, after, around, methods, Invocation, err
 def transactional():
     def decorator(func):
         Decorators.add(func, transactional)
-        return func
+        return func #
 
     return decorator
 
