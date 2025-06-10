@@ -5,12 +5,14 @@ Aspyx is a small python libary, that adds support for both dependency injection 
 The following features are supported 
 - constructor injection
 - method injection
+- post processors
 - factory classes and methods
 - support for eager construction
 - support for singletons
 - lifecycle events methods
-- bundling of injectable object sets by configuration classes including recursive imports
-- container instances that relate to configration classes and manage the lifecylce of related objects
+- custom scopes
+- bundling of injectable object sets by environment classes including recursive imports and inheritance
+- container instances that relate to environment classes and manage the lifecylce of related objects
 - hierarchical containers
 
 Let's look at a simple example
@@ -67,14 +69,14 @@ class SampleAdvice:
     def __init__(self):
         pass
 
-    @before(methods().named("hello").ofType(Foo))
+    @before(methods().named("hello").of_type(Foo))
     def callBefore(self, invocation: Invocation):
         print("before Foo.hello(...)")
 
-    @error(methods().named("hello").ofType(Foo))
+    @error(methods().named("hello").of_type(Foo))
     def callError(self, invocation: Invocation):
         print("error Foo.hello(...)")
-        print(invocation.error)
+        print(invocation.exception)
 
     @around(methods().named("hello"))
     def callAround(self, invocation: Invocation):
@@ -94,7 +96,7 @@ Let's look at the details
 
 # Registration
 
-Different mechanisms are available that make classes 'injectible' by the container 
+Different mechanisms are available that make classes eligible for injection
 
 ## Class
 
@@ -114,14 +116,14 @@ class Foo:
 
 
  The decorator accepts the keyword arguments
- - `eager=True` if `True`, the container will create the instances automatically while booting
- - `scope="singleton"` defines how often insatcens will be created. `singleton` will create it only once, while `request` will recreate it on every inejction request
+ - `eager=True` if `True`, the container will create the instances automatically while booting the environment
+ - `scope="singleton"` defines how often instances will be created. `singleton` will create it only once - per environment -, while `request` will recreate it on every injection request
 
  Other scopes can be defined. Please check the corresponding chapter.
 
 ## Class Factory
 
-Classes that implement the `Factory` base class and are annotated wirh `@factory` will register the appropriate class.
+Classes that implement the `Factory` base class and are annotated with `@factory` will register the appropriate classes returned by the `create` method.
 
 **Example**: 
 ```python
@@ -158,7 +160,7 @@ class Foo:
 
 ## Definition
 
-An Environment is the container that manages the lifecycle of objects
+An Environment is the container that manages the lifecycle of objects. It keeps track of all created instances.
 
 **Example**: 
 ```python
@@ -168,9 +170,9 @@ class SampleEnvironment:
         pass
 ```
 
-The default is that all registered classes, that are implemented in the containing module or in any submodules will be managed.
+The default is that all eligible classes, that are implemented in the containing module or in any submodule will be managed.
 
-By adding an `imports: list[Type]` parameter, specifying other environment types, it will register the appropriate classes  recursively.
+By adding an `imports: list[Type]` parameter, specifying other environment types, it will register the appropriate classes recursively.
 
 **Example**: 
 ```python
@@ -180,7 +182,7 @@ class SampleEnvironmen(imports=[OtherEnvironment])):
         pass
 ```
 
-Another possibility is to add a parent environment
+Another possibility is to add a parent environment as an `Environment` constructor parameter
 
 **Example**: 
 ```python
@@ -188,7 +190,13 @@ rootEnvironment = Environment(RootEnvironment)
 environment = Environment(SampleEnvironment, parent=rootEnvironment)
 ```
 
-The difference is, that in the first case, class instances of imported modules will be created in the scope of the _own_ environment, while in the second case, it will simply return instances managed by the parent.
+The difference is, that in the first case, class instances of imported modules will be created in the scope of the _own_ environment, while in the second case, it will return instances managed by the parent.
+
+The method
+
+```shutdown()````
+
+is used when a conatienr is not needed anymore. It will call any `on_detroy()` of managed objects.
 
 ## Retrieval
 
@@ -196,19 +204,37 @@ The difference is, that in the first case, class instances of imported modules w
 def get(type: Type[T]) -> T
 ```
 
-is used to retrieve object instances. Depending on the accoring scope it may need to crate them on the fly.
+is used to retrieve object instances. Depending on the according scope it will return cached insatcnes pr may need to create them on the fly.
 
-The container knwos about class hierarchies and is able to `get` base classes, as long as there is only one implementation. 
+The container knows about class hierarchies and is able to `get` base classes, as long as there is only one implementation. 
 
 In case of ambiguities, it will throw an exception.
 
-Please be aware, that a base class must not be annotated with `@injectable`, as this would mean, that it could be created on its own as well. ( Which is possible as well, btw. ) 
+Please be aware, that a base class are not required to be annotated with `@injectable`, as this would mean, that it could be created on its own as well. ( Which is possible as well, btw. ) 
 
 # Lifecycle methods
 
-It is possible to decdlare methods that will be called from the conatiner
-- `@on_init()` called after the constructor 
+It is possible to declare methods that will be called from the conatiner
+- `@on_init()` called after the constructor and all other injections.
 - `@on_destroy()` called after the container has shutdown
+
+# Post Processors
+
+As part of the instantiation logic it is possible to define post processors that execute any side effect on newly created instances.
+
+**Example**: 
+```python
+@injectable()
+class SamplePostProcessor(PostProcessor):
+    def process(self, instance: object, environment: Environment):
+        pass #print(f"created a {instance}")
+```
+
+Any implementing class of `PostProcessor` that is eligible for injection will be called by passing the new instance.
+
+Please be aware, that a post processor will only handle instances _after_ its _own_ registration.
+
+As injectables within a single file will be handled in the order as they are declared, a post processor will only take effect for all classes after its declaration!
 
 # Custom scopes
 
@@ -221,11 +247,11 @@ def get(self, provider: AbstractInstanceProvider, environment: Environment, argP
 ```
 
 Arguments are:
-- `provider` the actial provider that will create an instance
-- `environment`the requsting environment
+- `provider` the actual provider that will create an instance
+- `environment`the requesting environment
 - `argPovider` a function that can be called to compute the required arguments recursively
 
-**Example**: The code of the singleton provider
+**Example**: The simplified code of the singleton provider ( disregarding locking logic )
 
 ```python
 @scope("singleton")
@@ -246,14 +272,64 @@ class SingletonScope(Scope):
         return self.value
 ```
 
-# Aspects
+# AOP
 
-TODO
+It is possible to define different Aspects, that will be part of method calling flow. This login fits nicely in the library, since the DI framework controls the instantiation logic and can handle aspects within a regular post processor. 
+
+Advice classes need to be part of classes that add a `@advice()` decorator and can define methods that add aspects.
+
+```python
+@advice()
+class SampleAdvice:
+    def __init__(self):  # could inject dependencies
+        pass
+
+    @before(methods().named("hello").of_type(Foo))
+    def callBefore(self, invocation: Invocation):
+        # arguments: invocation.args
+        print("before Foo.hello(...)")
+
+    @error(methods().named("hello").of_type(Foo))
+    def callError(self, invocation: Invocation):
+        print("error Foo.hello(...)")
+        print(invocation.exception)
+
+    @around(methods().named("hello"))
+    def callAround(self, invocation: Invocation):
+        print("around Foo.hello()")
+
+        return invocation.proceed()  # will leave a result in invocation.result or invocation.exception in case of an exception
+```
+
+Different aspects - with the appropriate decorator - are possible:
+- `before` methods that will be executed _prior_ to the original method
+- `around` methods that will be executed _around_ to the original method givin it the possibility add side effects or even change the parameters.
+- `after` methods that will be executed _after_ to the original method
+- `error` methods that will be executed in case of a caught exception, which can be retrieved by `invocation.exception`
+
+All methods are expected to hava single `Invocation` parameter, that stores, the function, args and kwargs, the return value and possible exceptions.
+
+It is essential for àround`methods to call `proceed()` on the invocation, which will call the next around method in the chain or last but not least the original method.
+If the `proceed` is called with parameters, they will replace the original parameters! 
+
+The arguments to the corresponding decorators control, how aspects are associated with which methods.
+A fluent interface is used describe the mapping. 
+The parameters restrict either methods or classes and are constructed by a call to either `methods()` or `classes()`.
+
+Both add the fluent methods:
+- `of_type(type: Type)` defines the matching classes
+- `named(name: str)` defines method or class names
+- `matches(re: str)` defines regular expressions for methods or classes
+- `decorated_with(type: Type)` defines decorators on methods or classes
+
+The fluent methods `named`, `matches` and `of_type` can be called multiple timesAs !
 
 # Configuration 
 
+It is possible to inject configuration values, by decorating methods with `@value(<name>)` given a configuration key.
+
 ```python
-@inejctable()
+@injectable()
 class Foo:
     def __init__(self):
         pass
@@ -261,5 +337,49 @@ class Foo:
     @value("OS")
     def inject_value(self, os: str):
         ...
+```
+
+This concept relies on a central object `ConfigurationManager` that stores the overall configuration values as provided by so called configuration sources that are defined as follows.
+
+```python
+class ConfigurationSource(ABC):
+    def __init__(self, manager: ConfigurationManager):
+        manager._register(self)
+        pass
+
+    @abstractmethod
+    def load(self) -> dict:
+        pass
+```
+
+The `load` method is able to return a tree-like structure by returnin a `dict`.
+
+As a default environment variables are already supported.
+
+Other sources can be added dynamically by just registering them.
+
+```python
+@injectable()
+class SampleConfigurationSource(ConfigurationSource):
+    # constructor
+
+    def __init__(self, manager: ConfigurationManager):
+        super().__init__(manager)
+
+
+    def load(self) -> dict:
+        return {
+            "a": 1, 
+            "b": {
+                "d": "2", 
+                "e": 3, 
+                "f": 4
+                }
+            }
+```
+
+
+
+
       
 

@@ -60,11 +60,11 @@ class SampleAdvice:
 
     # aspects
 
-    @before(methods().named("say").ofType(Foo).matches(".*"))
+    @before(methods().named("say").of_type(Foo).matches(".*"))
     def callBeforeFoo(self, invocation: Invocation):
         self.before_calls += 1
 
-    @before(methods().named("say").ofType(Bar))
+    @before(methods().named("say").of_type(Bar))
     def callBeforeBar(self, invocation: Invocation):
         self.before_calls += 1
 
@@ -78,7 +78,7 @@ class SampleAdvice:
 
         return invocation.proceed()
 
-    @around(methods().decoratedWith(transactional))
+    @around(methods().decorated_with(transactional))
     def callTransactional1(self, invocation: Invocation):
         self.around_calls += 1
 

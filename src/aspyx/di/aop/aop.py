@@ -84,11 +84,11 @@ class AspectTarget(ABC):
 
         return self
     
-    def ofType(self, type: Type):
+    def of_type(self, type: Type):
         self.types.append(type)
         return self
 
-    def decoratedWith(self, decorator):
+    def decorated_with(self, decorator):
         self.decorators.append(decorator)
         return self
     
@@ -282,7 +282,7 @@ class Invocation:
         "args",
         "kwargs",
         "result",
-        "error",
+        "exception",
         "joinPoints",
         "currentJoinPoint",
     ]
@@ -291,10 +291,10 @@ class Invocation:
 
     def __init__(self,  func, joinPoints: JoinPoints):
         self.func = func
-        self.args = None
+        self.args : list[object] = []
         self.kwargs = None
         self.result = None
-        self.error = None
+        self.exception = None
         self.joinPoints = joinPoints
         self.currentJoinPoint = None
 
@@ -315,7 +315,7 @@ class Invocation:
             self.result = self.joinPoints.around[0].call(self) # will follow the proceed chain
 
         except Exception as e:
-            self.error = e
+            self.exception = e
             for joinPoint in self.joinPoints.error:
                 joinPoint.call(self)
 
@@ -324,8 +324,8 @@ class Invocation:
         for joinPoint in self.joinPoints.after:
             joinPoint.call(self)
 
-        if self.error is not None:
-            raise self.error # rethrow the error
+        if self.exception is not None:
+            raise self.exception # rethrow the error
         else:
             return self.result
 
