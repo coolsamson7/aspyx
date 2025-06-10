@@ -30,12 +30,12 @@ The following features are supported
 - post processors
 - factory classes and methods
 - support for eager construction
-- support for singletons
+- support for singleton and reuqest scopes
+- possibilty to add custom scopes
 - lifecycle events methods
-- custom scopes
 - bundling of injectable object sets by environment classes including recursive imports and inheritance
 - container instances that relate to environment classes and manage the lifecylce of related objects
-- hierarchical containers
+- hierarchical environments
 
 Let's look at a simple example
 
@@ -239,8 +239,10 @@ Please be aware, that a base class are not _required_ to be annotated with `@inj
 # Lifecycle methods
 
 It is possible to declare methods that will be called from the container
-- `@on_init()` called after the constructor and all other injections.
-- `@on_destroy()` called after the container has been shut down
+- `@on_init()` 
+   called after the constructor and all other injections.
+- `@on_destroy()` 
+   called after the container has been shut down
 
 # Post Processors
 
@@ -326,14 +328,18 @@ class SampleAdvice:
 ```
 
 Different aspects - with the appropriate decorator - are possible:
-- `before` methods that will be executed _prior_ to the original method
-- `around` methods that will be executed _around_ to the original method giving it the possibility add side effects or even change the parameters.
-- `after` methods that will be executed _after_ to the original method
-- `error` methods that will be executed in case of a caught exception, which can be retrieved by `invocation.exception`
+- `before` 
+   methods that will be executed _prior_ to the original method
+- `around` 
+   methods that will be executed _around_ to the original method giving it the possibility add side effects or even change the parameters.
+- `after`
+    methods that will be executed _after_ to the original method
+- `error` 
+   methods that will be executed in case of a caught exception, which can be retrieved by `invocation.exception`
 
 All methods are expected to hava single `Invocation` parameter, that stores, the function, args and kwargs, the return value and possible exceptions.
 
-It is essential for àround`methods to call `proceed()` on the invocation, which will call the next around method in the chain and finally the original method.
+It is essential for `around` methods to call `proceed()` on the invocation, which will call the next around method in the chain and finally the original method.
 If the `proceed` is called with parameters, they will replace the original parameters! 
 
 The arguments to the corresponding decorators control, how aspects are associated with which methods.
@@ -341,10 +347,14 @@ A fluent interface is used describe the mapping.
 The parameters restrict either methods or classes and are constructed by a call to either `methods()` or `classes()`.
 
 Both add the fluent methods:
-- `of_type(type: Type)` defines the matching classes
-- `named(name: str)` defines method or class names
-- `matches(re: str)` defines regular expressions for methods or classes
-- `decorated_with(type: Type)` defines decorators on methods or classes
+- `of_type(type: Type)` 
+   defines the matching classes
+- `named(name: str)` 
+   defines method or class names
+- `matches(re: str)` 
+   defines regular expressions for methods or classes
+- `decorated_with(type: Type)` 
+   defines decorators on methods or classes
 
 The fluent methods `named`, `matches` and `of_type` can be called multiple timess!
 
