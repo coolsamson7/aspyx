@@ -30,15 +30,11 @@ class Foo:
 
 @injectable()  # eager and singleton by default
 class Bar:
-    def __init__(self, foo: Foo):
+    def __init__(self, foo: Foo): # will inject the Foo dependency
         self.foo = foo
 
     @on_init()
     def init(self):
-        ...
-
-    @on_destroy()
-    def destroy(self):
         ...
 
 
@@ -46,7 +42,7 @@ class Bar:
 # In this case Foo and Bar
 
 @environment()
-class Configuration:
+class SampleEnvironment:
     # constructor
 
     def __init__(self):
@@ -55,7 +51,7 @@ class Configuration:
 
 # go, forrest
 
-environment = Environment(Configuration)
+environment = SampleEnvironment(Configuration)
 
 bar = env.get(Bar)
 bar.foo.hello("Andi")
@@ -93,5 +89,25 @@ The invocation parameter stores the complete context of the current execution, w
 - kwargs
 - the result
 - the possible caught error
+
+Let's look at the details
+
+# Registration
+
+Different mechanisms are available that a
+
+## Class
+
+## Class Factory
+
+## Method 
+
+# Injection
+
+# Aspects
+
+# Configuartion 
+
+  #
 
 
