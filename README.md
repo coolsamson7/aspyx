@@ -1,5 +1,9 @@
 # aspyx
 
+![Pylint](https://github.com/andreasernst/aspyx/actions/workflows/pylint.yml/badge.svg)
+
+
+
 ## Table of Contents
 
 - [Introduction](#aspyx)
