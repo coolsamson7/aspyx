@@ -3,10 +3,9 @@ from __future__ import annotations
 import logging
 import unittest
 
-from aspyx.aop.aop import AOPEnvironment, classes
 from aspyx.reflection import Decorators
-from aspyx.di import injectable, inject, Environment, environment
-from aspyx.aop import advice, before, after, around, methods, Invocation
+from aspyx.di import injectable, Environment, environment
+from aspyx.di.aop import advice, before, after, around, methods, Invocation
 
 
 def transactional():
@@ -16,7 +15,7 @@ def transactional():
 
     return decorator
 
-@environment(imports=[AOPEnvironment])
+@environment()
 class TestEnvironment:
     def __init__(self):
         pass
@@ -92,7 +91,7 @@ class SampleAdvice:
         return invocation.proceed()
 
 class TestInjector(unittest.TestCase):
-    def test_injector(self):
+    def test_advice(self):
         logging.basicConfig(level=logging.DEBUG)
 
         environment = Environment(TestEnvironment)  # creates eagerly!

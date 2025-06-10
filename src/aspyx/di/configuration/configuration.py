@@ -41,11 +41,11 @@ class ConfigurationManager:
 
     def _register(self, source: ConfigurationSource):
         self.sources.append(source)
-        pass
+        self.load_source(source)
 
     # public
 
-    def load(self):
+    def load_source(self,  source: ConfigurationSource):
         def merge_dicts(a: dict, b: dict) -> dict:
             result = a.copy()
             for key, b_val in b.items():
@@ -59,8 +59,7 @@ class ConfigurationManager:
                     result[key] = b_val
             return result
 
-        for source in self.sources:
-            self._data = merge_dicts(self._data, source.load())
+        self._data = merge_dicts(self._data, source.load())
 
     def get(self, path: str, type: Type[T], default=None) -> T:
         def resolve_value(path: str, default=None) -> T:
@@ -177,8 +176,3 @@ class ConfigurationLifecycleCallable(LifecycleCallable):
 
     def args(self, decorator: DecoratorDescriptor, method: TypeDescriptor.MethodDescriptor, environment: Environment):
         return [self.manager.get(decorator.args[0], method.paramTypes[0])]
-
-@environment()
-class ConfigurationEnvironment:
-    def __init__(self):
-        pass

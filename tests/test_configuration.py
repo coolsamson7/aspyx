@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import unittest
 
-from aspyx.configuration import ConfigurationSource, ConfigurationManager, value, ConfigurationEnvironment
+from aspyx.di.configuration import ConfigurationSource, ConfigurationManager, value
 
-from aspyx.di import injectable, Environment, environment, CallableProcessor
+from aspyx.di import injectable, Environment, environment
 
 
-@environment(imports=[ConfigurationEnvironment])
+@environment()
 class Configuration:
     def __init__(self):
         pass
@@ -33,14 +33,14 @@ class SampleConfigurationSource(ConfigurationSource):
 @injectable()
 class Foo:
     def __init__(self, manager: ConfigurationManager):
-        manager.load()
+        pass
 
     @value("b.d", 0)
     def set_foo(self, value: int):
         self.value = value
 
 class TestConfiguration(unittest.TestCase):
-    def testInjection(self):
+    def testConfigurationInjection(self):
         env = Environment(Configuration)
         foo = env.get(Foo)
         self.assertEqual(foo.value, 2)

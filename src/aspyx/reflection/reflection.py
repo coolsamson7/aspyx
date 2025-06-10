@@ -29,7 +29,7 @@ class Decorators:
 class TypeDescriptor:
     # inner class
 
-    class MethodDescriptor:  # TODO static methods
+    class MethodDescriptor:
         def __init__(self, cls, method: Callable):
             self.clazz = cls
             self.method = method

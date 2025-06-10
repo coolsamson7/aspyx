@@ -5,8 +5,7 @@ import logging
 import unittest
 from typing import Dict
 
-from aspyx.di import injectable, on_init, on_destroy, inject_environment, inject, Factory, create, environment, Environment, PostProcessor, factory
-from aspyx.di.di import InjectorException
+from aspyx.di import InjectorException, injectable, on_init, on_destroy, inject_environment, inject, Factory, create, environment, Environment, PostProcessor, factory
 from di_import import ImportedEnvironment, ImportedClass
 
 # not here
@@ -29,7 +28,7 @@ configure_logging({
 
 @injectable()
 class SamplePostProcessor(PostProcessor):
-    def process(self, instance: object):
+    def process(self, instance: object, environment: Environment):
         pass #print(f"created a {instance}")
 
 class Foo:

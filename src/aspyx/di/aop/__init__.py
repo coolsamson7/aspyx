@@ -1,4 +1,4 @@
-from .aop import before, after, around, error, advice, methods, Invocation
+from .aop import before, after, classes, around, error, advice, methods, Invocation
 __all__ = [
     "before",
     "after",
@@ -8,5 +8,4 @@ __all__ = [
     "classes",
     "methods",
     "Invocation",
-    "AOPConfiguration"
 ]

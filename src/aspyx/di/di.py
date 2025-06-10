@@ -461,12 +461,12 @@ class PostProcessor(LifecycleProcessor):
     def __init__(self):
         super().__init__()
 
-    def process(self, instance: object):
+    def process(self, instance: object, environment: Environment):
         pass
 
     def processLifecycle(self, lifecycle: Lifecycle, instance: object, environment: Environment) -> object:
         if lifecycle == Lifecycle.ON_INIT:
-            self.process(instance)
+            self.process(instance, environment)
 
 
 class Providers:
@@ -703,6 +703,7 @@ class Environment:
     instance : 'Environment' = None
 
     __slots__ = [
+        "type",
         "providers",
         "lifecycleProcessors",
         "parent",
@@ -720,6 +721,7 @@ class Environment:
         """
         # initialize
 
+        self.type = env
         self.parent = parent
         if self.parent is None and env is not BootEnvironment:
             self.parent = BootEnvironment.get_instance() # inherit environment including its manged instances!
@@ -746,7 +748,7 @@ class Environment:
 
             self.providers[type] = provider
 
-        # bootstrapping hack
+        # bootstrapping hack, they will be overwritten by the "real" providers
 
         if env is BootEnvironment:
             add_provider(SingletonScope, SingletonScopeInstanceProvider())
@@ -764,7 +766,9 @@ class Environment:
                 if decorator is None:
                     raise InjectorException(f"{env.__name__} is not an environment class")
 
-                scan = env.__module__  # maybe add parameters as well
+                scan = env.__module__
+                if "." in scan:
+                    scan = scan.rsplit('.', 1)[0]
 
                 # recursion
 
@@ -1025,7 +1029,7 @@ class SingletonScope(Scope):
 # internal class that is required to import technical instance providers
 
 @environment()
-class BootEnvironment: # todo ableitung
+class BootEnvironment:
     # class
 
     environment = None

@@ -8,10 +8,8 @@ from dataclasses import dataclass
 from enum import auto, Enum
 from typing import Optional, Dict, Type, Callable
 
-from sympy.solvers.diophantine.diophantine import descent
-
 from aspyx.reflection import Decorators, TypeDescriptor
-from aspyx.di import injectable, environment, Providers, ClassInstanceProvider, Environment, PostProcessor
+from aspyx.di import injectable, Providers, ClassInstanceProvider, Environment, PostProcessor
 
 
 class AOPException(Exception):
@@ -357,16 +355,11 @@ class Advice:
 
     def __init__(self):
         self.cache : Dict[Type, Dict[Callable,JoinPoints]] = dict()
-        self.resolve()
 
     # methods
 
-    def resolve(self):
-        for target in Advice.targets:
-            target._instance = Environment.instance.get(target._clazz) # TODO
-
-    def collect(self, clazz, member, type: AspectType):
-        aspects = [FunctionJoinPoint(target._instance, target._function, None) for target in Advice.targets if target._type == type and target._matches(clazz, member)]
+    def collect(self, clazz, member, type: AspectType, environment: Environment):
+        aspects = [FunctionJoinPoint(environment.get(target._clazz), target._function, None) for target in Advice.targets if target._type == type and target._matches(clazz, member)]
 
         # link
 
@@ -378,7 +371,7 @@ class Advice:
         return aspects
 
     # TODO thread-safe
-    def joinPoints4(self, instance) -> Dict[Callable,JoinPoints]:
+    def joinPoints4(self, instance, environment: Environment) -> Dict[Callable,JoinPoints]:
         clazz = type(instance)
 
         result = self.cache.get(clazz, None)
@@ -386,7 +379,7 @@ class Advice:
             result = dict()
 
             for name, member in inspect.getmembers(clazz, predicate=inspect.isfunction):
-                joinPoints = self.computeJoinPoints(clazz, member)
+                joinPoints = self.computeJoinPoints(clazz, member, environment)
                 if joinPoints is not None:
                     result[member] = joinPoints
 
@@ -415,11 +408,11 @@ class Advice:
 
         return value
 
-    def computeJoinPoints(self, clazz, member) -> Optional[JoinPoints]:
-        befores = self.collect(clazz, member, AspectType.BEFORE)
-        arounds = self.collect(clazz, member, AspectType.AROUND)
-        afters = self.collect(clazz, member, AspectType.AFTER)
-        errors = self.collect(clazz, member, AspectType.ERROR)
+    def computeJoinPoints(self, clazz, member, environment: Environment) -> Optional[JoinPoints]:
+        befores = self.collect(clazz, member, AspectType.BEFORE, environment)
+        arounds = self.collect(clazz, member, AspectType.AROUND, environment)
+        afters = self.collect(clazz, member, AspectType.AFTER, environment)
+        errors = self.collect(clazz, member, AspectType.ERROR, environment)
 
         if len(befores) > 0 or len(arounds) > 0 or len(afters) > 0  or len(errors) > 0:
             return JoinPoints(
@@ -443,7 +436,7 @@ def advice(cls):
     Classes decorated with @advice are treated as aspect classes.
     They can contain methods decorated with @before, @after, @around, or @error to define aspects.
     """
-    Providers.register(ClassInstanceProvider(cls, True, True))
+    Providers.register(ClassInstanceProvider(cls, True))
 
     Decorators.add(cls, advice)
 
@@ -527,8 +520,8 @@ class AdviceProcessor(PostProcessor):
 
     # implement
 
-    def process(self, instance: object):
-        joinPointDict = self.advice.joinPoints4(instance)
+    def process(self, instance: object, environment: Environment):
+        joinPointDict = self.advice.joinPoints4(instance, environment)
 
         for member, joinPoints in joinPointDict.items():
             Environment.logger.debug(f"add aspects for {type(instance)}:{member.__name__}")
@@ -537,8 +530,3 @@ class AdviceProcessor(PostProcessor):
                 return lambda *args, **kwargs: Invocation(member, jp).call(*args, **kwargs)
 
             setattr(instance, member.__name__, types.MethodType(wrap(joinPoints), instance))
-
-@environment()
-class AOPEnvironment:
-    def __init__(self):
-        pass
