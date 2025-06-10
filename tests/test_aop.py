@@ -5,7 +5,7 @@ import unittest
 
 from aspyx.reflection import Decorators
 from aspyx.di import injectable, Environment, environment
-from aspyx.di.aop import advice, before, after, around, methods, Invocation
+from aspyx.di.aop import advice, before, after, around, methods, Invocation, error
 
 
 def transactional():
@@ -38,6 +38,9 @@ class Foo:
     def say(self, hello: str):
         return hello
 
+    def throw_error(self):
+        raise Exception("ouch")
+
 @advice
 class SampleAdvice:
     # constructor
@@ -50,6 +53,8 @@ class SampleAdvice:
         self.around_calls = 0
         self.error_calls = 0
 
+        self.exception = None
+
     # public
 
     def reset(self):
@@ -58,7 +63,13 @@ class SampleAdvice:
         self.around_calls = 0
         self.error_calls = 0
 
+        self.exception = None
+
     # aspects
+
+    @error(methods().of_type(Foo).matches(".*"))
+    def error(self, invocation: Invocation):
+        self.exception = invocation.exception
 
     @before(methods().named("say").of_type(Foo).matches(".*"))
     def callBeforeFoo(self, invocation: Invocation):
@@ -90,10 +101,10 @@ class SampleAdvice:
 
         return invocation.proceed()
 
-class TestInjector(unittest.TestCase):
-    def test_advice(self):
-        logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG)
 
+class TestAdvice(unittest.TestCase):
+    def test_advice(self):
         environment = Environment(TestEnvironment)  # creates eagerly!
 
         advice = environment.get(SampleAdvice)
@@ -124,6 +135,21 @@ class TestInjector(unittest.TestCase):
         self.assertEqual(advice.around_calls, 2)
         self.assertEqual(advice.after_calls, 1)
 
+    def test_error(self):
+        environment = Environment(TestEnvironment)  # creates eagerly!
+
+
+        foo = environment.get(Foo)
+        advice = environment.get(SampleAdvice)
+
+        try:
+            foo.throw_error()
+        except Exception as e:#
+            self.assertIs(e, advice.exception)
+
+        # foo
+
+        result = foo.say("hello")
 
 if __name__ == '__main__':
     unittest.main()

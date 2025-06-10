@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 import os
-from typing import Type, TypeVar
+from typing import Optional, Type, TypeVar
 from dotenv import load_dotenv
 
 from aspyx.di import injectable, Environment, CallableProcessor, LifecycleCallable, Lifecycle, environment
@@ -19,7 +19,8 @@ class ConfigurationException(Exception):
 @injectable()
 class ConfigurationManager:
     """
-    ConfigurationManager is responsible for managing configuration sources and loading configuration data.
+    ConfigurationManager is responsible for managing different configuration sources by merging the different values
+    and offering a uniform api.
     """
 
     __slots__ = ["sources", "_data", "coercions"]
@@ -61,7 +62,16 @@ class ConfigurationManager:
 
         self._data = merge_dicts(self._data, source.load())
 
-    def get(self, path: str, type: Type[T], default=None) -> T:
+    def get(self, path: str, type: Type[T], default : Optional[T]=None) -> T:
+        """
+        Get a configuration value by path and type, with optional coercion.
+        Arguments:
+            path (str): The path to the configuration value, e.g. "database.host".
+            type (Type[T]): The expected type.
+            default (Optional[T]): The default value to return if the path is not found.
+        Returns:
+            T: The configuration value coerced to the specified type, or the default value if not found.
+        """
         def resolve_value(path: str, default=None) -> T:
             keys = path.split(".")
             current = self._data
@@ -99,12 +109,14 @@ class ConfigurationSource(ABC):
 
     @abstractmethod
     def load(self) -> dict:
+        """
+        return the configuration values of this source as a dictionary."""
         pass
 
 @injectable()
 class EnvConfigurationSource(ConfigurationSource):
     """
-    EnvConfigurationSource loads configuration from environment variables.
+    EnvConfigurationSource loads all environment variables.
     """
 
     __slots__ = []
