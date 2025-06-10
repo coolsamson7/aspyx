@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import inspect
 import logging
-import threading
+
 from abc import abstractmethod, ABC
 from enum import Enum, auto
-from types import FunctionType
 from typing import Type, Dict, TypeVar, Generic, Optional, cast, Callable
 
 from aspyx.reflection import Decorators, TypeDescriptor, DecoratorDescriptor
@@ -14,7 +13,7 @@ T = TypeVar("T")
 
 class Factory(ABC, Generic[T]):
     """
-    Abstract base class for factories that create insatnces of type T.
+    Abstract base class for factories that create instances of type T.
     """
 
     __slots__ = []
@@ -45,7 +44,7 @@ class AbstractInstanceProvider(ABC, Generic[T]):
         pass
 
     @abstractmethod
-    def is_singleton(self) -> bool:
+    def get_scope(self) -> str:
         pass
 
     @abstractmethod
@@ -69,20 +68,23 @@ class InstanceProvider(AbstractInstanceProvider):
         "host",
         "type",
         "eager",
-        "singleton",
+        "scope",
         "dependencies"
     ]
 
     # constructor
 
-    def __init__(self, host: Type, t: Type[T], eager: bool, singleton: bool):
+    def __init__(self, host: Type, t: Type[T], eager: bool, scope: str):
         self.host = host
         self.type = t
         self.eager = eager
-        self.singleton = singleton
+        self.scope = scope
         self.dependencies : Optional[list[AbstractInstanceProvider]] = None
 
     # implement AbstractInstanceProvider
+
+    def resolve(self, context: Providers.Context) -> AbstractInstanceProvider:
+        return self
 
     def get_module(self) -> str:
         return self.host.__module__
@@ -93,8 +95,8 @@ class InstanceProvider(AbstractInstanceProvider):
     def is_eager(self) -> bool:
         return self.eager
 
-    def is_singleton(self) -> bool:
-        return self.singleton
+    def get_scope(self) -> str:
+        return self.scope
 
     def get_dependencies(self) -> list[AbstractInstanceProvider]:
         return self.dependencies
@@ -115,6 +117,22 @@ class InstanceProvider(AbstractInstanceProvider):
     @abstractmethod
     def create(self, environment: Environment, *args):
         pass
+
+# we need this classes to bootstrap the system...
+class SingletonScopeInstanceProvider(InstanceProvider):
+    def __init__(self):
+        super().__init__(SingletonScope, SingletonScope, False, "request")
+
+    def create(self, environment: Environment, *args):
+        return SingletonScope()
+
+class RequestScopeInstanceProvider(InstanceProvider):
+    def __init__(self):
+        super().__init__(SingletonScope, SingletonScope, False, "singleton")
+
+    def create(self, environment: Environment, *args):
+        return RequestScope()
+
 
 class AmbiguousProvider(AbstractInstanceProvider):
     """
@@ -150,8 +168,8 @@ class AmbiguousProvider(AbstractInstanceProvider):
     def is_eager(self) -> bool:
         return False
 
-    def is_singleton(self) -> bool:
-        return False
+    def get_scope(self) -> str:
+        return "singleton"
 
     def get_dependencies(self) -> list[AbstractInstanceProvider]:
         return []
@@ -165,8 +183,6 @@ class AmbiguousProvider(AbstractInstanceProvider):
     def __str__(self):
         return f"AmbiguousProvider({self.type})"
 
-####### TEST
-
 class Scopes:
     # static data
 
@@ -175,16 +191,16 @@ class Scopes:
     # class methods
 
     @classmethod
+    def get(cls, scope: str, environment: Environment):
+        scopeType = Scopes.scopes.get(scope, None)
+        if scopeType is None:
+            raise InjectorException(f"unknown scope type {scope}")
+
+        return environment.get(scopeType)
+
+    @classmethod
     def register(cls, scopeClass: Type, name: str):
         Scopes.scopes[name] = scopeClass
-
-def scope(name: str):
-    def decorator(cls):
-        Scopes.register(cls, name)
-
-        return cls
-
-    return decorator
 
 class Scope:
     # properties
@@ -202,35 +218,12 @@ class Scope:
     def get(self, provider: AbstractInstanceProvider, environment: Environment, argProvider: Callable[[],list]):
         return provider.create(environment, *argProvider())
 
-@scope("singleton")
-class SingletonScope(Scope):
-    # properties
-
-    __slots__ = [
-        "value"
-    ]
-
-    # constructor
-
-    def __init__(self):
-        super().__init__()
-
-        self.value = None
-
-    # override
-
-    def get(self, provider: AbstractInstanceProvider, environment: Environment, argProvider: Callable[[],list]):
-        if self.value is None:
-            self.value = provider.create(environment, *argProvider())
-
-        return self.value
-
 class EnvironmentInstanceProvider(AbstractInstanceProvider):
     # properties
 
     __slots__ = [
         "environment",
-        "scope",
+        "scopeInstance",
         "provider",
         "dependencies",
     ]
@@ -244,12 +237,7 @@ class EnvironmentInstanceProvider(AbstractInstanceProvider):
         self.provider = provider
         self.dependencies : list[AbstractInstanceProvider] = []
 
-        # compute scope TODO -> registry
-
-        if provider.is_singleton():
-            self.scope = SingletonScope()
-        else:
-            self.scope = Scope()
+        self.scopeInstance = Scopes.get(provider.get_scope(), environment)
 
     # implement
 
@@ -265,8 +253,8 @@ class EnvironmentInstanceProvider(AbstractInstanceProvider):
     def is_eager(self) -> bool:
         return self.provider.is_eager()
 
-    def is_singleton(self) -> bool:
-        return self.provider.is_singleton()
+    def get_scope(self) -> str:
+        return self.provider.get_scope()
 
     # custom logic
 
@@ -284,7 +272,7 @@ class EnvironmentInstanceProvider(AbstractInstanceProvider):
         return self.provider.get_dependencies()
 
     def create(self, env: Environment, *args):
-        return self.scope.get(self.provider, self.environment, lambda: [provider.create(env) for provider in self.dependencies] ) # already scope property!
+        return self.scopeInstance.get(self.provider, self.environment, lambda: [provider.create(env) for provider in self.dependencies] ) # already scope property!
 
     def __str__(self):
         return f"EnvironmentInstanceProvider({self.provider})"
@@ -300,8 +288,8 @@ class ClassInstanceProvider(InstanceProvider):
 
     # constructor
 
-    def __init__(self, t: Type[T], eager: bool, singleton: bool):
-        super().__init__(t, t, eager, singleton)
+    def __init__(self, t: Type[T], eager: bool, scope = "singleton"):
+        super().__init__(t, t, eager, scope)
 
         self.params = 0
 
@@ -360,8 +348,8 @@ class FunctionInstanceProvider(InstanceProvider):
 
     # constructor
 
-    def __init__(self, clazz : Type, method, return_type : Type[T], eager = True, singleton = True):
-        super().__init__(clazz, return_type, eager, singleton)
+    def __init__(self, clazz : Type, method, return_type : Type[T], eager = True, scope = "singleton"):
+        super().__init__(clazz, return_type, eager, scope)
 
         self.method = method
 
@@ -406,8 +394,8 @@ class FactoryInstanceProvider(InstanceProvider):
 
     # constructor
 
-    def __init__(self, factory: Type, eager: bool, singleton: bool):
-        super().__init__(factory, FactoryInstanceProvider.getFactoryType(factory), eager, singleton)
+    def __init__(self, factory: Type, eager: bool, scope: str):
+        super().__init__(factory, FactoryInstanceProvider.getFactoryType(factory), eager, scope)
 
     # implement
 
@@ -605,14 +593,14 @@ def registerFactories(cls: Type):
             Providers.register(FunctionInstanceProvider(cls, method.method, method.returnType, create_decorator.args[0],
                                                         create_decorator.args[1]))
 
-def injectable(eager=True, singleton=True):
+def injectable(eager=True, scope="singleton"):
     """
     Instances of classes that are annotated with @injectable can be created by an Environment.
     """
     def decorator(cls):
         Decorators.add(cls, injectable)
 
-        Providers.register(ClassInstanceProvider(cls, eager, singleton))
+        Providers.register(ClassInstanceProvider(cls, eager, scope))
 
         #TODO registerFactories(cls)
 
@@ -620,26 +608,26 @@ def injectable(eager=True, singleton=True):
 
     return decorator
 
-def factory(eager=True, singleton=True):
+def factory(eager=True, scope="singleton"):
     """
     Decorator that needs to be used on a class that implements the Factory interface.
     """
     def decorator(cls):
         Decorators.add(cls, factory)
 
-        Providers.register(ClassInstanceProvider(cls, eager, singleton))
-        Providers.register(FactoryInstanceProvider(cls, eager, singleton))
+        Providers.register(ClassInstanceProvider(cls, eager, scope))
+        Providers.register(FactoryInstanceProvider(cls, eager, scope))
 
         return cls
 
     return decorator
 
-def create(eager=True, singleton=True):
+def create(eager=True, scope="singleton"):
     """
     Any method annotated with @create will be registered as a factory method.
     """
     def decorator(func):
-        Decorators.add(func, create, eager, singleton)
+        Decorators.add(func, create, eager, scope)
         return func
 
     return decorator
@@ -672,7 +660,7 @@ def environment(imports: Optional[list[Type]] = None):
         imports (Optional[list[Type]]): Optional list of imported environment types
     """
     def decorator(cls):
-        Providers.register(ClassInstanceProvider(cls, True, True))
+        Providers.register(ClassInstanceProvider(cls, True))
 
         Decorators.add(cls, environment, imports)
         Decorators.add(cls, injectable) # do we need that?
@@ -733,6 +721,9 @@ class Environment:
         # initialize
 
         self.parent = parent
+        if self.parent is None and env is not BootEnvironment:
+            self.parent = BootEnvironment.get_instance() # inherit environment including its manged instances!
+
         self.providers: Dict[Type, AbstractInstanceProvider] = dict()
         self.lifecycleProcessors: list[LifecycleProcessor] = []
 
@@ -755,6 +746,12 @@ class Environment:
 
             self.providers[type] = provider
 
+        # bootstrapping hack
+
+        if env is BootEnvironment:
+            add_provider(SingletonScope, SingletonScopeInstanceProvider())
+            add_provider(SingletonScope, RequestScopeInstanceProvider())
+
         def load_environment(env: Type):
             if env not in loaded:
                 Environment.logger.debug(f"load environment {env.__qualname__}")
@@ -776,30 +773,37 @@ class Environment:
 
                 # load providers
 
-                #{k: v for k, v in my_dict.items() if v % 2 == 0}
-
                 localProviders = {type: provider for type, provider in Providers.cache.items() if provider.get_module().startswith(scan)}
 
                 # register providers
 
+                # make sure, that for every type ony a single EnvironmentInstanceProvider is created!
+                # otherwise inheritance will fuck it up
+
+                environmentProviders : dict[AbstractInstanceProvider, EnvironmentInstanceProvider] = {}
+
                 for type, provider in localProviders.items():
-                    self.providers[type] = EnvironmentInstanceProvider(self, provider)
+                    environmentProvider = environmentProviders.get(provider, None)
+                    if environmentProvider is None:
+                        environmentProvider =  EnvironmentInstanceProvider(self, provider)
+                        environmentProviders[provider] = environmentProvider
+
+                    add_provider(type, environmentProvider)
 
                 # tweak dependencies
 
                 for type, provider in localProviders.items():
                     cast(EnvironmentInstanceProvider, self.providers[type]).tweakDependencies(self.providers)
 
-        # load environments
+                # return local providers
 
-        if parent is None:
-            load_environment(DIEnvironment) # internal stuff
+                return environmentProviders.values()
+            else:
+                return []
 
-        load_environment(env)
+        # construct eager objects for local providers
 
-        # construct eager objects
-
-        for provider in self.providers.values():
+        for provider in load_environment(env):
             if provider.is_eager():
                 provider.create(self)
     # internal
@@ -965,13 +969,79 @@ class InjectLifecycleCallable(LifecycleCallable):
     def args(self, decorator: DecoratorDescriptor,  method: TypeDescriptor.MethodDescriptor, environment: Environment):
         return [environment.get(type) for type in method.paramTypes]
 
-##
+def scope(name: str):
+    def decorator(cls):
+        Scopes.register(cls, name)
+
+        Decorators.add(cls, scope)
+        # Decorators.add(cls, injectable)
+
+        Providers.register(ClassInstanceProvider(cls, True))
+
+        return cls
+
+    return decorator
+
+@scope("request")
+class RequestScope(Scope):
+    # properties
+
+    __slots__ = [
+    ]
+
+    # constructor
+
+    def __init__(self):
+        super().__init__()
+
+    # public
+
+    def get(self, provider: AbstractInstanceProvider, environment: Environment, argProvider: Callable[[],list]):
+        return provider.create(environment, *argProvider())
+
+@scope("singleton")
+class SingletonScope(Scope):
+    # properties
+
+    __slots__ = [
+        "value"
+    ]
+
+    # constructor
+
+    def __init__(self):
+        super().__init__()
+
+        self.value = None
+
+    # override
+
+    def get(self, provider: AbstractInstanceProvider, environment: Environment, argProvider: Callable[[],list]):
+        if self.value is None:
+            self.value = provider.create(environment, *argProvider())
+
+        return self.value
 
 # internal class that is required to import technical instance providers
 
 @environment()
-class DIEnvironment:
+class BootEnvironment: # todo ableitung
+    # class
+
+    environment = None
+
+    @classmethod
+    def get_instance(cls):
+        if BootEnvironment.environment is None:
+            BootEnvironment.environment = Environment(BootEnvironment)
+
+        return BootEnvironment.environment
+
+    # properties
+
     __slots__ = []
+
+    # constructor
 
     def __init__(self):
         pass

@@ -67,7 +67,7 @@ class Unknown:
     def __init__(self):
         pass#
 
-@injectable(singleton=False)
+@injectable(scope="request")
 class NonSingleton:
     def __init__(self):
         super().__init__()
