@@ -98,7 +98,7 @@ Different mechanisms are available that make classes 'injectible' by the contain
 
 ## Class
 
-Classes annotated with `@injectable` are registered
+Any class annotated with `@injectable` is eligible for injection
 
 **Example**: 
 
@@ -114,8 +114,8 @@ class Foo:
 
 
  The decorator accepts the keyword arguments
- - `eager=True` if `True, the container will create the instances while booting automatically
- - `scope="singleton"` defines how often insatcens will be created. `singleton` will cerate it only once, while `request` will recreate it on every inejction request
+ - `eager=True` if `True`, the container will create the instances automatically while booting
+ - `scope="singleton"` defines how often insatcens will be created. `singleton` will create it only once, while `request` will recreate it on every inejction request
 
  Other scopes can be defined. Please check the corresponding chapter.
 
@@ -156,6 +156,8 @@ class Foo:
 
 # Environment
 
+## Definition
+
 An Environment is the container that manages the lifecycle of objects
 
 **Example**: 
@@ -168,7 +170,7 @@ class SampleEnvironment:
 
 The default is that all registered classes, that are implemented in the containing module or in any submodules will be managed.
 
-By adding an `imports: list[Type]` parameter, specifying other environment types, it will inherit the appropriate classes.
+By adding an `imports: list[Type]` parameter, specifying other environment types, it will register the appropriate classes  recursively.
 
 **Example**: 
 ```python
@@ -178,12 +180,29 @@ class SampleEnvironmen(imports=[OtherEnvironment])):
         pass
 ```
 
+Another possibility is to add a parent environment
+
+**Example**: 
+```python
+rootEnvironment = Environment(RootEnvironment)
+environment = Environment(SampleEnvironment, parent=rootEnvironment)
+```
+
+The difference is, that in the first case, class instances of imported modules will be created in the scope of the _own_ environment, while in the second case, it will simply return instances managed by the parent.
+
+## Retrieval
 
 ```python
 def get(type: Type[T]) -> T
 ```
 
-is used to retrieve object instances.
+is used to retrieve object instances. Depending on the accoring scope it may need to crate them on the fly.
+
+The container knwos about class hierarchies and is able to `get` base classes, as long as there is only one implementation. 
+
+In case of ambiguities, it will throw an exception.
+
+Please be aware, that a base class must not be annotated with `@injectable`, as this would mean, that it could be created on its own as well. ( Which is possible as well, btw. ) 
 
 # Lifecycle methods
 
