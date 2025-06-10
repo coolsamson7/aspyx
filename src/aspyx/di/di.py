@@ -131,7 +131,7 @@ class RequestScopeInstanceProvider(InstanceProvider):
         super().__init__(SingletonScope, SingletonScope, False, "singleton")
 
     def create(self, environment: Environment, *args):
-        return RequestScope()
+        return RequestScope() #
 
 
 class AmbiguousProvider(AbstractInstanceProvider):
