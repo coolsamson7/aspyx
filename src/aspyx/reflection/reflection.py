@@ -52,14 +52,14 @@ class TypeDescriptor:
 
         def get_decorator(self, decorator):
             for dec in self.decorators:
-                if dec.decorator == decorator:
+                if dec.decorator is decorator:
                     return dec
 
             return None
 
         def has_decorator(self, decorator):
             for dec in self.decorators:
-                if dec.decorator == decorator:
+                if dec.decorator is decorator:
                     return True
 
             return False

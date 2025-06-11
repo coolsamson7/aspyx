@@ -6,6 +6,7 @@ from typing import Optional, Type, TypeVar
 from dotenv import load_dotenv
 
 from aspyx.di import injectable, Environment, CallableProcessor, LifecycleCallable, Lifecycle, environment
+from aspyx.di.di import order
 from aspyx.reflection import Decorators, DecoratorDescriptor, TypeDescriptor
 
 T = TypeVar("T")
@@ -180,9 +181,10 @@ def value(key: str, default=None):
     return decorator
 
 @injectable()
+@order(9)
 class ConfigurationLifecycleCallable(LifecycleCallable):
     def __init__(self, processor: CallableProcessor,  manager: ConfigurationManager):
-        super().__init__(value, processor, Lifecycle.ON_INIT)
+        super().__init__(value, processor, Lifecycle.ON_INIT, 9)
 
         self.manager = manager
 

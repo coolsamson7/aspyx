@@ -220,7 +220,7 @@ class TestInject(unittest.TestCase):
 
         self.assertIsNot(ns, ns1)
 
-    #def test_import_configurations(self):
+    #def test_import_configurations(self): TODO
     #    env = Environment(TestEnvironment)#
 
     #    imported = env.get(ImportedClass)

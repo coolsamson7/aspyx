@@ -597,6 +597,13 @@ def registerFactories(cls: Type):
             create_decorator = method.get_decorator(create)
             Providers.register(FunctionInstanceProvider(cls, method.method, method.returnType, create_decorator.args[0],
                                                         create_decorator.args[1]))
+def order(prio = 0):
+    def decorator(cls):
+        Decorators.add(cls, order, prio)
+
+        return cls
+
+    return decorator
 
 def injectable(eager=True, scope="singleton"):
     """
@@ -867,12 +874,14 @@ class Environment:
 class LifecycleCallable:
     __slots__ = [
         "decorator",
-        "lifecycle"
+        "lifecycle",
+        "order"
     ]
 
-    def __init__(self, decorator, processor: CallableProcessor, lifecycle: Lifecycle):
+    def __init__(self, decorator, processor: CallableProcessor, lifecycle: Lifecycle, order: int):
         self.decorator = decorator
         self.lifecycle = lifecycle
+        self.order = order
 
         processor.register(self)
 
@@ -912,6 +921,13 @@ class CallableProcessor(LifecycleProcessor):
         self.cache : Dict[Type,list[CallableProcessor.MethodCall]]  = dict()
 
     def computeCallables(self, type: Type) -> list[CallableProcessor.MethodCall] :
+        def get_order(method: TypeDescriptor.MethodDescriptor) -> int:
+            if method.has_decorator(order):
+                return method.get_decorator(order).args[0]
+            else:
+                return 10
+
+
         descriptor = TypeDescriptor.for_type(type)
 
         result = []
@@ -920,6 +936,12 @@ class CallableProcessor(LifecycleProcessor):
             for decorator in method.decorators:
                 if self.callables.get(decorator.decorator) is not None:
                     result.append(CallableProcessor.MethodCall(method, decorator, self.callables[decorator.decorator]))
+
+        # sort according to order
+
+        result.sort(key=lambda call: call.lifecycleCallable.order)
+
+        # done
 
         return result
 
@@ -943,35 +965,39 @@ class CallableProcessor(LifecycleProcessor):
                 callable.execute(instance, environment)
 
 @injectable()
+@order(1000)
 class OnInitLifecycleCallable(LifecycleCallable):
     __slots__ = []
 
     def __init__(self, processor: CallableProcessor):
-        super().__init__(on_init, processor, Lifecycle.ON_INIT)
+        super().__init__(on_init, processor, Lifecycle.ON_INIT, 1000)
 
 @injectable()
+@order(1001)
 class OnDestroyLifecycleCallable(LifecycleCallable):
     __slots__ = []
 
     def __init__(self, processor: CallableProcessor):
-        super().__init__(on_destroy, processor, Lifecycle.ON_DESTROY)
+        super().__init__(on_destroy, processor, Lifecycle.ON_DESTROY, 1001)
 
 @injectable()
+@order(9)
 class EnvironmentAwareLifecycleCallable(LifecycleCallable):
     __slots__ = []
 
     def __init__(self, processor: CallableProcessor):
-        super().__init__(inject_environment, processor, Lifecycle.ON_INIT)
+        super().__init__(inject_environment, processor, Lifecycle.ON_INIT, 9)
 
     def args(self, decorator: DecoratorDescriptor, method: TypeDescriptor.MethodDescriptor, environment: Environment):
         return [environment]
 
 @injectable()
+@order(10)
 class InjectLifecycleCallable(LifecycleCallable):
     __slots__ = []
 
     def __init__(self, processor: CallableProcessor):
-        super().__init__(inject, processor, Lifecycle.ON_INIT)
+        super().__init__(inject, processor, Lifecycle.ON_INIT, 10 )
 
     # override
 
