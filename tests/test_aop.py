@@ -90,7 +90,7 @@ class SampleAdvice:
 
         return invocation.proceed()
 
-    @around(methods().decorated_with(transactional).union(classes().decorated_with(transactional)))
+    @around(methods().decorated_with(transactional), classes().decorated_with(transactional))
     def callTransactional1(self, invocation: Invocation):
         self.around_calls += 1
 

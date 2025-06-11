@@ -87,6 +87,12 @@ class AspectTarget(ABC):
     def _matchesSelf(self, clazz: Type, func):
         pass
 
+    # protected
+
+    def _add(self, target: AspectTarget):
+        self.other.append(target)
+        return self
+
      # fluent
 
     def function(self, func):
@@ -96,10 +102,6 @@ class AspectTarget(ABC):
     def type(self, type: AspectType):
         self._type = type
 
-        return self
-
-    def union(self, target: AspectTarget):
-        self.other.append(target)
         return self
 
     def of_type(self, type: Type):
@@ -474,51 +476,56 @@ def advice(cls):
 
 # decorators
 
-def _register(decorator, target: AspectTarget, func, aspectType: AspectType):
+def _register(decorator, targets: list[AspectTarget], func, aspectType: AspectType):
+    target = targets[0]
+
+    for i in range(1, len(targets)):
+        target._add(targets[i])
+
     target.function(func).type(aspectType)
 
     Decorators.add(func, decorator, target)
 
-def before(target: AspectTarget):
+def before(*targets: AspectTarget):
     """
     Methods decorated with @before will be executed before the target method is invoked.
     """
     def decorator(func):
-        _register(before, target, func, AspectType.BEFORE)
+        _register(before, targets, func, AspectType.BEFORE)
 
         return func
 
     return decorator
 
-def error(target: AspectTarget):
+def error(*targets: AspectTarget):
     """
     Methods decorated with @error will be executed if the target method raises an exception."""
     def decorator(func):
-        _register(error, target, func, AspectType.ERROR)
+        _register(error, targets, func, AspectType.ERROR)
 
         return func
 
     return decorator
 
-def after(target: AspectTarget):
+def after(*targets: AspectTarget):
     """
     Methods decorated with @after will be executed after the target method is invoked.
     """
     def decorator(func):
-        _register(after, target, func, AspectType.AFTER)
+        _register(after, targets, func, AspectType.AFTER)
 
         return func
 
     return decorator
 
-def around(target: AspectTarget):
+def around(*targets: AspectTarget):
     """
     Methods decorated with @around will be executed around the target method.
     Every around method must accept a single parameter of type Invocation and needs to call proceed
     on this parameter to proceed to the next around method.
     """
     def decorator(func):
-        _register(around, target, func, AspectType.AROUND)
+        _register(around, targets, func, AspectType.AROUND)
 
         return func
 
