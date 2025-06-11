@@ -43,7 +43,7 @@ class SampleConfigurationSource2(ConfigurationSource):
                 }
             }
 
-@injectable()
+@injectable(scope="request")
 class Foo:
     def __init__(self, manager: ConfigurationManager):
         self.value = None
@@ -52,21 +52,24 @@ class Foo:
         pass
 
     @value("b.d", 0)
-    def set_foo(self, value: int):
+    def set_value(self, value: int):
         self.value = value
 
     # will coerce
     @value("b.e", 0)
-    def set_foo(self, value: str):
+    def set_value1(self, value: str):
         self.value1 = value
 
     @value("b.z", "unknown")
-    def set_foo(self, value: str):
+    def set_value2(self, value: str):
         self.value2 = value
 
 class TestConfiguration(unittest.TestCase):
+    testEnvironment = Environment(Configuration)
+
     def test_configuration(self):
-        env = Environment(Configuration)
+        env = TestConfiguration.testEnvironment
+
         config = env.get(ConfigurationManager)
         v1 = config.get("b.d", str)
         v2 = config.get("b.e", int, )
@@ -74,24 +77,24 @@ class TestConfiguration(unittest.TestCase):
 
         self.assertEqual(v1, "2")
         self.assertEqual(v2, 3)
-        self.assertEqual(v2, "unknown")
+        self.assertEqual(v3, "unknown")
 
     def test_configuration_injection(self):
-        env = Environment(Configuration)
+        env = TestConfiguration.testEnvironment
 
         foo = env.get(Foo)
 
         self.assertEqual(foo.value, 2)
 
     def test_configuration_injection_coercion(self):
-        env = Environment(Configuration)
+        env = TestConfiguration.testEnvironment
 
         foo = env.get(Foo)
 
         self.assertEqual(foo.value1, "3")
 
     def test_configuration_injection_default(self):
-        env = Environment(Configuration)
+        env = TestConfiguration.testEnvironment
 
         foo = env.get(Foo)
 

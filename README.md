@@ -328,13 +328,13 @@ class SampleAdvice:
 ```
 
 Different aspects - with the appropriate decorator - are possible:
-- `before` 
+- `before`  
    methods that will be executed _prior_ to the original method
-- `around` 
+- `around`  
    methods that will be executed _around_ to the original method giving it the possibility add side effects or even change the parameters.
-- `after`
+- `after`  
     methods that will be executed _after_ to the original method
-- `error` 
+- `error`  
    methods that will be executed in case of a caught exception, which can be retrieved by `invocation.exception`
 
 All methods are expected to hava single `Invocation` parameter, that stores, the function, args and kwargs, the return value and possible exceptions.
@@ -347,13 +347,13 @@ A fluent interface is used describe the mapping.
 The parameters restrict either methods or classes and are constructed by a call to either `methods()` or `classes()`.
 
 Both add the fluent methods:
-- `of_type(type: Type)` 
+- `of_type(type: Type)`  
    defines the matching classes
-- `named(name: str)` 
+- `named(name: str)`  
    defines method or class names
-- `matches(re: str)` 
+- `matches(re: str)`  
    defines regular expressions for methods or classes
-- `decorated_with(type: Type)` 
+- `decorated_with(type: Type)`  
    defines decorators on methods or classes
 
 The fluent methods `named`, `matches` and `of_type` can be called multiple timess!

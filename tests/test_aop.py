@@ -104,8 +104,10 @@ class SampleAdvice:
 logging.basicConfig(level=logging.DEBUG)
 
 class TestAdvice(unittest.TestCase):
+    testEnvironment = Environment(TestEnvironment)
+
     def test_advice(self):
-        environment = Environment(TestEnvironment)  # creates eagerly!
+        environment = TestAdvice.testEnvironment
 
         advice = environment.get(SampleAdvice)
 
@@ -136,7 +138,7 @@ class TestAdvice(unittest.TestCase):
         self.assertEqual(advice.after_calls, 1)
 
     def test_error(self):
-        environment = Environment(TestEnvironment)  # creates eagerly!
+        environment = TestAdvice.testEnvironment
 
 
         foo = environment.get(Foo)

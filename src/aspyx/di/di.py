@@ -121,14 +121,14 @@ class InstanceProvider(AbstractInstanceProvider):
 # we need this classes to bootstrap the system...
 class SingletonScopeInstanceProvider(InstanceProvider):
     def __init__(self):
-        super().__init__(SingletonScope, SingletonScope, False, "request")
+        super().__init__(SingletonScopeInstanceProvider, SingletonScope, False, "request")
 
     def create(self, environment: Environment, *args):
         return SingletonScope()
 
 class RequestScopeInstanceProvider(InstanceProvider):
     def __init__(self):
-        super().__init__(SingletonScope, SingletonScope, False, "singleton")
+        super().__init__(RequestScopeInstanceProvider, RequestScope, False, "singleton")
 
     def create(self, environment: Environment, *args):
         return RequestScope()
@@ -238,6 +238,7 @@ class EnvironmentInstanceProvider(AbstractInstanceProvider):
         self.dependencies : list[AbstractInstanceProvider] = []
 
         self.scopeInstance = Scopes.get(provider.get_scope(), environment)
+        print()
 
     # implement
 
@@ -752,7 +753,7 @@ class Environment:
 
         if env is BootEnvironment:
             add_provider(SingletonScope, SingletonScopeInstanceProvider())
-            add_provider(SingletonScope, RequestScopeInstanceProvider())
+            add_provider(RequestScope, RequestScopeInstanceProvider())
 
         def load_environment(env: Type):
             if env not in loaded:
@@ -980,7 +981,7 @@ def scope(name: str):
         Decorators.add(cls, scope)
         # Decorators.add(cls, injectable)
 
-        Providers.register(ClassInstanceProvider(cls, True))
+        Providers.register(ClassInstanceProvider(cls, eager=True, scope="request"))
 
         return cls
 
@@ -1021,7 +1022,7 @@ class SingletonScope(Scope):
     # override
 
     def get(self, provider: AbstractInstanceProvider, environment: Environment, argProvider: Callable[[],list]):
-        if self.value is None:
+        if self.value is None: # TODO thread-safe
             self.value = provider.create(environment, *argProvider())
 
         return self.value
