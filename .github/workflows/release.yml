@@ -30,7 +30,7 @@ jobs:
 
       - name: Run tests
         run: |
-          pytest --forked
+          pytest
 
       - name: Build the package
         run: |

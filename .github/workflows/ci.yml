@@ -16,4 +16,4 @@ jobs:
       - run: pip show pytest-xdist
       - run: pip freeze
       - run: pytest --trace-config
-      - run: pytest --forked
+      - run: pytest
