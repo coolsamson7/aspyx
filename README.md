@@ -41,11 +41,12 @@ The following features are supported
 - container instances that relate to environment classes and manage the lifecylce of related objects
 - hierarchical environments
 
+The library is thread-safe!
+
 Let's look at a simple example
 
 ```python
 from aspyx.di import injectable, on_init, on_destroy, environment, Environment
-
 
 @injectable()
 class Foo:
@@ -54,7 +55,6 @@ class Foo:
 
     def hello(msg: str):
         print(f"hello {msg}")
-
 
 @injectable()  # eager and singleton by default
 class Bar:
@@ -71,21 +71,19 @@ class Bar:
 
 @environment()
 class SampleEnvironment:
-    # constructor
-
     def __init__(self):
         pass
-
 
 # go, forrest
 
 environment = Environment(SampleEnvironment)
 
 bar = env.get(Bar)
-bar.foo.hello("Andi")
+
+bar.foo.hello("world")
 ```
 
-The concepts should be pretty familiar , as well as the names which are a combination of Spring and Angular names :-)
+The concepts should be pretty familiar as well as the names which are a combination of Spring and Angular names :-)
 
 Let's add some aspects...
 
