@@ -28,6 +28,7 @@ jobs:
 
       - name: Run tests
         run: |
+          pip install pytest-xdist
           pytest  # or your test command
 
       - name: Build the package
