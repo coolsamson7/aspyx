@@ -2,11 +2,13 @@
 
 ![Pylint](https://github.com/coolsamson7/aspyx/actions/workflows/pylint.yml/badge.svg)
 ![Build Status](https://github.com/coolsamson7/aspyx/actions/workflows/ci.yml/badge.svg)
-
+![PyPI - Python Version](https://img.shields.io/pypi/pyversions/aspyx)
+![License](https://img.shields.io/github/license/coolsamson7/aspyx)
 
 ## Table of Contents
 
 - [Introduction](#aspyx)
+- [Installation](#installation)
 - [Registration](#registration)
   - [Class](#class)
   - [Class Factory](#class-factory)
@@ -117,6 +119,12 @@ The invocation parameter stores the complete context of the current execution, w
 - the possible caught error
 
 Let's look at the details
+
+# Installation
+
+`pip install aspyx`
+
+Ready to go...
 
 # Registration
 
