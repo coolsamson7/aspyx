@@ -52,6 +52,7 @@ class AspectTarget(ABC):
         "names",
         "patterns",
         "types",
+        "other",
         "decorators",
     ]
 
@@ -66,12 +67,24 @@ class AspectTarget(ABC):
         self.types = []
         self.decorators = []
 
+        self.other : list[AspectTarget] = []
+
         pass
 
     # abstract
 
-    @abstractmethod
     def _matches(self, clazz : Type, func):
+        if not self._matchesSelf(clazz, func):
+            for target in self.other:
+                if target._matches(clazz, func):
+                    return True
+
+            return False
+
+        return True
+
+    @abstractmethod
+    def _matchesSelf(self, clazz: Type, func):
         pass
 
      # fluent
@@ -84,7 +97,11 @@ class AspectTarget(ABC):
         self._type = type
 
         return self
-    
+
+    def union(self, target: AspectTarget):
+        self.other.append(target)
+        return self
+
     def of_type(self, type: Type):
         self.types.append(type)
         return self
@@ -119,9 +136,9 @@ class ClassAspectTarget(AspectTarget):
 
     # public
 
-    def _matches(self, clazz : Type, func):
-        descriptor = TypeDescriptor.for_type(clazz)
-
+    def _matchesSelf(self, clazz : Type, func):
+        classDescriptor = TypeDescriptor.for_type(clazz)
+        #descriptor = TypeDescriptor.for_type(func)
         # type
 
         if len(self.types) > 0:
@@ -131,7 +148,7 @@ class ClassAspectTarget(AspectTarget):
         # decorators
 
         if len(self.decorators) > 0:
-            if next((decorator for decorator in self.decorators if descriptor.has_decorator(decorator)), None) is None:
+            if next((decorator for decorator in self.decorators if classDescriptor.has_decorator(decorator)), None) is None:
                 return False
 
         # names
@@ -145,8 +162,6 @@ class ClassAspectTarget(AspectTarget):
         if len(self.patterns) > 0:
             if next((pattern for pattern in self.patterns if re.fullmatch(pattern, clazz.__name__) is not None), None) is None:
                 return False
-   
-        # yipee
 
         return True
     
@@ -175,7 +190,7 @@ class MethodAspectTarget(AspectTarget):
 
     # public
 
-    def _matches(self, clazz : Type, func):
+    def _matchesSelf(self, clazz : Type, func):
         descriptor = TypeDescriptor.for_type(clazz)
 
         methodDescriptor = descriptor.get_method(func.__name__)
@@ -357,7 +372,7 @@ class Advice:
 
     def __init__(self):
         self.cache : Dict[Type, Dict[Callable,JoinPoints]] = dict()
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()
 
     # methods
 

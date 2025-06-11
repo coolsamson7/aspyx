@@ -6,6 +6,11 @@ from typing import Callable, get_type_hints, Type, Dict, Optional
 from weakref import WeakKeyDictionary
 
 class DecoratorDescriptor:
+    __slots__ = [
+        "decorator",
+        "args"
+    ]
+
     def __init__(self, decorator, *args):
         self.decorator = decorator
         self.args = args
@@ -122,7 +127,7 @@ class TypeDescriptor:
 
     def has_decorator(self, decorator) -> bool:
         for dec in self.decorators:
-            if dec.decorator is decorator:
+            if dec.decorator.__name__ == decorator.__name__:
                 return True
 
         return False

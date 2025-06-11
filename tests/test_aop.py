@@ -5,7 +5,7 @@ import unittest
 
 from aspyx.reflection import Decorators
 from aspyx.di import injectable, Environment, environment
-from aspyx.di.aop import advice, before, after, around, methods, Invocation, error
+from aspyx.di.aop import advice, before, after, around, methods, Invocation, error, classes
 
 
 def transactional():
@@ -22,11 +22,12 @@ class TestEnvironment:
 
 
 @injectable()
+@transactional()
 class Bar:
     def __init__(self):
         pass
 
-    @transactional()
+    #@transactional()
     def say(self, hello: str):
         return hello
 
@@ -89,7 +90,7 @@ class SampleAdvice:
 
         return invocation.proceed()
 
-    @around(methods().decorated_with(transactional))
+    @around(methods().decorated_with(transactional).union(classes().decorated_with(transactional)))
     def callTransactional1(self, invocation: Invocation):
         self.around_calls += 1
 
@@ -101,7 +102,7 @@ class SampleAdvice:
 
         return invocation.proceed()
 
-logging.basicConfig(level=logging.DEBUG)
+#logging.basicConfig(level=logging.DEBUG)
 
 class TestAdvice(unittest.TestCase):
     testEnvironment = Environment(TestEnvironment)
