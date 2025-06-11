@@ -14,21 +14,6 @@ jobs:
       - run: pip install --upgrade --force-reinstall pytest pytest-xdist
       - run: echo "PYTHONPATH=$PWD/src:$PWD/tests" >> $GITHUB_ENV
       - run: pip show pytest-xdist
+      - run: pip freeze
+      - run: pytest --trace-config
       - run: pytest --forked
-
-  release:
-    needs: test
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - run: pip install build twine
-      - run: python -m build
-      - name: Publish to PyPI
-        env:
-          TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
-          TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-        run: twine upload dist/*
