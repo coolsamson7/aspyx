@@ -14,8 +14,10 @@
 - [Environment](#environment)
   - [Definition](#definition)
   - [Retrieval](#retrieval)
-- [Lifecycle methods](#lifecycle-methods)
-- [Post Processors](#post-processors)
+- [Instantiation logic](#instantiation-logic)
+  - [Injection Methods](#injection-methods)
+  - [Lifecycle Methods](#lifecycle-methods)
+  - [Post Processors](#post-processors)
 - [Custom scopes](#custom-scopes)
 - [AOP](#aop)
 - [Configuration](#configuration)
@@ -132,9 +134,10 @@ class Foo:
     def __init__(self):
         pass
 ```
- Please make sure, that the class defines a constructor, as this is required to determine injected instances. 
+Please make sure, that the class defines a local constructor, as this is required to determine injected instances. 
+All referenced types will be injected by the environemnt. 
 
- The constructor can only define parameter types that are known as well to the container! 
+Only eligible types are allowed, of course!
 
 
  The decorator accepts the keyword arguments
@@ -236,15 +239,39 @@ In case of ambiguities, it will throw an exception.
 
 Please be aware, that a base class are not _required_ to be annotated with `@injectable`, as this would mean, that it could be created on its own as well. ( Which is possible as well, btw. ) 
 
-# Lifecycle methods
+# Instantiation logic
 
-It is possible to declare methods that will be called from the container
+Constructing a new instance involves a number of steps executed in this order
+- Constructor call  
+  the constructor is called with the resolved parameters
+- Advice injection  
+  All methods involving aspects are updated
+- Lifecycle methods   
+  different decorators can mark methods that should be called during the lifecycle ( here the construction ) of an instance.
+  These are various injection possibilities as well as an optional final `on_init` call
+- PostProcessors  
+  Any custom post processors, that can add isde effects or modify the instances
+
+## Injection methods
+
+Different decorators are implemented, that call methods with computed values
+
+- `@inject`  
+   the method is called with all resolved parameter types ( same as the constructor call)
+- `@inject_environment`  
+   the method is called with the creating environment as a single parameter
+- `@value()`  
+   the method is called with a rewolved configuration value. Check the corresponding chapter
+
+## Lifecycle methods
+
+It is possible to mark specific lifecle methods. 
 - `@on_init()` 
    called after the constructor and all other injections.
 - `@on_destroy()` 
-   called after the container has been shut down
+   called during shutdown of the environment
 
-# Post Processors
+## Post Processors
 
 As part of the instantiation logic it is possible to define post processors that execute any side effect on newly created instances.
 

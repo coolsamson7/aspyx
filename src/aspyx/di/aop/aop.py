@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from enum import auto, Enum
 from typing import Optional, Dict, Type, Callable
 
+from aspyx.di.di import order
 from aspyx.reflection import Decorators, TypeDescriptor
 from aspyx.di import injectable, Providers, ClassInstanceProvider, Environment, PostProcessor
 
@@ -532,6 +533,7 @@ def around(*targets: AspectTarget):
     return decorator
 
 @injectable()
+@order(0)
 class AdviceProcessor(PostProcessor):
     # properties
 

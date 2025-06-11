@@ -184,7 +184,7 @@ def value(key: str, default=None):
 @order(9)
 class ConfigurationLifecycleCallable(LifecycleCallable):
     def __init__(self, processor: CallableProcessor,  manager: ConfigurationManager):
-        super().__init__(value, processor, Lifecycle.ON_INIT, 9)
+        super().__init__(value, processor, Lifecycle.ON_INIT)
 
         self.manager = manager
 

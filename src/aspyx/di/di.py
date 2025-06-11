@@ -439,12 +439,16 @@ class LifecycleProcessor(ABC):
     """
     A LifecycleProcessor is used to perform any side effects on managed objects during their lifecycle.
     """
-    __slots__ = []
+    __slots__ = [
+        "order"
+    ]
 
     # constructor
 
     def __init__(self):
-        pass
+        self.order = 0
+        if TypeDescriptor.for_type(type(self)).has_decorator(order):
+            self.order =  TypeDescriptor.for_type(type(self)).get_decorator(order).args[0]
 
     # methods
 
@@ -723,6 +727,7 @@ class Environment:
     ]
 
     # constructor
+
     def __init__(self, env: Type, parent : Optional[Environment] = None):
         """
         Creates a new Environment instance.
@@ -831,10 +836,20 @@ class Environment:
         return instance
 
     def created(self, instance: T) -> T:
+        def get_order(type: TypeDescriptor) -> int:
+            if type.has_decorator(order):
+                return type.get_decorator(order).args[0]
+            else:
+                return 10
+
         # remember lifecycle processors
 
         if isinstance(instance, LifecycleProcessor):
             self.lifecycleProcessors.append(instance)
+
+            # sort immediately
+
+            self.lifecycleProcessors.sort(key=lambda processor: processor.order)
 
         # remember instance
 
@@ -878,10 +893,13 @@ class LifecycleCallable:
         "order"
     ]
 
-    def __init__(self, decorator, processor: CallableProcessor, lifecycle: Lifecycle, order: int):
+    def __init__(self, decorator, processor: CallableProcessor, lifecycle: Lifecycle):
         self.decorator = decorator
         self.lifecycle = lifecycle
-        self.order = order
+        self.order = 0
+
+        if TypeDescriptor.for_type(type(self)).has_decorator(order):
+            self.order =  TypeDescriptor.for_type(type(self)).get_decorator(order).args[0]
 
         processor.register(self)
 
@@ -889,6 +907,7 @@ class LifecycleCallable:
         return []
 
 @injectable()
+@order(1)
 class CallableProcessor(LifecycleProcessor):
     # local classes
 
@@ -921,13 +940,6 @@ class CallableProcessor(LifecycleProcessor):
         self.cache : Dict[Type,list[CallableProcessor.MethodCall]]  = dict()
 
     def computeCallables(self, type: Type) -> list[CallableProcessor.MethodCall] :
-        def get_order(method: TypeDescriptor.MethodDescriptor) -> int:
-            if method.has_decorator(order):
-                return method.get_decorator(order).args[0]
-            else:
-                return 10
-
-
         descriptor = TypeDescriptor.for_type(type)
 
         result = []
@@ -970,7 +982,7 @@ class OnInitLifecycleCallable(LifecycleCallable):
     __slots__ = []
 
     def __init__(self, processor: CallableProcessor):
-        super().__init__(on_init, processor, Lifecycle.ON_INIT, 1000)
+        super().__init__(on_init, processor, Lifecycle.ON_INIT)
 
 @injectable()
 @order(1001)
@@ -978,7 +990,7 @@ class OnDestroyLifecycleCallable(LifecycleCallable):
     __slots__ = []
 
     def __init__(self, processor: CallableProcessor):
-        super().__init__(on_destroy, processor, Lifecycle.ON_DESTROY, 1001)
+        super().__init__(on_destroy, processor, Lifecycle.ON_DESTROY)
 
 @injectable()
 @order(9)
@@ -986,7 +998,7 @@ class EnvironmentAwareLifecycleCallable(LifecycleCallable):
     __slots__ = []
 
     def __init__(self, processor: CallableProcessor):
-        super().__init__(inject_environment, processor, Lifecycle.ON_INIT, 9)
+        super().__init__(inject_environment, processor, Lifecycle.ON_INIT)
 
     def args(self, decorator: DecoratorDescriptor, method: TypeDescriptor.MethodDescriptor, environment: Environment):
         return [environment]
@@ -997,7 +1009,7 @@ class InjectLifecycleCallable(LifecycleCallable):
     __slots__ = []
 
     def __init__(self, processor: CallableProcessor):
-        super().__init__(inject, processor, Lifecycle.ON_INIT, 10 )
+        super().__init__(inject, processor, Lifecycle.ON_INIT)
 
     # override
 
