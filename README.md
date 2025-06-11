@@ -261,7 +261,23 @@ Different decorators are implemented, that call methods with computed values
 - `@inject_environment`  
    the method is called with the creating environment as a single parameter
 - `@value()`  
-   the method is called with a rewolved configuration value. Check the corresponding chapter
+   the method is called with a resolved configuration value. Check the corresponding chapter
+
+**Example**:
+```python
+@injectable()
+class Foo:
+    def __init__(self):
+        pass
+
+    @inject_environment()
+    def initEnvironment(self, env: Environment):
+        ...
+
+    @inject()
+    def set(self, baz: Baz) -> None:
+        ...
+```
 
 ## Lifecycle methods
 
