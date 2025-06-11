@@ -13,7 +13,8 @@ jobs:
       - run: pip install -r requirements.txt
       - run: pip install --upgrade pytest pytest-xdist
       - run: echo "PYTHONPATH=$PWD/src:$PWD/tests" >> $GITHUB_ENV
-      - run: pytest-xdist --forked
+      - run: pip show pytest-xdist
+      - run: pytest --forked
 
   release:
     needs: test
