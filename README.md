@@ -1,7 +1,7 @@
 # aspyx
 
-![Pylint](https://github.com/andreasernst/aspyx/actions/workflows/pylint.yml/badge.svg)
-![Build Status](https://github.com/andreasernst/aspyx/actions/workflows/ci.yml/badge.svg)
+![Pylint](https://github.com/coolsamson7/aspyx/actions/workflows/pylint.yml/badge.svg)
+![Build Status](https://github.com/coolsamson7/aspyx/actions/workflows/ci.yml/badge.svg)
 
 
 ## Table of Contents
