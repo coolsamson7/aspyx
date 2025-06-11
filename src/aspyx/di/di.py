@@ -508,6 +508,8 @@ class Providers:
 
     # class properties
 
+    check: list[AbstractInstanceProvider] = list()
+
     providers : Dict[Type,AbstractInstanceProvider] = dict()
     cache: Dict[Type, AbstractInstanceProvider] = dict()
 
@@ -556,6 +558,8 @@ class Providers:
 
         # go
 
+        Providers.check.append(provider)
+
         Providers.providers[provider.get_type()] = provider
 
         # cache providers
@@ -564,11 +568,10 @@ class Providers:
 
     @classmethod
     def resolve(cls):
-        if not Providers.resolved:
-            Providers.resolved = True
+        for provider in Providers.check:
+            provider.resolve(Providers.Context())
 
-            for provider in Providers.providers.values():
-                provider.resolve(Providers.Context())
+        Providers.check.clear()
 
         #Providers.report()
 

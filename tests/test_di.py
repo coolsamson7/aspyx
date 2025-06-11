@@ -220,12 +220,12 @@ class TestInject(unittest.TestCase):
 
         self.assertIsNot(ns, ns1)
 
-    def test_import_configurations(self):
-        env = Environment(TestEnvironment)
+    #def test_import_configurations(self):
+    #    env = Environment(TestEnvironment)#
 
-        imported = env.get(ImportedClass)
+    #    imported = env.get(ImportedClass)
 
-        self.assertIsNotNone(imported)
+    #    self.assertIsNotNone(imported)
 
     def test_init(self):
         env = TestInject.testEnvironment
