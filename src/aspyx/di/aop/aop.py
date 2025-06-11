@@ -3,6 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 import inspect
 import re
+import threading
 import types
 from dataclasses import dataclass
 from enum import auto, Enum
@@ -349,12 +350,14 @@ class Advice:
 
     __slots__ = [
         "cache",
+        "lock"
     ]
 
     # constructor
 
     def __init__(self):
         self.cache : Dict[Type, Dict[Callable,JoinPoints]] = dict()
+        self.lock = threading.Lock()
 
     # methods
 
@@ -370,20 +373,23 @@ class Advice:
 
         return aspects
 
-    # TODO thread-safe
     def joinPoints4(self, instance, environment: Environment) -> Dict[Callable,JoinPoints]:
         clazz = type(instance)
 
         result = self.cache.get(clazz, None)
         if result is None:
-            result = dict()
+            with self.lock:
+                result = self.cache.get(clazz, None)
 
-            for name, member in inspect.getmembers(clazz, predicate=inspect.isfunction):
-                joinPoints = self.computeJoinPoints(clazz, member, environment)
-                if joinPoints is not None:
-                    result[member] = joinPoints
+                if result is None:
+                    result = dict()
 
-            self.cache[clazz] = result
+                    for name, member in inspect.getmembers(clazz, predicate=inspect.isfunction):
+                        joinPoints = self.computeJoinPoints(clazz, member, environment)
+                        if joinPoints is not None:
+                            result[member] = joinPoints
+
+                    self.cache[clazz] = result
 
         # add around methods
 

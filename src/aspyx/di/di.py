@@ -5,6 +5,7 @@ import logging
 
 from abc import abstractmethod, ABC
 from enum import Enum, auto
+import threading
 from typing import Type, Dict, TypeVar, Generic, Optional, cast, Callable
 
 from aspyx.reflection import Decorators, TypeDescriptor, DecoratorDescriptor
@@ -1012,7 +1013,8 @@ class SingletonScope(Scope):
     # properties
 
     __slots__ = [
-        "value"
+        "value",
+        "lock"
     ]
 
     # constructor
@@ -1021,12 +1023,15 @@ class SingletonScope(Scope):
         super().__init__()
 
         self.value = None
+        self.lock = threading.Lock()
 
     # override
 
     def get(self, provider: AbstractInstanceProvider, environment: Environment, argProvider: Callable[[],list]):
-        if self.value is None: # TODO thread-safe
-            self.value = provider.create(environment, *argProvider())
+        if self.value is None:
+            with self.lock:
+                if self.value is None: 
+                    self.value = provider.create(environment, *argProvider())
 
         return self.value
 
