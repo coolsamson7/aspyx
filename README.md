@@ -79,7 +79,7 @@ class SampleEnvironment:
 
 # go, forrest
 
-environment = SampleEnvironment(Configuration)
+environment = Environment(SampleEnvironment)
 
 bar = env.get(Bar)
 bar.foo.hello("Andi")
