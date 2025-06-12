@@ -1,3 +1,6 @@
+"""
+Tests
+"""
 from __future__ import annotations
 
 import unittest
@@ -10,7 +13,6 @@ from aspyx.di.di import InjectorException
 class Foo:
     def __init__(self, foo: Bar):
         pass
-    pass
 
 @injectable()
 class Bar:
@@ -26,9 +28,9 @@ class TestEnvironment:
 
 class TestCycle(unittest.TestCase):
     def test_cycle(self):
-        pass #with self.assertRaises(InjectorException):
-        #    env = Environment(TestEnvironment)
+        with self.assertRaises(InjectorException):
+            Environment(TestEnvironment)
 
 
 if __name__ == '__main__':
-   unittest.main()
+    unittest.main()
