@@ -149,11 +149,11 @@ All referenced types will be injected by the environemnt.
 Only eligible types are allowed, of course!
 
 The decorator accepts the keyword arguments
-- `eager : boolean`
+- `eager : boolean`  
   if `True`, the container will create the instances automatically while booting the environment. This is the default.
-- `scope: boolean`
+- `scope: str`  
   the name of a scope which will determine how often instances will be created.
- `singleton` will create it only once - per environment -, while `request` will recreate it on every injection request. THe default is `singleton`
+ `singleton` will create it only once - per environment -, while `request` will recreate it on every injection request. The default is `singleton`
 
  Other scopes - e.g. session related scopes - can be defined dynamically. Please check the corresponding chapter.
 
@@ -444,9 +444,10 @@ This concept relies on a central object `ConfigurationManager` that stores the o
 
 ```python
 class ConfigurationSource(ABC):
-    def __init__(self, manager: ConfigurationManager):
-        manager._register(self)
+    def __init__(self):
         pass
+
+   ...
 
     @abstractmethod
     def load(self) -> dict:
@@ -459,12 +460,10 @@ As a default environment variables are already supported.
 
 Other sources can be added dynamically by just registering them.
 
-**Exmaple**:
+**Example**:
 ```python
 @injectable()
 class SampleConfigurationSource(ConfigurationSource):
-    # constructor
-
     def __init__(self):
         super().__init__()
 
@@ -479,7 +478,42 @@ class SampleConfigurationSource(ConfigurationSource):
             }
 ```
 
-# Refletion
+# Reflection
+
+As the library heavily relies on type introspection of classes and methods, a utility class `TypeDescriptor` is available that covers type information on classes. 
+
+After beeing instatiated with
+
+```python
+TypeDescriptor.for_type(<type>)
+```
+
+it offers the methods
+- `get_methods(local=False)`
+- `get_method(name: str, local=False)`
+- `has_decorator(decorator)`
+- `get_decorator(decorator)`
+
+The returned method descriptors offer:
+- `paramTypes`
+- `returnType`
+- `has_decorator(decorator)`
+- `get_decorator(decorator)`
+
+The management of decorators in turn relies on another utility class `Decorators` that caches decorators.
+
+Whenver you define a custom decorator, you will need to register it accordingly.
+
+**Example**:
+```python
+def transactional():
+    def decorator(func):
+        Decorators.add(func, transactional)
+        return func
+
+    return decorator
+```
+
 
 
 
