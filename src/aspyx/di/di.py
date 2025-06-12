@@ -11,6 +11,7 @@ from enum import Enum, auto
 import threading
 from typing import Type, Dict, TypeVar, Generic, Optional, cast, Callable
 
+from aspyx.di.util import StringBuilder
 from aspyx.reflection import Decorators, TypeDescriptor, DecoratorDescriptor
 
 T = TypeVar("T")
@@ -574,8 +575,6 @@ class Providers:
 
         Providers.check.clear()
 
-        #Providers.report()
-
     @classmethod
     def report(cls):
         for provider in Providers.cache.values():
@@ -823,6 +822,7 @@ class Environment:
         for provider in load_environment(env):
             if provider.is_eager():
                 provider.create(self)
+
     # internal
 
     def execute_processors(self, lifecycle: Lifecycle, instance: T) -> T:
@@ -850,6 +850,47 @@ class Environment:
         return self.execute_processors(Lifecycle.ON_INIT, instance)
 
     # public
+
+    def report(self):
+        builder = StringBuilder()
+
+        builder.append(f"Environment {self.type.__name__}")
+
+        if self.parent is not None:
+            builder.append(f" parent {self.parent.type.__name__}")
+
+        builder.append("\n")
+
+        # post processors
+
+        builder.append("Processors \n")
+        for processor in self.lifecycle_processors:
+            builder.append(f"- {processor.__class__.__name__}\n")
+
+        # providers
+
+        builder.append("Providers \n")
+        for t, provider in self.providers.items():
+            if cast(EnvironmentInstanceProvider, provider).environment is self:
+                builder.append(f"- {cast(EnvironmentInstanceProvider, provider).provider}\n")
+
+        # instances
+
+        builder.append("Instances \n")
+
+        result = {}
+        for obj in self.instances:
+            cls = type(obj)
+            result[cls] = result.get(cls, 0) + 1
+
+        for cls, count in result.items():
+            builder.append(f"- {cls.__name__}: {count} \n")
+
+        # done
+
+        result = str(builder)
+
+        return result
 
     def destroy(self):
         """
