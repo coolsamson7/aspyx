@@ -325,7 +325,7 @@ class ClassInstanceProvider(InstanceProvider):
                         if self.add_dependency(provider):
                             provider.resolve(context)
         else: # check if the dependencies create a cycle
-            context.add(*self.dependencies)
+            context.add(self, *self.dependencies)
 
         return self
 
@@ -367,7 +367,7 @@ class FunctionInstanceProvider(InstanceProvider):
             if self.add_dependency(provider):
                 provider.resolve(context)
         else: # check if the dependencies crate a cycle
-            context.add(*self.dependencies)
+            context.add(self, *self.dependencies)
 
         return self
 
@@ -412,7 +412,7 @@ class FactoryInstanceProvider(InstanceProvider):
                 provider.resolve(context)
 
         else: # check if the dependencies crate a cycle
-            context.add(*self.dependencies)
+            context.add(self, *self.dependencies)
 
         return self
 
