@@ -1,3 +1,6 @@
+"""
+Dynamic proxies for method interception and delegation.
+"""
 from typing import Generic, TypeVar, Type
 
 T = TypeVar("T")

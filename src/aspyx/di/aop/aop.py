@@ -1,3 +1,6 @@
+"""
+This module provides aspect-oriented programming (AOP) capabilities for Python applications.
+"""
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -16,8 +19,8 @@ from aspyx.di import injectable, Providers, ClassInstanceProvider, Environment, 
 
 class AOPException(Exception):
     """
-    Exception raised for errors in the aop logic."""
-    pass
+    Exception raised for errors in the aop logic.
+    """
 
 class AspectType(Enum):
     """
@@ -62,6 +65,8 @@ class AspectTarget(ABC):
     def __init__(self):
         self._clazz = None
         self._instance = None
+        self._function = None
+        self._type = None
 
         self.patterns = []
         self.names = []
@@ -69,8 +74,6 @@ class AspectTarget(ABC):
         self.decorators = []
 
         self.other : list[AspectTarget] = []
-
-        pass
 
     # abstract
 
@@ -112,7 +115,7 @@ class AspectTarget(ABC):
     def decorated_with(self, decorator):
         self.decorators.append(decorator)
         return self
-    
+
     def matches(self, pattern: str):
         """
         Matches the target against a pattern.
@@ -129,13 +132,6 @@ class ClassAspectTarget(AspectTarget):
 
     __slots__ = [
     ]
-
-    # constructor
-
-    def __init__(self):
-        super().__init__()
-
-        pass
 
     # public
 
@@ -159,7 +155,7 @@ class ClassAspectTarget(AspectTarget):
         if len(self.names) > 0:
             if next((name for name in self.names if name == clazz.__name__), None) is None:
                 return False
-            
+
         # patterns
 
         if len(self.patterns) > 0:
@@ -167,29 +163,13 @@ class ClassAspectTarget(AspectTarget):
                 return False
 
         return True
-    
+
     # fluent
 
-
-    
 class MethodAspectTarget(AspectTarget):
     # properties
 
-    __slots__ = [
-        "_clazz",
-        "_instance",
-        "_type",
-        "_function",
-        "names",
-        "patterns",
-        "types",
-        "decorators",
-    ]
-
-    # constructor
-
-    def __init__(self):
-       super().__init__()
+    __slots__ = [ ]
 
     # public
 
@@ -215,13 +195,13 @@ class MethodAspectTarget(AspectTarget):
         if len(self.names) > 0:
             if next((name for name in self.names if name == func.__name__), None) is None:
                 return False
-            
+
         # patterns
 
         if len(self.patterns) > 0:
             if next((pattern for pattern in self.patterns if re.fullmatch(pattern, func.__name__) is not None), None) is None:
                 return False
-   
+
         # yipee
 
         return True
@@ -345,8 +325,8 @@ class Invocation:
 
         if self.exception is not None:
             raise self.exception # rethrow the error
-        else:
-            return self.result
+
+        return self.result
 
     def proceed(self, *args, **kwargs):
         """
@@ -374,7 +354,7 @@ class Advice:
     # constructor
 
     def __init__(self):
-        self.cache : Dict[Type, Dict[Callable,JoinPoints]] = dict()
+        self.cache : Dict[Type, Dict[Callable,JoinPoints]] = {}
         self.lock = threading.RLock()
 
     # methods
@@ -400,9 +380,9 @@ class Advice:
                 result = self.cache.get(clazz, None)
 
                 if result is None:
-                    result = dict()
+                    result = {}
 
-                    for name, member in inspect.getmembers(clazz, predicate=inspect.isfunction):
+                    for _, member in inspect.getmembers(clazz, predicate=inspect.isfunction):
                         joinPoints = self.computeJoinPoints(clazz, member, environment)
                         if joinPoints is not None:
                             result[member] = joinPoints
@@ -411,7 +391,7 @@ class Advice:
 
         # add around methods
 
-        value = dict()
+        value = {}
 
         for key, cjp in result.items():
             jp = JoinPoints(
@@ -554,7 +534,7 @@ class AdviceProcessor(PostProcessor):
         joinPointDict = self.advice.joinPoints4(instance, environment)
 
         for member, joinPoints in joinPointDict.items():
-            Environment.logger.debug(f"add aspects for {type(instance)}:{member.__name__}")
+            Environment.logger.debug("add aspects for %s:%s", type(instance), member.__name__)
 
             def wrap(jp):
                 return lambda *args, **kwargs: Invocation(member, jp).call(*args, **kwargs)

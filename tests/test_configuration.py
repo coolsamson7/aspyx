@@ -16,9 +16,8 @@ class Configuration:
 class SampleConfigurationSource1(ConfigurationSource):
     # constructor
 
-    def __init__(self, manager: ConfigurationManager):
-        super().__init__(manager)
-
+    def __init__(self):
+        super().__init__()
 
     def load(self) -> dict:
         return {
@@ -30,9 +29,8 @@ class SampleConfigurationSource1(ConfigurationSource):
 class SampleConfigurationSource2(ConfigurationSource):
     # constructor
 
-    def __init__(self, manager: ConfigurationManager):
-        super().__init__(manager)
-
+    def __init__(self):
+        super().__init__()
 
     def load(self) -> dict:
         return {
@@ -45,7 +43,7 @@ class SampleConfigurationSource2(ConfigurationSource):
 
 @injectable(scope="request")
 class Foo:
-    def __init__(self, manager: ConfigurationManager):
+    def __init__(self):
         self.value = None
         self.value1 = None
         self.value2 = None

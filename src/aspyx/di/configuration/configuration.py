@@ -1,3 +1,6 @@
+"""
+Configuration handling module.
+"""
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -5,8 +8,8 @@ import os
 from typing import Optional, Type, TypeVar
 from dotenv import load_dotenv
 
-from aspyx.di import injectable, Environment, CallableProcessor, LifecycleCallable, Lifecycle, environment
-from aspyx.di.di import order
+from aspyx.di import injectable, Environment, CallableProcessor, LifecycleCallable, Lifecycle
+from aspyx.di.di import order, inject
 from aspyx.reflection import Decorators, DecoratorDescriptor, TypeDescriptor
 
 T = TypeVar("T")
@@ -15,7 +18,6 @@ class ConfigurationException(Exception):
     """
     Exception raised for errors in the configuration logic.
     """
-    pass
 
 @injectable()
 class ConfigurationManager:
@@ -30,7 +32,7 @@ class ConfigurationManager:
 
     def __init__(self):
         self.sources = []
-        self._data = dict()
+        self._data = {}
         self.coercions = {
             int: int,
             float: float,
@@ -82,17 +84,17 @@ class ConfigurationManager:
                 current = current[key]
 
             return current
-        
+
         v = resolve_value(path, default)
 
         if isinstance(v, type):
             return v
-            
+
         if type in self.coercions:
             try:
                 return self.coercions[type](v)
-            except Exception:
-                raise ConfigurationException(f"error during coercion to {type}")
+            except Exception as e:
+                raise ConfigurationException(f"error during coercion to {type}") from e
         else:
             raise ConfigurationException(f"unknown coercion to {type}")
 
@@ -104,15 +106,18 @@ class ConfigurationSource(ABC):
 
     __slots__ = []
 
-    def __init__(self, manager: ConfigurationManager):
-        manager._register(self)
+    def __init__(self):
         pass
+
+    @inject()
+    def set_manager(self, manager: ConfigurationManager):
+        manager._register(self)
 
     @abstractmethod
     def load(self) -> dict:
         """
-        return the configuration values of this source as a dictionary."""
-        pass
+        return the configuration values of this source as a dictionary.
+        """
 
 @injectable()
 class EnvConfigurationSource(ConfigurationSource):
@@ -124,8 +129,8 @@ class EnvConfigurationSource(ConfigurationSource):
 
     # constructor
 
-    def __init__(self, manager: ConfigurationManager):
-        super().__init__(manager)
+    def __init__(self):
+        super().__init__()
 
         load_dotenv()
 

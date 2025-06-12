@@ -5,15 +5,15 @@ on: [push, pull_request]
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ matrix.python-version }}
       - run: pip install -r requirements.txt
-      - run: pip install --upgrade --force-reinstall pytest pytest-xdist
+      - run: pip install pytest
       - run: echo "PYTHONPATH=$PWD/src:$PWD/tests" >> $GITHUB_ENV
-      - run: pip show pytest-xdist
-      - run: pip freeze
-      - run: pytest --trace-config
       - run: pytest

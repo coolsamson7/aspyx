@@ -1,3 +1,6 @@
+"""
+Configuration value handling
+"""
 from .configuration import ConfigurationManager, ConfigurationSource, EnvConfigurationSource, value
 
 __all__ = [

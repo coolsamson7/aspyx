@@ -1,9 +1,14 @@
+"""
+This module provides a TypeDescriptor class that allows introspection of Python classes,
+including their methods, decorators, and type hints. It supports caching for performance
+"""
 from __future__ import annotations
 
 import inspect
 from inspect import signature, getmembers
 from typing import Callable, get_type_hints, Type, Dict, Optional
 from weakref import WeakKeyDictionary
+
 
 class DecoratorDescriptor:
     __slots__ = [
@@ -44,20 +49,20 @@ class TypeDescriptor:
             type_hints = get_type_hints(method)
             sig = signature(method)
 
-            for name, param in sig.parameters.items():
+            for name, _ in sig.parameters.items():
                 if name != 'self':
                     self.paramTypes.append(type_hints.get(name, object))
 
             self.returnType = type_hints.get('return', None)
 
-        def get_decorator(self, decorator):
+        def get_decorator(self, decorator) -> Optional[DecoratorDescriptor]:
             for dec in self.decorators:
                 if dec.decorator is decorator:
                     return dec
 
             return None
 
-        def has_decorator(self, decorator):
+        def has_decorator(self, decorator) -> bool:
             for dec in self.decorators:
                 if dec.decorator is decorator:
                     return True
@@ -66,8 +71,6 @@ class TypeDescriptor:
 
         def __str__(self):
             return f"Method({self.method.__name__})"
-
-    # class methods
 
     # class properties
 
@@ -81,6 +84,7 @@ class TypeDescriptor:
         if descriptor is None:
             descriptor = TypeDescriptor(clazz)
             cls._cache[clazz] = descriptor
+
         return descriptor
 
     # constructor
@@ -88,8 +92,8 @@ class TypeDescriptor:
     def __init__(self, cls):
         self.cls = cls
         self.decorators = Decorators.get(cls)
-        self.methods: Dict[str, TypeDescriptor.MethodDescriptor] = dict()
-        self.localMethods: Dict[str, TypeDescriptor.MethodDescriptor] = dict()
+        self.methods: Dict[str, TypeDescriptor.MethodDescriptor] = {}
+        self.localMethods: Dict[str, TypeDescriptor.MethodDescriptor] = {}
 
         # check superclasses
 
@@ -106,8 +110,6 @@ class TypeDescriptor:
             self.methods[name] = method
 
     # internal
-
-    #isinstance(attr, classmethod)
 
     def _get_local_members(self, cls):
         return [
@@ -127,13 +129,19 @@ class TypeDescriptor:
 
     def has_decorator(self, decorator) -> bool:
         for dec in self.decorators:
-            if dec.decorator.__name__ == decorator.__name__:
+            if dec.decorator is decorator:
                 return True
 
         return False
 
-    def get_local_method(self, name) -> Optional[MethodDescriptor]:
-        return self.localMethods.get(name, None)
+    def get_methods(self, local = False) ->  list[TypeDescriptor.MethodDescriptor]:
+        if local:
+            return list(self.localMethods.values())
+        else:
+            return list(self.methods.values())
 
-    def get_method(self, name) -> Optional[MethodDescriptor]:
-        return self.methods.get(name, None)
+    def get_method(self, name: str, local = False) -> Optional[TypeDescriptor.MethodDescriptor]:
+        if local:
+            return self.localMethods.get(name, None)
+        else:
+            return self.methods.get(name, None)

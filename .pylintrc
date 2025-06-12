@@ -443,7 +443,19 @@ disable=raw-checker-failed,
         C0115,
         C0116,
         C0301,
-        missing-class-docstring
+        missing-class-docstring,
+        no-else-return,
+        redefined-builtin,
+        too-few-public-methods,
+        broad-exception-caught,
+        redefined-outer-name,
+        invalid-name,
+        too-many-lines,
+        too-many-instance-attributes,
+        too-many-arguments,
+        too-many-positional-arguments,
+        protected-access,
+        unused-argument
 
 # Enable the message, report, category or checker with the given id(s). You can
 # either give multiple identifier separated by comma (,) or put this option
