@@ -5,8 +5,8 @@ from .di import InjectorException, CallableProcessor, LifecycleCallable, Lifecyc
 
 # import something from the subpackages, so that teh decorators are executed
 
-from aspyx.di.configuration import ConfigurationManager
-from aspyx.di.aop import before
+from .configuration import ConfigurationManager
+from .aop import before
 
 imports = [ConfigurationManager, before]
 

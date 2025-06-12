@@ -1,6 +1,8 @@
+"""
+Tests for the AOP (Aspect-Oriented Programming) functionality in the aspyx.di module.
+"""
 from __future__ import annotations
 
-import logging
 import unittest
 
 from aspyx.reflection import Decorators
@@ -73,31 +75,31 @@ class SampleAdvice:
         self.exception = invocation.exception
 
     @before(methods().named("say").of_type(Foo).matches(".*"))
-    def callBeforeFoo(self, invocation: Invocation):
+    def call_before_foo(self, invocation: Invocation):
         self.before_calls += 1
 
     @before(methods().named("say").of_type(Bar))
-    def callBeforeBar(self, invocation: Invocation):
+    def call_before_bar(self, invocation: Invocation):
         self.before_calls += 1
 
     @after(methods().named("say"))
-    def callAfter(self, invocation: Invocation):
+    def call_after(self, invocation: Invocation):
         self.after_calls += 1
 
     @around(methods().named("say"))
-    def callAround(self, invocation: Invocation):
+    def call_around(self, invocation: Invocation):
         self.around_calls += 1
 
         return invocation.proceed()
 
     @around(methods().decorated_with(transactional), classes().decorated_with(transactional))
-    def callTransactional1(self, invocation: Invocation):
+    def call_transactional1(self, invocation: Invocation):
         self.around_calls += 1
 
         return invocation.proceed()
-    
+
     #@around(classes().decoratedWith(transactional))
-    def callTransactional(self, invocation: Invocation):
+    def call_transactional(self, invocation: Invocation):
         self.around_calls += 1
 
         return invocation.proceed()
@@ -152,7 +154,7 @@ class TestAdvice(unittest.TestCase):
 
         # foo
 
-        result = foo.say("hello")
+        foo.say("hello")
 
 if __name__ == '__main__':
     unittest.main()

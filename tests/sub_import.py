@@ -1,3 +1,6 @@
+"""
+Sub module
+"""
 from aspyx.di import environment, injectable
 
 @environment()

@@ -1,8 +1,10 @@
+"""
+Test cases for the TypeDescriptor and Decorators functionality in aspyx.reflection.
+"""
 from __future__ import annotations
 
 import unittest
 
-from aspyx.di import injectable
 from aspyx.reflection import TypeDescriptor, Decorators
 
 
@@ -22,13 +24,10 @@ class Base:
     def base(self, message: str) -> str:
         pass
 
-    def noTypeHints(self, message):
+    def no_type_hints(self, message):
         pass
 
 class Derived(Base):
-    def __init__(self):
-        super().__init__()
-
     @classmethod
     def foo(cls):
         pass
@@ -38,18 +37,15 @@ class Derived(Base):
 
 class TestReflection(unittest.TestCase):
     def test_decorators(self):
-        baseDescriptor = TypeDescriptor.for_type(Base)
+        base_descriptor = TypeDescriptor.for_type(Base)
 
-        self.assertTrue(baseDescriptor.has_decorator(transactional))
-        self.assertTrue( baseDescriptor.get_method("base").has_decorator(transactional))
+        self.assertTrue(base_descriptor.has_decorator(transactional))
+        self.assertTrue( base_descriptor.get_method("base").has_decorator(transactional))
 
     def test_methods(self):
-        derivedDescriptor = TypeDescriptor.for_type(Derived)
+        derived_descriptor = TypeDescriptor.for_type(Derived)
 
-        self.assertIsNotNone(derivedDescriptor.get_method("derived").return_type, str)
-
-
-        print(derivedDescriptor)
+        self.assertIsNotNone(derived_descriptor.get_method("derived").return_type, str)
 
 
 if __name__ == '__main__':

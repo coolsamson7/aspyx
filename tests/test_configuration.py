@@ -1,3 +1,6 @@
+"""
+Test cases for the Configuration system in aspyx.di
+"""
 from __future__ import annotations
 
 import unittest
@@ -24,7 +27,7 @@ class SampleConfigurationSource1(ConfigurationSource):
             "a": 1, 
             "b": {}
             }
-    
+
 @injectable()
 class SampleConfigurationSource2(ConfigurationSource):
     # constructor
@@ -47,7 +50,6 @@ class Foo:
         self.value = None
         self.value1 = None
         self.value2 = None
-        pass
 
     @value("b.d", 0)
     def set_value(self, value: int):

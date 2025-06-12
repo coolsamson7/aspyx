@@ -61,7 +61,7 @@ class AbstractInstanceProvider(ABC, Generic[T]):
         pass
 
     @abstractmethod
-    def resolve(self, context: Providers.Context) -> AbstractInstanceProvider:
+    def resolve(self, context: Providers.Context):
         pass
 
 
@@ -86,10 +86,15 @@ class InstanceProvider(AbstractInstanceProvider):
         self.scope = scope
         self.dependencies : Optional[list[AbstractInstanceProvider]] = None
 
+    # internal
+
+    def _is_resolved(self) -> bool:
+        return self.dependencies is not None
+
     # implement AbstractInstanceProvider
 
-    def resolve(self, context: Providers.Context) -> AbstractInstanceProvider:
-        return self
+    def resolve(self, context: Providers.Context):
+        pass
 
     def get_module(self) -> str:
         return self.host.__module__
@@ -179,8 +184,8 @@ class AmbiguousProvider(AbstractInstanceProvider):
     def get_dependencies(self) -> list[AbstractInstanceProvider]:
         return []
 
-    def resolve(self, context: Providers.Context) -> AbstractInstanceProvider:
-        return self
+    def resolve(self, context: Providers.Context):
+        pass
 
     def create(self, environment: Environment, *args):
         raise InjectorException(f"multiple candidates for type {self.type}")
@@ -246,7 +251,7 @@ class EnvironmentInstanceProvider(AbstractInstanceProvider):
 
     # implement
 
-    def resolve(self, context: Providers.Context) -> AbstractInstanceProvider:
+    def resolve(self, context: Providers.Context):
         pass # noop
 
     def get_module(self) -> str:
@@ -298,11 +303,11 @@ class ClassInstanceProvider(InstanceProvider):
 
     # implement
 
-    def resolve(self, context: Providers.Context) -> InstanceProvider:
-        if self.dependencies is None:
-            self.dependencies = []
+    def resolve(self, context: Providers.Context):
+        context.add(self)
 
-            context.add(self)
+        if not self._is_resolved():
+            self.dependencies = []
 
             # check constructor
 
@@ -313,7 +318,7 @@ class ClassInstanceProvider(InstanceProvider):
             for param in init.param_types:
                 provider = Providers.get_provider(param)
                 self.params += 1
-                if self.add_dependency(provider):
+                if self.add_dependency(provider): # a dependency can occur multiple times, e.g in __init__ and in an injected method
                     provider.resolve(context)
 
             # check @inject
@@ -326,9 +331,7 @@ class ClassInstanceProvider(InstanceProvider):
                         if self.add_dependency(provider):
                             provider.resolve(context)
         else: # check if the dependencies create a cycle
-            context.add(self, *self.dependencies)
-
-        return self
+            context.add(*self.dependencies)
 
     def create(self, environment: Environment, *args):
         Environment.logger.debug("%s create class %s", self, self.type.__qualname__)
@@ -358,19 +361,17 @@ class FunctionInstanceProvider(InstanceProvider):
 
     # implement
 
-    def resolve(self, context: Providers.Context) -> AbstractInstanceProvider:
-        if self.dependencies is None:
-            self.dependencies = []
+    def resolve(self, context: Providers.Context):
+        context.add(self)
 
-            context.add(self)
+        if not self._is_resolved():
+            self.dependencies = []
 
             provider = Providers.get_provider(self.host)
             if self.add_dependency(provider):
                 provider.resolve(context)
         else: # check if the dependencies crate a cycle
-            context.add(self, *self.dependencies)
-
-        return self
+            context.add(*self.dependencies)
 
     def create(self, environment: Environment, *args):
         Environment.logger.debug("%s create class %s", self, self.type.__qualname__)
@@ -402,18 +403,18 @@ class FactoryInstanceProvider(InstanceProvider):
 
     # implement
 
-    def resolve(self, context: Providers.Context) -> AbstractInstanceProvider:
-        if self.dependencies is None:
-            self.dependencies = []
+    def resolve(self, context: Providers.Context):
+        context.add(self)
 
-            context.add(self)
+        if  not self._is_resolved():
+            self.dependencies = []
 
             provider = Providers.get_provider(self.host)
             if self.add_dependency(provider):
                 provider.resolve(context)
 
         else: # check if the dependencies crate a cycle
-            context.add(self, *self.dependencies)
+            context.add(*self.dependencies)
 
         return self
 
@@ -483,12 +484,14 @@ class Providers:
 
         def __init__(self):
             self.dependencies : list[AbstractInstanceProvider] = []
+            print("new context")
 
         def add(self, *providers: AbstractInstanceProvider):
             for provider in providers:
                 if next((p for p in self.dependencies if p.get_type() is provider.get_type()), None) is not None:
                     raise InjectorException(self.cycle_report(provider))
 
+                print(f" + {provider}")
                 self.dependencies.append(provider)
 
         def cycle_report(self, provider: AbstractInstanceProvider):
@@ -503,7 +506,7 @@ class Providers:
 
                 cycle += f"{p.get_type().__name__}"
 
-            cycle += f" -> {provider.get_type().__name__}"
+            cycle += f" <> {provider.get_type().__name__}"
 
             return cycle
 
@@ -749,7 +752,7 @@ class Environment:
 
         Environment.instance = self
 
-        # resolve providers on a static basis. This is only executed once!
+        # resolve providers on a static basis. This is executed for all new providers ( in case of new modules multiple times) !
 
         Providers.resolve()
 
@@ -870,7 +873,7 @@ class Environment:
         # providers
 
         builder.append("Providers \n")
-        for t, provider in self.providers.items():
+        for _, provider in self.providers.items():
             if cast(EnvironmentInstanceProvider, provider).environment is self:
                 builder.append(f"- {cast(EnvironmentInstanceProvider, provider).provider}\n")
 
@@ -1087,7 +1090,7 @@ class SingletonScope(Scope):
         super().__init__()
 
         self.value = None
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()
 
     # override
 

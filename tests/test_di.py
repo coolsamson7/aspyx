@@ -1,3 +1,6 @@
+"""
+Test cases for the aspyx.di module.
+"""
 from __future__ import annotations
 
 import time
@@ -7,7 +10,8 @@ from typing import Dict
 
 from aspyx.di import InjectorException, injectable, on_init, on_destroy, inject_environment, inject, Factory, create, environment, Environment, PostProcessor, factory
 from aspyx.di.di import order
-from di_import import ImportedEnvironment, ImportedClass
+
+from .di_import import ImportedEnvironment
 
 # not here
 
@@ -20,9 +24,7 @@ def configure_logging(levels: Dict[str, int]) -> None:
     for name in levels:
         logging.getLogger(name).setLevel(levels[name])
 
-configure_logging({
-    "aspyx": logging.DEBUG
-})
+#configure_logging({"aspyx": logging.DEBUG})
 
 # not here
 
@@ -49,11 +51,9 @@ class Baz:
     def init(self):
         self.inited = True
 
-    pass
-
 @injectable()
 class Bazong:
-    def __init__(self, foo: Foo):
+    def __init__(self):
         pass
 
 class Base:
@@ -104,7 +104,7 @@ class Bar(Base):
         self.destroyed = True
 
     @inject_environment()
-    def initEnvironment(self, env: Environment):
+    def init_environment(self, env: Environment):
         self.environment = env
 
     @inject()
@@ -250,7 +250,8 @@ class TestInject(unittest.TestCase):
 
         start = time.perf_counter()
         for _ in range(1000000):
-            bar = env.get(Bar)
+            env.get(Bar)
+
         end = time.perf_counter()
 
         avg_ms = ((end - start) / 1000000) * 1000
@@ -258,4 +259,4 @@ class TestInject(unittest.TestCase):
 
 
 if __name__ == '__main__':
-   unittest.main()
+    unittest.main()
