@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import inspect
 from inspect import signature, getmembers
+import threading
 from typing import Callable, get_type_hints, Type, Dict, Optional
 from weakref import WeakKeyDictionary
 
@@ -75,6 +76,7 @@ class TypeDescriptor:
     # class properties
 
     _cache = WeakKeyDictionary()
+    _lock = threading.RLock()
 
     # class methods
 
@@ -82,8 +84,11 @@ class TypeDescriptor:
     def for_type(cls, clazz: Type) -> TypeDescriptor:
         descriptor = cls._cache.get(clazz)
         if descriptor is None:
-            descriptor = TypeDescriptor(clazz)
-            cls._cache[clazz] = descriptor
+            with cls._lock:
+                descriptor = cls._cache.get(clazz)
+                if descriptor is None:
+                    descriptor = TypeDescriptor(clazz)
+                    cls._cache[clazz] = descriptor
 
         return descriptor
 
