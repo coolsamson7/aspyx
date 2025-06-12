@@ -149,6 +149,8 @@ class TestInject(unittest.TestCase):
     def test_process_factory_instances(self):
         env = TestInject.testEnvironment
 
+        print(env.report())
+
         baz = env.get(Baz)
         foo = env.get(Foo)
         self.assertEqual(baz.inited, True)

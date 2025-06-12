@@ -8,7 +8,7 @@ import os
 from typing import Optional, Type, TypeVar
 from dotenv import load_dotenv
 
-from aspyx.di import injectable, Environment, CallableProcessor, LifecycleCallable, Lifecycle
+from aspyx.di import injectable, Environment, LifecycleCallable, Lifecycle
 from aspyx.di.di import order, inject
 from aspyx.reflection import Decorators, DecoratorDescriptor, TypeDescriptor
 
@@ -188,8 +188,8 @@ def value(key: str, default=None):
 @injectable()
 @order(9)
 class ConfigurationLifecycleCallable(LifecycleCallable):
-    def __init__(self, processor: CallableProcessor,  manager: ConfigurationManager):
-        super().__init__(value, processor, Lifecycle.ON_INIT)
+    def __init__(self,  manager: ConfigurationManager):
+        super().__init__(value, Lifecycle.ON_INJECT)
 
         self.manager = manager
 
