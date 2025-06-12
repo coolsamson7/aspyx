@@ -194,4 +194,4 @@ class ConfigurationLifecycleCallable(LifecycleCallable):
         self.manager = manager
 
     def args(self, decorator: DecoratorDescriptor, method: TypeDescriptor.MethodDescriptor, environment: Environment):
-        return [self.manager.get(decorator.args[0], method.paramTypes[0], decorator.args[1])]
+        return [self.manager.get(decorator.args[0], method.param_types[0], decorator.args[1])]

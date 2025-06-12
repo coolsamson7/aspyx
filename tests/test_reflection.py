@@ -46,7 +46,7 @@ class TestReflection(unittest.TestCase):
     def test_methods(self):
         derivedDescriptor = TypeDescriptor.for_type(Derived)
 
-        self.assertIsNotNone(derivedDescriptor.get_method("derived").returnType, str)
+        self.assertIsNotNone(derivedDescriptor.get_method("derived").return_type, str)
 
 
         print(derivedDescriptor)

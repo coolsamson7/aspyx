@@ -196,15 +196,15 @@ class Scopes:
 
     @classmethod
     def get(cls, scope: str, environment: Environment):
-        scopeType = Scopes.scopes.get(scope, None)
-        if scopeType is None:
+        scope_type = Scopes.scopes.get(scope, None)
+        if scope_type is None:
             raise InjectorException(f"unknown scope type {scope}")
 
-        return environment.get(scopeType)
+        return environment.get(scope_type)
 
     @classmethod
-    def register(cls, scopeClass: Type, name: str):
-        Scopes.scopes[name] = scopeClass
+    def register(cls, scope_type: Type, name: str):
+        Scopes.scopes[name] = scope_type
 
 class Scope:
     # properties
@@ -219,15 +219,15 @@ class Scope:
 
     # public
 
-    def get(self, provider: AbstractInstanceProvider, environment: Environment, argProvider: Callable[[],list]):
-        return provider.create(environment, *argProvider())
+    def get(self, provider: AbstractInstanceProvider, environment: Environment, arg_provider: Callable[[],list]):
+        return provider.create(environment, *arg_provider())
 
 class EnvironmentInstanceProvider(AbstractInstanceProvider):
     # properties
 
     __slots__ = [
         "environment",
-        "scopeInstance",
+        "scope_instance",
         "provider",
         "dependencies",
     ]
@@ -241,8 +241,7 @@ class EnvironmentInstanceProvider(AbstractInstanceProvider):
         self.provider = provider
         self.dependencies : list[AbstractInstanceProvider] = []
 
-        self.scopeInstance = Scopes.get(provider.get_scope(), environment)
-        print()
+        self.scope_instance = Scopes.get(provider.get_scope(), environment)
 
     # implement
 
@@ -263,19 +262,19 @@ class EnvironmentInstanceProvider(AbstractInstanceProvider):
 
     # custom logic
 
-    def tweakDependencies(self, providers: dict[Type, AbstractInstanceProvider]):
+    def tweak_dependencies(self, providers: dict[Type, AbstractInstanceProvider]):
         for dependency in self.provider.get_dependencies():
-            instanceProvider = providers.get(dependency.get_type(), None)
-            if instanceProvider is None:
+            instance_provider = providers.get(dependency.get_type(), None)
+            if instance_provider is None:
                 raise InjectorException(f"missing import for {dependency.get_type()} ")
 
-            self.dependencies.append(instanceProvider)
+            self.dependencies.append(instance_provider)
 
     def get_dependencies(self) -> list[AbstractInstanceProvider]:
         return self.provider.get_dependencies()
 
     def create(self, environment: Environment, *args):
-        return self.scopeInstance.get(self.provider, self.environment, lambda: [provider.create(environment) for provider in self.dependencies] ) # already scope property!
+        return self.scope_instance.get(self.provider, self.environment, lambda: [provider.create(environment) for provider in self.dependencies]) # already scope property!
 
     def __str__(self):
         return f"EnvironmentInstanceProvider({self.provider})"
@@ -310,8 +309,8 @@ class ClassInstanceProvider(InstanceProvider):
             if init is None:
                 raise InjectorException(f"{self.type.__name__} does not implement __init__")
 
-            for param in init.paramTypes:
-                provider = Providers.getProvider(param)
+            for param in init.param_types:
+                provider = Providers.get_provider(param)
                 self.params += 1
                 if self.add_dependency(provider):
                     provider.resolve(context)
@@ -320,8 +319,8 @@ class ClassInstanceProvider(InstanceProvider):
 
             for method in TypeDescriptor.for_type(self.type).get_methods():
                 if method.has_decorator(inject):
-                    for param in method.paramTypes:
-                        provider = Providers.getProvider(param)
+                    for param in method.param_types:
+                        provider = Providers.get_provider(param)
 
                         if self.add_dependency(provider):
                             provider.resolve(context)
@@ -364,7 +363,7 @@ class FunctionInstanceProvider(InstanceProvider):
 
             context.add(self)
 
-            provider = Providers.getProvider(self.host)
+            provider = Providers.get_provider(self.host)
             if self.add_dependency(provider):
                 provider.resolve(context)
         else: # check if the dependencies crate a cycle
@@ -392,13 +391,13 @@ class FactoryInstanceProvider(InstanceProvider):
     # class method
 
     @classmethod
-    def getFactoryType(cls, clazz):
-        return TypeDescriptor.for_type(clazz).get_method("create", local=True).returnType
+    def get_factory_type(cls, clazz):
+        return TypeDescriptor.for_type(clazz).get_method("create", local=True).return_type
 
     # constructor
 
     def __init__(self, factory: Type, eager: bool, scope: str):
-        super().__init__(factory, FactoryInstanceProvider.getFactoryType(factory), eager, scope)
+        super().__init__(factory, FactoryInstanceProvider.get_factory_type(factory), eager, scope)
 
     # implement
 
@@ -408,7 +407,7 @@ class FactoryInstanceProvider(InstanceProvider):
 
             context.add(self)
 
-            provider = Providers.getProvider(self.host)
+            provider = Providers.get_provider(self.host)
             if self.add_dependency(provider):
                 provider.resolve(context)
 
@@ -454,7 +453,7 @@ class LifecycleProcessor(ABC):
     # methods
 
     @abstractmethod
-    def processLifecycle(self, lifecycle: Lifecycle, instance: object, environment: Environment) -> object:
+    def process_lifecycle(self, lifecycle: Lifecycle, instance: object, environment: Environment) -> object:
         pass
 
 class PostProcessor(LifecycleProcessor):
@@ -467,7 +466,7 @@ class PostProcessor(LifecycleProcessor):
     def process(self, instance: object, environment: Environment):
         pass
 
-    def processLifecycle(self, lifecycle: Lifecycle, instance: object, environment: Environment) -> object:
+    def process_lifecycle(self, lifecycle: Lifecycle, instance: object, environment: Environment) -> object:
         if lifecycle == Lifecycle.ON_INIT:
             self.process(instance, environment)
 
@@ -487,11 +486,11 @@ class Providers:
         def add(self, *providers: AbstractInstanceProvider):
             for provider in providers:
                 if next((p for p in self.dependencies if p.get_type() is provider.get_type()), None) is not None:
-                    raise InjectorException(self.cycleReport(provider))
+                    raise InjectorException(self.cycle_report(provider))
 
                 self.dependencies.append(provider)
 
-        def cycleReport(self, provider: AbstractInstanceProvider):
+        def cycle_report(self, provider: AbstractInstanceProvider):
             cycle = ""
 
             first = True
@@ -538,7 +537,7 @@ class Providers:
 
             return True
 
-        def cacheProviderForType(provider: AbstractInstanceProvider, type: Type):
+        def cache_provider_for_type(provider: AbstractInstanceProvider, type: Type):
             existing_provider = Providers.cache.get(type)
             if existing_provider is None:
                 Providers.cache[type] = provider
@@ -554,9 +553,9 @@ class Providers:
 
             # recursion
 
-            for superClass in type.__bases__:
-                if is_injectable(superClass):
-                    cacheProviderForType(provider, superClass)
+            for super_class in type.__bases__:
+                if is_injectable(super_class):
+                    cache_provider_for_type(provider, super_class)
 
         # go
 
@@ -566,7 +565,7 @@ class Providers:
 
         # cache providers
 
-        cacheProviderForType(provider, provider.get_type())
+        cache_provider_for_type(provider, provider.get_type())
 
     @classmethod
     def resolve(cls):
@@ -583,20 +582,20 @@ class Providers:
             print(f"provider {provider.get_type().__qualname__}")
 
     @classmethod
-    def getProvider(cls, type: Type) -> AbstractInstanceProvider:
+    def get_provider(cls, type: Type) -> AbstractInstanceProvider:
         provider = Providers.cache.get(type, None)
         if provider is None:
             raise InjectorException(f"{type.__name__} not registered as injectable")
 
         return provider
 
-def registerFactories(cls: Type):
+def register_factories(cls: Type):
     descriptor = TypeDescriptor.for_type(cls)
 
     for method in descriptor.get_methods():
         if method.has_decorator(create):
             create_decorator = method.get_decorator(create)
-            Providers.register(FunctionInstanceProvider(cls, method.method, method.returnType, create_decorator.args[0],
+            Providers.register(FunctionInstanceProvider(cls, method.method, method.return_type, create_decorator.args[0],
                                                         create_decorator.args[1]))
 def order(prio = 0):
     def decorator(cls):
@@ -678,7 +677,7 @@ def environment(imports: Optional[list[Type]] = None):
         Decorators.add(cls, environment, imports)
         Decorators.add(cls, injectable) # do we need that?
 
-        registerFactories(cls)
+        register_factories(cls)
 
         return cls
 
@@ -718,7 +717,7 @@ class Environment:
     __slots__ = [
         "type",
         "providers",
-        "lifecycleProcessors",
+        "lifecycle_processors",
         "parent",
         "instances"
     ]
@@ -741,11 +740,11 @@ class Environment:
             self.parent = BootEnvironment.get_instance() # inherit environment including its manged instances!
 
         self.providers: Dict[Type, AbstractInstanceProvider] = {}
-        self.lifecycleProcessors: list[LifecycleProcessor] = []
+        self.lifecycle_processors: list[LifecycleProcessor] = []
 
         if self.parent is not None:
             self.providers |= self.parent.providers
-            self.lifecycleProcessors += self.parent.lifecycleProcessors
+            self.lifecycle_processors += self.parent.lifecycle_processors
 
         self.instances = []
 
@@ -791,31 +790,31 @@ class Environment:
 
                 # load providers
 
-                localProviders = {type: provider for type, provider in Providers.cache.items() if provider.get_module().startswith(scan)}
+                local_providers = {type: provider for type, provider in Providers.cache.items() if provider.get_module().startswith(scan)}
 
                 # register providers
 
                 # make sure, that for every type ony a single EnvironmentInstanceProvider is created!
                 # otherwise inheritance will fuck it up
 
-                environmentProviders : dict[AbstractInstanceProvider, EnvironmentInstanceProvider] = {}
+                environment_providers : dict[AbstractInstanceProvider, EnvironmentInstanceProvider] = {}
 
-                for type, provider in localProviders.items():
-                    environmentProvider = environmentProviders.get(provider, None)
-                    if environmentProvider is None:
-                        environmentProvider =  EnvironmentInstanceProvider(self, provider)
-                        environmentProviders[provider] = environmentProvider
+                for type, provider in local_providers.items():
+                    environment_provider = environment_providers.get(provider, None)
+                    if environment_provider is None:
+                        environment_provider =  EnvironmentInstanceProvider(self, provider)
+                        environment_providers[provider] = environment_provider
 
-                    add_provider(type, environmentProvider)
+                    add_provider(type, environment_provider)
 
                 # tweak dependencies
 
-                for type, provider in localProviders.items():
-                    cast(EnvironmentInstanceProvider, self.providers[type]).tweakDependencies(self.providers)
+                for type, provider in local_providers.items():
+                    cast(EnvironmentInstanceProvider, self.providers[type]).tweak_dependencies(self.providers)
 
                 # return local providers
 
-                return environmentProviders.values()
+                return environment_providers.values()
             else:
                 return []
 
@@ -826,9 +825,9 @@ class Environment:
                 provider.create(self)
     # internal
 
-    def executeProcessors(self, lifecycle: Lifecycle, instance: T) -> T:
-        for processor in self.lifecycleProcessors:
-            processor.processLifecycle(lifecycle, instance, self)
+    def execute_processors(self, lifecycle: Lifecycle, instance: T) -> T:
+        for processor in self.lifecycle_processors:
+            processor.process_lifecycle(lifecycle, instance, self)
 
         return instance
 
@@ -836,11 +835,11 @@ class Environment:
         # remember lifecycle processors
 
         if isinstance(instance, LifecycleProcessor):
-            self.lifecycleProcessors.append(instance)
+            self.lifecycle_processors.append(instance)
 
             # sort immediately
 
-            self.lifecycleProcessors.sort(key=lambda processor: processor.order)
+            self.lifecycle_processors.sort(key=lambda processor: processor.order)
 
         # remember instance
 
@@ -848,7 +847,7 @@ class Environment:
 
         # execute processors
 
-        return self.executeProcessors(Lifecycle.ON_INIT, instance)
+        return self.execute_processors(Lifecycle.ON_INIT, instance)
 
     # public
 
@@ -857,7 +856,7 @@ class Environment:
         destroy all managed instances by calling the appropriate lifecycle methods
         """
         for instance in self.instances:
-            self.executeProcessors(Lifecycle.ON_DESTROY, instance)
+            self.execute_processors(Lifecycle.ON_DESTROY, instance)
 
         self.instances.clear() # make the cy happy
 
@@ -906,18 +905,18 @@ class CallableProcessor(LifecycleProcessor):
         __slots__ = [
             "decorator",
             "method",
-            "lifecycleCallable"
+            "lifecycle_callable"
         ]
 
         # constructor
 
-        def __init__(self, method: TypeDescriptor.MethodDescriptor, decorator: DecoratorDescriptor, lifecycleCallable: LifecycleCallable):
+        def __init__(self, method: TypeDescriptor.MethodDescriptor, decorator: DecoratorDescriptor, lifecycle_callable: LifecycleCallable):
             self.decorator = decorator
             self.method = method
-            self.lifecycleCallable = lifecycleCallable
+            self.lifecycle_callable = lifecycle_callable
 
         def execute(self, instance, environment: Environment):
-            self.method.method(instance, *self.lifecycleCallable.args(self.decorator, self.method, environment))
+            self.method.method(instance, *self.lifecycle_callable.args(self.decorator, self.method, environment))
 
         def __str__(self):
             return f"MethodCall({self.method.method.__name__})"
@@ -930,7 +929,7 @@ class CallableProcessor(LifecycleProcessor):
         self.callables : Dict[object,LifecycleCallable] = {}
         self.cache : Dict[Type,list[CallableProcessor.MethodCall]]  = {}
 
-    def computeCallables(self, type: Type) -> list[CallableProcessor.MethodCall] :
+    def compute_callables(self, type: Type) -> list[CallableProcessor.MethodCall] :
         descriptor = TypeDescriptor.for_type(type)
 
         result = []
@@ -942,16 +941,16 @@ class CallableProcessor(LifecycleProcessor):
 
         # sort according to order
 
-        result.sort(key=lambda call: call.lifecycleCallable.order)
+        result.sort(key=lambda call: call.lifecycle_callable.order)
 
         # done
 
         return result
 
-    def callablesFor(self, type: Type)-> list[CallableProcessor.MethodCall]:
+    def callables_for(self, type: Type)-> list[CallableProcessor.MethodCall]:
         callables = self.cache.get(type, None)
         if callables is None:
-            callables = self.computeCallables(type)
+            callables = self.compute_callables(type)
             self.cache[type] = callables
 
         return callables
@@ -961,10 +960,10 @@ class CallableProcessor(LifecycleProcessor):
 
     # implement
 
-    def processLifecycle(self, lifecycle: Lifecycle, instance: object, environment: Environment) -> object:
-        callables = self.callablesFor(type(instance))
+    def process_lifecycle(self, lifecycle: Lifecycle, instance: object, environment: Environment) -> object:
+        callables = self.callables_for(type(instance))
         for callable in callables:
-            if callable.lifecycleCallable.lifecycle is lifecycle:
+            if callable.lifecycle_callable.lifecycle is lifecycle:
                 callable.execute(instance, environment)
 
 @injectable()
@@ -1005,7 +1004,7 @@ class InjectLifecycleCallable(LifecycleCallable):
     # override
 
     def args(self, decorator: DecoratorDescriptor,  method: TypeDescriptor.MethodDescriptor, environment: Environment):
-        return [environment.get(type) for type in method.paramTypes]
+        return [environment.get(type) for type in method.param_types]
 
 def scope(name: str):
     def decorator(cls):
@@ -1029,8 +1028,8 @@ class RequestScope(Scope):
 
     # public
 
-    def get(self, provider: AbstractInstanceProvider, environment: Environment, argProvider: Callable[[],list]):
-        return provider.create(environment, *argProvider())
+    def get(self, provider: AbstractInstanceProvider, environment: Environment, arg_provider: Callable[[],list]):
+        return provider.create(environment, *arg_provider())
 
 @scope("singleton")
 class SingletonScope(Scope):
@@ -1051,11 +1050,11 @@ class SingletonScope(Scope):
 
     # override
 
-    def get(self, provider: AbstractInstanceProvider, environment: Environment, argProvider: Callable[[],list]):
+    def get(self, provider: AbstractInstanceProvider, environment: Environment, arg_provider: Callable[[],list]):
         if self.value is None:
             with self.lock:
                 if self.value is None:
-                    self.value = provider.create(environment, *argProvider())
+                    self.value = provider.create(environment, *arg_provider())
 
         return self.value
 

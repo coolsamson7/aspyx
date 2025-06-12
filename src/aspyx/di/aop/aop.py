@@ -78,7 +78,7 @@ class AspectTarget(ABC):
     # abstract
 
     def _matches(self, clazz : Type, func):
-        if not self._matchesSelf(clazz, func):
+        if not self._matches_self(clazz, func):
             for target in self.other:
                 if target._matches(clazz, func):
                     return True
@@ -88,7 +88,7 @@ class AspectTarget(ABC):
         return True
 
     @abstractmethod
-    def _matchesSelf(self, clazz: Type, func):
+    def _matches_self(self, clazz: Type, func):
         pass
 
     # protected
@@ -135,8 +135,8 @@ class ClassAspectTarget(AspectTarget):
 
     # public
 
-    def _matchesSelf(self, clazz : Type, func):
-        classDescriptor = TypeDescriptor.for_type(clazz)
+    def _matches_self(self, clazz : Type, func):
+        class_descriptor = TypeDescriptor.for_type(clazz)
         #descriptor = TypeDescriptor.for_type(func)
         # type
 
@@ -147,7 +147,7 @@ class ClassAspectTarget(AspectTarget):
         # decorators
 
         if len(self.decorators) > 0:
-            if next((decorator for decorator in self.decorators if classDescriptor.has_decorator(decorator)), None) is None:
+            if next((decorator for decorator in self.decorators if class_descriptor.has_decorator(decorator)), None) is None:
                 return False
 
         # names
@@ -173,10 +173,10 @@ class MethodAspectTarget(AspectTarget):
 
     # public
 
-    def _matchesSelf(self, clazz : Type, func):
+    def _matches_self(self, clazz : Type, func):
         descriptor = TypeDescriptor.for_type(clazz)
 
-        methodDescriptor = descriptor.get_method(func.__name__)
+        method_descriptor = descriptor.get_method(func.__name__)
 
         # type
 
@@ -187,7 +187,7 @@ class MethodAspectTarget(AspectTarget):
         # decorators
 
         if len(self.decorators) > 0:
-            if next((decorator for decorator in self.decorators if methodDescriptor.has_decorator(decorator)), None) is None:
+            if next((decorator for decorator in self.decorators if method_descriptor.has_decorator(decorator)), None) is None:
                 return False
 
         # names
@@ -247,7 +247,7 @@ class FunctionJoinPoint(JoinPoint):
         self.func = func
 
     def call(self, invocation: 'Invocation'):
-        invocation.currentJoinPoint = self
+        invocation.current_join_point = self
 
         return self.func(self.instance, invocation)
 
@@ -258,7 +258,7 @@ class MethodJoinPoint(FunctionJoinPoint):
         super().__init__(instance, func, None)
 
     def call(self, invocation: 'Invocation'):
-        invocation.currentJoinPoint = self
+        invocation.current_join_point = self
 
         return self.func(*invocation.args, **invocation.kwargs)
 
@@ -282,20 +282,20 @@ class Invocation:
         "kwargs",
         "result",
         "exception",
-        "joinPoints",
-        "currentJoinPoint",
+        "join_points",
+        "current_join_point",
     ]
 
     # constructor
 
-    def __init__(self,  func, joinPoints: JoinPoints):
+    def __init__(self, func, join_points: JoinPoints):
         self.func = func
         self.args : list[object] = []
         self.kwargs = None
         self.result = None
         self.exception = None
-        self.joinPoints = joinPoints
-        self.currentJoinPoint = None
+        self.join_points = join_points
+        self.current_join_point = None
 
     def call(self, *args, **kwargs):
         # remember args
@@ -305,23 +305,23 @@ class Invocation:
 
         # run all before
 
-        for joinPoint in self.joinPoints.before:
-            joinPoint.call(self)
+        for join_point in self.join_points.before:
+            join_point.call(self)
 
         # run around's with the method being the last aspect!
 
         try:
-            self.result = self.joinPoints.around[0].call(self) # will follow the proceed chain
+            self.result = self.join_points.around[0].call(self) # will follow the proceed chain
 
         except Exception as e:
             self.exception = e
-            for joinPoint in self.joinPoints.error:
-                joinPoint.call(self)
+            for join_point in self.join_points.error:
+                join_point.call(self)
 
         # run all before
 
-        for joinPoint in self.joinPoints.after:
-            joinPoint.call(self)
+        for join_point in self.join_points.after:
+            join_point.call(self)
 
         if self.exception is not None:
             raise self.exception # rethrow the error
@@ -338,7 +338,7 @@ class Invocation:
 
         # next one please...
 
-        return self.currentJoinPoint.next.call(self)
+        return self.current_join_point.next.call(self)
 
 @injectable()
 class Advice:
@@ -371,7 +371,7 @@ class Advice:
 
         return aspects
 
-    def joinPoints4(self, instance, environment: Environment) -> Dict[Callable,JoinPoints]:
+    def join_points4(self, instance, environment: Environment) -> Dict[Callable,JoinPoints]:
         clazz = type(instance)
 
         result = self.cache.get(clazz, None)
@@ -383,9 +383,9 @@ class Advice:
                     result = {}
 
                     for _, member in inspect.getmembers(clazz, predicate=inspect.isfunction):
-                        joinPoints = self.computeJoinPoints(clazz, member, environment)
-                        if joinPoints is not None:
-                            result[member] = joinPoints
+                        join_points = self.compute_join_points(clazz, member, environment)
+                        if join_points is not None:
+                            result[member] = join_points
 
                     self.cache[clazz] = result
 
@@ -412,7 +412,7 @@ class Advice:
 
         return value
 
-    def computeJoinPoints(self, clazz, member, environment: Environment) -> Optional[JoinPoints]:
+    def compute_join_points(self, clazz, member, environment: Environment) -> Optional[JoinPoints]:
         befores = self.collect(clazz, member, AspectType.BEFORE, environment)
         arounds = self.collect(clazz, member, AspectType.AROUND, environment)
         afters = self.collect(clazz, member, AspectType.AFTER, environment)
@@ -428,9 +428,9 @@ class Advice:
         else:
             return None
 
-def sanityCheck(clazz: Type, name: str):
+def sanity_check(clazz: Type, name: str):
     m = TypeDescriptor.for_type(clazz).get_method(name)
-    if len(m.paramTypes) != 1 or m.paramTypes[0] != Invocation:
+    if len(m.param_types) != 1 or m.param_types[0] != Invocation:
         raise AOPException(f"Method {clazz.__name__}.{name} expected to have one parameter of type Invocation")
 
 # decorators
@@ -449,7 +449,7 @@ def advice(cls):
         if decorator is not None:
             target = decorator.args[0]
             target._clazz = cls
-            sanityCheck(cls, name)
+            sanity_check(cls, name)
             Advice.targets.append(target)
 
     return cls
@@ -457,13 +457,13 @@ def advice(cls):
 
 # decorators
 
-def _register(decorator, targets: list[AspectTarget], func, aspectType: AspectType):
+def _register(decorator, targets: list[AspectTarget], func, aspect_type: AspectType):
     target = targets[0]
 
     for i in range(1, len(targets)):
         target._add(targets[i])
 
-    target.function(func).type(aspectType)
+    target.function(func).type(aspect_type)
 
     Decorators.add(func, decorator, target)
 
@@ -531,12 +531,12 @@ class AdviceProcessor(PostProcessor):
     # implement
 
     def process(self, instance: object, environment: Environment):
-        joinPointDict = self.advice.joinPoints4(instance, environment)
+        join_point_dict = self.advice.join_points4(instance, environment)
 
-        for member, joinPoints in joinPointDict.items():
+        for member, join_points in join_point_dict.items():
             Environment.logger.debug("add aspects for %s:%s", type(instance), member.__name__)
 
             def wrap(jp):
                 return lambda *args, **kwargs: Invocation(member, jp).call(*args, **kwargs)
 
-            setattr(instance, member.__name__, types.MethodType(wrap(joinPoints), instance))
+            setattr(instance, member.__name__, types.MethodType(wrap(join_points), instance))

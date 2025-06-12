@@ -44,16 +44,16 @@ class TypeDescriptor:
             self.clazz = cls
             self.method = method
             self.decorators: list[DecoratorDescriptor] = Decorators.get(method)
-            self.paramTypes : list[Type] = []
+            self.param_types : list[Type] = []
 
             type_hints = get_type_hints(method)
             sig = signature(method)
 
             for name, _ in sig.parameters.items():
                 if name != 'self':
-                    self.paramTypes.append(type_hints.get(name, object))
+                    self.param_types.append(type_hints.get(name, object))
 
-            self.returnType = type_hints.get('return', None)
+            self.return_type = type_hints.get('return', None)
 
         def get_decorator(self, decorator) -> Optional[DecoratorDescriptor]:
             for dec in self.decorators:
@@ -93,20 +93,20 @@ class TypeDescriptor:
         self.cls = cls
         self.decorators = Decorators.get(cls)
         self.methods: Dict[str, TypeDescriptor.MethodDescriptor] = {}
-        self.localMethods: Dict[str, TypeDescriptor.MethodDescriptor] = {}
+        self.local_methods: Dict[str, TypeDescriptor.MethodDescriptor] = {}
 
         # check superclasses
 
-        self.superTypes = [TypeDescriptor.for_type(x) for x in cls.__bases__ if not x is object]
+        self.super_types = [TypeDescriptor.for_type(x) for x in cls.__bases__ if not x is object]
 
-        for superType in self.superTypes:
-            self.methods = self.methods | superType.methods
+        for super_type in self.super_types:
+            self.methods = self.methods | super_type.methods
 
         # methods
 
         for name, member in self._get_local_members(cls):
             method = TypeDescriptor.MethodDescriptor(cls, member)
-            self.localMethods[name] = method
+            self.local_methods[name] = method
             self.methods[name] = method
 
     # internal
@@ -136,12 +136,12 @@ class TypeDescriptor:
 
     def get_methods(self, local = False) ->  list[TypeDescriptor.MethodDescriptor]:
         if local:
-            return list(self.localMethods.values())
+            return list(self.local_methods.values())
         else:
             return list(self.methods.values())
 
     def get_method(self, name: str, local = False) -> Optional[TypeDescriptor.MethodDescriptor]:
         if local:
-            return self.localMethods.get(name, None)
+            return self.local_methods.get(name, None)
         else:
             return self.methods.get(name, None)

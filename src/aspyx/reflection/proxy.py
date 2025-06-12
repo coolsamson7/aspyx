@@ -25,7 +25,7 @@ class DynamicProxy(Generic[T]):
 
     Attributes:
         type: The proxied class type.
-        invocationHandler: The handler that processes intercepted method calls.
+        invocation_handler: The handler that processes intercepted method calls.
     """
     # inner class
 
@@ -43,19 +43,19 @@ class DynamicProxy(Generic[T]):
     # class methods
 
     @classmethod
-    def create(cls, type: Type[T], invocationHandler: 'DynamicProxy.InvocationHandler') -> T:
-        return DynamicProxy(type, invocationHandler)
+    def create(cls, type: Type[T], invocation_handler: 'DynamicProxy.InvocationHandler') -> T:
+        return DynamicProxy(type, invocation_handler)
 
     # constructor
 
-    def __init__(self, type: Type[T], invocationHandler: 'DynamicProxy.InvocationHandler'):
+    def __init__(self, type: Type[T], invocation_handler: 'DynamicProxy.InvocationHandler'):
         self.type = type
-        self.invocationHandler = invocationHandler
+        self.invocation_handler = invocation_handler
 
     # public
 
     def __getattr__(self, name):
         def wrapper(*args, **kwargs):
-            return self.invocationHandler.invoke(DynamicProxy.Invocation(self.type, name, *args, **kwargs))
+            return self.invocation_handler.invoke(DynamicProxy.Invocation(self.type, name, *args, **kwargs))
 
         return wrapper
