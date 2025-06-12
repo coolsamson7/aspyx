@@ -9,7 +9,7 @@ description = "A DI and AOP library for Python"
 authors = [{ name = "Andreas Ernst", email = "andreas.ernst7@gmail.com" }]
 readme = "README.md"
 license = { file = "LICENSE" }
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 dependencies = []
 
 [tool.setuptools]

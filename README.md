@@ -23,6 +23,7 @@
 - [Custom scopes](#custom-scopes)
 - [AOP](#aop)
 - [Configuration](#configuration)
+- [Reflection](#reflection)
 
 # Introduction
 
@@ -95,16 +96,16 @@ class SampleAdvice:
         pass
 
     @before(methods().named("hello").of_type(Foo))
-    def callBefore(self, invocation: Invocation):
+    def call_before(self, invocation: Invocation):
         print("before Foo.hello(...)")
 
     @error(methods().named("hello").of_type(Foo))
-    def callError(self, invocation: Invocation):
+    def call_error(self, invocation: Invocation):
         print("error Foo.hello(...)")
         print(invocation.exception)
 
     @around(methods().named("hello"))
-    def callAround(self, invocation: Invocation):
+    def call_around(self, invocation: Invocation):
         print("around Foo.hello()")
 
         return invocation.proceed()
@@ -365,17 +366,17 @@ class SampleAdvice:
         pass
 
     @before(methods().named("hello").of_type(Foo))
-    def callBefore(self, invocation: Invocation):
+    def call_before(self, invocation: Invocation):
         # arguments: invocation.args
         print("before Foo.hello(...)")
 
     @error(methods().named("hello").of_type(Foo))
-    def callError(self, invocation: Invocation):
+    def call_error(self, invocation: Invocation):
         print("error Foo.hello(...)")
         print(invocation.exception)
 
     @around(methods().named("hello"))
-    def callAround(self, invocation: Invocation):
+    def call_around(self, invocation: Invocation):
         print("around Foo.hello()")
 
         return invocation.proceed()  # will leave a result in invocation.result or invocation.exception in case of an exception
@@ -421,7 +422,7 @@ class TransactionAdvice:
         pass
 
     @around(methods().decorated_with(transactional), classes().decorated_with(transactional))
-    def establishTransaction(self, invocation: Invocation):
+    def establish_transaction(self, invocation: Invocation):
         ...
 ```
 
@@ -491,12 +492,12 @@ TypeDescriptor.for_type(<type>)
 it offers the methods
 - `get_methods(local=False)`
 - `get_method(name: str, local=False)`
-- `has_decorator(decorator)`
+- `has_decorator(decorator) -> bool`
 - `get_decorator(decorator)`
 
 The returned method descriptors offer:
-- `paramTypes`
-- `returnType`
+- `param_types`
+- `return_type`
 - `has_decorator(decorator)`
 - `get_decorator(decorator)`
 
