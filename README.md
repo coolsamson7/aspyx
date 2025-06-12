@@ -61,7 +61,7 @@ class Bar:
     def __init__(self, foo: Foo): # will inject the Foo dependency
         self.foo = foo
 
-    @on_init() # a lifecycle callback called  after the constructor
+    @on_init() # a lifecycle callback called after the constructor and all possible injections
     def init(self):
         ...
 
@@ -88,9 +88,10 @@ The concepts should be pretty familiar as well as the names which are a combinat
 Let's add some aspects...
 
 ```python
+
 @advice
 class SampleAdvice:
-    def __init__(self):
+    def __init__(self): # could inject additional stuff
         pass
 
     @before(methods().named("hello").of_type(Foo))
@@ -122,6 +123,8 @@ Let's look at the details
 
 `pip install aspyx`
 
+The library is tested with Python version > 3.8
+
 Ready to go...
 
 # Registration
@@ -145,12 +148,14 @@ All referenced types will be injected by the environemnt.
 
 Only eligible types are allowed, of course!
 
+The decorator accepts the keyword arguments
+- `eager : boolean`
+  if `True`, the container will create the instances automatically while booting the environment. This is the default.
+- `scope: boolean`
+  the name of a scope which will determine how often instances will be created.
+ `singleton` will create it only once - per environment -, while `request` will recreate it on every injection request. THe default is `singleton`
 
- The decorator accepts the keyword arguments
- - `eager=True` if `True`, the container will create the instances automatically while booting the environment
- - `scope="singleton"` defines how often instances will be created. `singleton` will create it only once - per environment -, while `request` will recreate it on every injection request
-
- Other scopes can be defined. Please check the corresponding chapter.
+ Other scopes - e.g. session related scopes - can be defined dynamically. Please check the corresponding chapter.
 
 ## Class Factory
 
@@ -391,7 +396,7 @@ All methods are expected to hava single `Invocation` parameter, that stores, the
 It is essential for `around` methods to call `proceed()` on the invocation, which will call the next around method in the chain and finally the original method.
 If the `proceed` is called with parameters, they will replace the original parameters! 
 
-The arguments to the corresponding decorators control, how aspects are associated with which methods.
+The argument list to the corresponding decorators control, how aspects are associated with which methods.
 A fluent interface is used describe the mapping. 
 The parameters restrict either methods or classes and are constructed by a call to either `methods()` or `classes()`.
 
@@ -405,7 +410,20 @@ Both add the fluent methods:
 - `decorated_with(type: Type)`  
    defines decorators on methods or classes
 
-The fluent methods `named`, `matches` and `of_type` can be called multiple timess!
+The fluent methods `named`, `matches` and `of_type` can be called multiple times!
+
+**Example**:
+
+```python
+@injectable()
+class TransactionAdvice:
+    def __init__(self):
+        pass
+
+    @around(methods().decorated_with(transactional), classes().decorated_with(transactional))
+    def establishTransaction(self, invocation: Invocation):
+        ...
+```
 
 # Configuration 
 
@@ -441,14 +459,14 @@ As a default environment variables are already supported.
 
 Other sources can be added dynamically by just registering them.
 
+**Exmaple**:
 ```python
 @injectable()
 class SampleConfigurationSource(ConfigurationSource):
     # constructor
 
-    def __init__(self, manager: ConfigurationManager):
-        super().__init__(manager)
-
+    def __init__(self):
+        super().__init__()
 
     def load(self) -> dict:
         return {
@@ -460,6 +478,8 @@ class SampleConfigurationSource(ConfigurationSource):
                 }
             }
 ```
+
+# Refletion
 
 
 
