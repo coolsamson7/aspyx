@@ -11,7 +11,7 @@ from aspyx.di import injectable, Environment, environment
 
 
 @environment()
-class Configuration:
+class SampleEnvironment:
     def __init__(self):
         pass
 
@@ -65,7 +65,7 @@ class Foo:
         self.value2 = value
 
 class TestConfiguration(unittest.TestCase):
-    testEnvironment = Environment(Configuration)
+    testEnvironment = Environment(SampleEnvironment)
 
     def test_configuration(self):
         env = TestConfiguration.testEnvironment

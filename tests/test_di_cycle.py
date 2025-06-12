@@ -20,7 +20,7 @@ class Bar:
         pass
 
 @environment()
-class TestEnvironment:
+class SampleEnvironment:
     # constructor
 
     def __init__(self):
@@ -29,7 +29,7 @@ class TestEnvironment:
 class TestCycle(unittest.TestCase):
     def test_cycle(self):
         with self.assertRaises(InjectorException):
-            Environment(TestEnvironment)
+            Environment(SampleEnvironment)
 
 
 if __name__ == '__main__':

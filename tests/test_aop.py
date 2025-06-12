@@ -18,7 +18,7 @@ def transactional():
     return decorator
 
 @environment()
-class TestEnvironment:
+class SampleEnvironment:
     def __init__(self):
         pass
 
@@ -107,7 +107,7 @@ class SampleAdvice:
 #logging.basicConfig(level=logging.DEBUG)
 
 class TestAdvice(unittest.TestCase):
-    testEnvironment = Environment(TestEnvironment)
+    testEnvironment = Environment(SampleEnvironment)
 
     def test_advice(self):
         environment = TestAdvice.testEnvironment

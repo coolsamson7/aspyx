@@ -113,7 +113,7 @@ class Bar(Base):
         self.bazong = bazong
 
 @factory()
-class TestFactory(Factory[Foo]):
+class SampleFactory(Factory[Foo]):
     __slots__ = []
 
     def __init__(self):
@@ -136,7 +136,7 @@ class SimpleEnvironment:
         return Baz()
 
 @environment(imports=[SimpleEnvironment, ImportedEnvironment])
-class TestEnvironment:
+class ComplexEnvironment:
     # constructor
 
     def __init__(self):

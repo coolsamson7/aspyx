@@ -4,7 +4,7 @@ Sub module
 from aspyx.di import environment, injectable
 
 @environment()
-class SubImportConfiguration:
+class SubImportEnvironment:
     def __init__(self):
         pass
 
