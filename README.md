@@ -2,8 +2,9 @@
 
 ![Pylint](https://github.com/coolsamson7/aspyx/actions/workflows/pylint.yml/badge.svg)
 ![Build Status](https://github.com/coolsamson7/aspyx/actions/workflows/ci.yml/badge.svg)
-![PyPI - Python Version](https://img.shields.io/pypi/pyversions/aspyx)
+![Python Versions](https://img.shields.io/badge/python-3.9%20|%203.10%20|%203.11%20|%203.12-blue)
 ![License](https://img.shields.io/github/license/coolsamson7/aspyx)
+![coverage](https://img.shields.io/badge/coverage-94%25-brightgreen)
 
 ## Table of Contents
 
@@ -30,12 +31,11 @@
 Aspyx is a small python libary, that adds support for both dependency injection and aop.
 
 The following features are supported 
-- constructor injection
-- method injection
+- constructor and setter injection
 - post processors
 - factory classes and methods
 - support for eager construction
-- support for singleton and reuqest scopes
+- support for singleton and request scopes
 - possibilty to add custom scopes
 - lifecycle events methods
 - bundling of injectable object sets by environment classes including recursive imports and inheritance
@@ -124,7 +124,7 @@ Let's look at the details
 
 `pip install aspyx`
 
-The library is tested with Python version > 3.8
+The library is tested with all Python version > 3.9
 
 Ready to go...
 
@@ -153,8 +153,15 @@ The decorator accepts the keyword arguments
 - `eager : boolean`  
   if `True`, the container will create the instances automatically while booting the environment. This is the default.
 - `scope: str`  
-  the name of a scope which will determine how often instances will be created.
- `singleton` will create it only once - per environment -, while `request` will recreate it on every injection request. The default is `singleton`
+  the name of a - registered - scope which will determine how often instances will be created.
+
+ The following scopes are implemented out of the box:
+ - `singleton`  
+   objects are created once inside an environment and cached. This is the default.
+ - `request`  
+   obejcts are created on every injection request
+ - `thread`  
+   objects are cerated and cached with respect to the current thread.
 
  Other scopes - e.g. session related scopes - can be defined dynamically. Please check the corresponding chapter.
 
@@ -272,7 +279,7 @@ Different decorators are implemented, that call methods with computed values
    the method is called with all resolved parameter types ( same as the constructor call)
 - `@inject_environment`  
    the method is called with the creating environment as a single parameter
-- `@value()`  
+- `@inject_value()`  
    the method is called with a resolved configuration value. Check the corresponding chapter
 
 **Example**:
@@ -428,7 +435,7 @@ class TransactionAdvice:
 
 # Configuration 
 
-It is possible to inject configuration values, by decorating methods with `@value(<name>)` given a configuration key.
+It is possible to inject configuration values, by decorating methods with `@inject-value(<name>)` given a configuration key.
 
 ```python
 @injectable()
@@ -490,16 +497,24 @@ TypeDescriptor.for_type(<type>)
 ```
 
 it offers the methods
-- `get_methods(local=False)`
-- `get_method(name: str, local=False)`
-- `has_decorator(decorator) -> bool`
-- `get_decorator(decorator)`
+- `get_methods(local=False)`  
+   return a list of either local or overall methods
+- `get_method(name: str, local=False)`  
+   return a single either local or overall method
+- `has_decorator(decorator: Callable) -> bool`  
+   return `True`, if the class is decorated with the specified decrator
+- `get_decorator(decorator) -> Optional[DecoratorDescriptor]`  
+   return a descriptor covering the decorator. In addition to the callable, it also stores the supplied args in the `args` property
 
 The returned method descriptors offer:
-- `param_types`
-- `return_type`
-- `has_decorator(decorator)`
-- `get_decorator(decorator)`
+- `param_types`  
+   list of arg types
+- `return_type`  
+   the retur type
+- `has_decorator(decorator: Callable) -> bool` 
+   return `True`, if the method is decorated with the specified decrator
+- `get_decorator(decorator: Callable) -> Optional[DecoratorDescriptor]`  
+   return a descriptor covering the decorator. In addition to the callable, it also stores the supplied args in the `args` property
 
 The management of decorators in turn relies on another utility class `Decorators` that caches decorators.
 

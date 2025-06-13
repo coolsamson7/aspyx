@@ -56,14 +56,14 @@ class TypeDescriptor:
 
             self.return_type = type_hints.get('return', None)
 
-        def get_decorator(self, decorator) -> Optional[DecoratorDescriptor]:
+        def get_decorator(self, decorator: Callable) -> Optional[DecoratorDescriptor]:
             for dec in self.decorators:
                 if dec.decorator is decorator:
                     return dec
 
             return None
 
-        def has_decorator(self, decorator) -> bool:
+        def has_decorator(self, decorator: Callable) -> bool:
             for dec in self.decorators:
                 if dec.decorator is decorator:
                     return True
@@ -125,14 +125,14 @@ class TypeDescriptor:
 
     # public
 
-    def get_decorator(self, decorator) -> Optional[DecoratorDescriptor]:
+    def get_decorator(self, decorator: Callable) -> Optional[DecoratorDescriptor]:
         for dec in self.decorators:
             if dec.decorator is decorator:
                 return dec
 
         return None
 
-    def has_decorator(self, decorator) -> bool:
+    def has_decorator(self, decorator: Callable) -> bool:
         for dec in self.decorators:
             if dec.decorator is decorator:
                 return True

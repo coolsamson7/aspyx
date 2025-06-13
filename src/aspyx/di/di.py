@@ -805,7 +805,7 @@ class Environment:
 
                 # register providers
 
-                # make sure, that for every type ony a single EnvironmentInstanceProvider is created!
+                # make sure, that for every type only a single EnvironmentInstanceProvider is created!
                 # otherwise inheritance will fuck it up
 
                 environment_providers : dict[AbstractInstanceProvider, EnvironmentInstanceProvider] = {}
@@ -1166,6 +1166,23 @@ class SingletonScope(Scope):
                     self.value = provider.create(environment, *arg_provider())
 
         return self.value
+    
+@scope("thread")
+class ThreadScope(Scope):
+    __slots__ = [
+        "_local"
+    ]
+
+    # constructor
+
+    def __init__(self):
+        super().__init__()
+        self._local = threading.local()
+
+    def get(self, provider: AbstractInstanceProvider, environment: Environment, arg_provider: Callable[[], list]):
+        if not hasattr(self._local, "value"):
+            self._local.value = provider.create(environment, *arg_provider())
+        return self._local.value
 
 # internal class that is required to import technical instance providers
 

@@ -8,8 +8,8 @@ import logging
 import unittest
 from typing import Dict
 
-from aspyx.di import InjectorException, injectable, on_init, on_destroy, inject_environment, inject, Factory, create, environment, Environment, PostProcessor, factory
-from aspyx.di.di import order
+from aspyx.di import InjectorException, injectable, on_init, on_running, on_destroy, inject_environment, inject, Factory, create, environment, Environment, PostProcessor, factory
+from aspyx.di.di import order, on_running
 
 from .di_import import ImportedEnvironment
 
@@ -92,12 +92,17 @@ class Bar(Base):
         self.baz = None
         self.foo = foo
         self.inited = False
+        self.running = False
         self.destroyed = False
         self.environment = None
 
     @on_init()
     def init(self):
         self.inited = True
+
+    @on_running()
+    def running(self):
+        self.running = True
 
     @on_destroy()
     def destroy(self):
@@ -237,6 +242,13 @@ class TestInject(unittest.TestCase):
         bar = env.get(Bar)
 
         self.assertEqual(bar.inited, True)
+
+    def test_running(self):
+        env = TestInject.testEnvironment
+
+        bar = env.get(Bar)
+
+        self.assertEqual(bar.running, True)
 
     def test_destroy(self):
         env = TestInject.testEnvironment
