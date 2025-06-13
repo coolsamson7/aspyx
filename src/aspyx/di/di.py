@@ -1019,6 +1019,7 @@ class AbstractCallableProcessor(LifecycleProcessor):
 
     # static data
 
+    lock = threading.RLock()
     callables : Dict[object, LifecycleCallable] = {}
     cache : Dict[Type, list[list[AbstractCallableProcessor.MethodCall]]] = {}
 
@@ -1056,8 +1057,11 @@ class AbstractCallableProcessor(LifecycleProcessor):
     def callables_for(cls, type: Type) -> list[list[AbstractCallableProcessor.MethodCall]]:
         callables = AbstractCallableProcessor.cache.get(type, None)
         if callables is None:
-            callables = AbstractCallableProcessor.compute_callables(type)
-            AbstractCallableProcessor.cache[type] = callables
+            with AbstractCallableProcessor.lock:
+                callables = AbstractCallableProcessor.cache.get(type, None)
+                if callables is None:
+                    callables = AbstractCallableProcessor.compute_callables(type)
+                    AbstractCallableProcessor.cache[type] = callables
 
         return callables
 
