@@ -4,6 +4,7 @@ Test cases for the Configuration system in aspyx.di
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
 
 from aspyx.di.configuration import ConfigurationSource, ConfigurationManager, value, EnvConfigurationSource, \
     YamlConfigurationSource
@@ -24,6 +25,10 @@ class SampleEnvironment:
 
     @create()
     def create_yaml_source(self) -> YamlConfigurationSource:
+        file_path = Path(__file__)
+
+        print(file_path)
+
         return YamlConfigurationSource("./config.yaml")
 
 @injectable()
