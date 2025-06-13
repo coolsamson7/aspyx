@@ -24,7 +24,7 @@ class SampleEnvironment:
 
     @create()
     def create_yaml_source(self) -> YamlConfigurationSource:
-        return YamlConfigurationSource("config.yaml")
+        return YamlConfigurationSource("./config.yaml")
 
 @injectable()
 class SampleConfigurationSource1(ConfigurationSource):
