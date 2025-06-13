@@ -5,6 +5,7 @@
 ![Python Versions](https://img.shields.io/badge/python-3.9%20|%203.10%20|%203.11%20|%203.12-blue)
 ![License](https://img.shields.io/github/license/coolsamson7/aspyx)
 ![coverage](https://img.shields.io/badge/coverage-94%25-brightgreen)
+[![PyPI](https://img.shields.io/pypi/v/aspyx)](https://pypi.org/project/aspyx/)
 
 ## Table of Contents
 
