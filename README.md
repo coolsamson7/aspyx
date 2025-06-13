@@ -25,6 +25,7 @@
 - [AOP](#aop)
 - [Configuration](#configuration)
 - [Reflection](#reflection)
+- [Version History](#version-history)
 
 # Introduction
 
@@ -531,7 +532,16 @@ def transactional():
 ```
 
 
+# Version History
 
+**1.0.1**
+
+- some internal refactorings
+
+**1.0.2**
+
+- added `@on_running()` callback
+- added `thread` scope
 
 
       
