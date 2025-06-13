@@ -533,10 +533,10 @@ class AdviceProcessor(PostProcessor):
     def process(self, instance: object, environment: Environment):
         join_point_dict = self.advice.join_points4(instance, environment)
 
-        for member, join_points in join_point_dict.items():
+        for member, joinPoints in join_point_dict.items():
             Environment.logger.debug("add aspects for %s:%s", type(instance), member.__name__)
 
             def wrap(jp):
                 return lambda *args, **kwargs: Invocation(member, jp).call(*args, **kwargs)
 
-            setattr(instance, member.__name__, types.MethodType(wrap(join_points), instance))
+            setattr(instance, member.__name__, types.MethodType(wrap(joinPoints), instance))

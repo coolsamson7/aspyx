@@ -4,9 +4,7 @@ Configuration handling module.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-import os
 from typing import Optional, Type, TypeVar
-from dotenv import load_dotenv
 
 from aspyx.di import injectable, Environment, LifecycleCallable, Lifecycle
 from aspyx.di.di import order, inject
@@ -67,7 +65,7 @@ class ConfigurationManager:
 
     def get(self, path: str, type: Type[T], default : Optional[T]=None) -> T:
         """
-        Get a configuration value by path and type, with optional coercion.
+        Retrieve a configuration value by path and type, with optional coercion.
         Arguments:
             path (str): The path to the configuration value, e.g. "database.host".
             type (Type[T]): The expected type.
@@ -118,54 +116,6 @@ class ConfigurationSource(ABC):
         """
         return the configuration values of this source as a dictionary.
         """
-
-@injectable()
-class EnvConfigurationSource(ConfigurationSource):
-    """
-    EnvConfigurationSource loads all environment variables.
-    """
-
-    __slots__ = []
-
-    # constructor
-
-    def __init__(self):
-        super().__init__()
-
-        load_dotenv()
-
-    # implement
-
-    def load(self) -> dict:
-        def merge_dicts(a, b):
-            """Recursively merges b into a"""
-            for key, value in b.items():
-                if isinstance(value, dict) and key in a and isinstance(a[key], dict):
-                    merge_dicts(a[key], value)
-                else:
-                    a[key] = value
-            return a
-
-        def explode_key(key, value):
-            """Explodes keys with '.' or '/' into nested dictionaries"""
-            parts = key.replace('/', '.').split('.')
-            d = current = {}
-            for part in parts[:-1]:
-                current[part] = {}
-                current = current[part]
-            current[parts[-1]] = value
-            return d
-
-        exploded = {}
-
-        for key, value in os.environ.items():
-            if '.' in key or '/' in key:
-                partial = explode_key(key, value)
-                merge_dicts(exploded, partial)
-            else:
-                exploded[key] = value
-
-        return exploded
 
 # decorator
 

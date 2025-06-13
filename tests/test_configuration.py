@@ -5,15 +5,26 @@ from __future__ import annotations
 
 import unittest
 
-from aspyx.di.configuration import ConfigurationSource, ConfigurationManager, value
+from aspyx.di.configuration import ConfigurationSource, ConfigurationManager, value, EnvConfigurationSource, \
+    YamlConfigurationSource
 
-from aspyx.di import injectable, Environment, environment
+from aspyx.di import injectable, Environment, environment, create
 
 
 @environment()
 class SampleEnvironment:
+    # constructor
+
     def __init__(self):
         pass
+
+    @create()
+    def create_env_source(self) -> EnvConfigurationSource:
+        return EnvConfigurationSource()
+
+    @create()
+    def create_yaml_source(self) -> YamlConfigurationSource:
+        return YamlConfigurationSource("config.yaml")
 
 @injectable()
 class SampleConfigurationSource1(ConfigurationSource):
@@ -66,6 +77,22 @@ class Foo:
 
 class TestConfiguration(unittest.TestCase):
     testEnvironment = Environment(SampleEnvironment)
+
+    def test_yaml(self):
+        env = TestConfiguration.testEnvironment
+
+        config = env.get(ConfigurationManager)
+
+        server = config.get("server.name", str)
+        self.assertEqual(server, "bla")
+
+    def test_env(self):
+        env = TestConfiguration.testEnvironment
+
+        config = env.get(ConfigurationManager)
+
+        os = config.get("HOME", str)
+        self.assertIsNotNone(os)
 
     def test_configuration(self):
         env = TestConfiguration.testEnvironment

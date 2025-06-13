@@ -1,5 +1,5 @@
 """
-The deoendency injection module provides a framework for managing dependencies and lifecycle of objects in Python applications.
+The dependency injection module provides a framework for managing dependencies and lifecycle of objects in Python applications.
 """
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import inspect
 import logging
 
 from abc import abstractmethod, ABC
-from enum import Enum, auto
+from enum import Enum
 import threading
 from typing import Type, Dict, TypeVar, Generic, Optional, cast, Callable
 
@@ -27,9 +27,19 @@ class Factory(ABC, Generic[T]):
     def create(self) -> T:
         pass
 
-class InjectorException(Exception):
+class DIException(Exception):
     """
     Exception raised for errors in the injector.
+    """
+
+class DIRegistrationException(DIException):
+    """
+    Exception raised during the registration of dependencies.
+    """
+
+class DIRuntimeException(DIException):
+    """
+    Exception raised during the runtime.
     """
 
 class AbstractInstanceProvider(ABC, Generic[T]):
@@ -201,7 +211,7 @@ class AmbiguousProvider(AbstractInstanceProvider):
         pass
 
     def create(self, environment: Environment, *args):
-        raise InjectorException(f"multiple candidates for type {self.type}")
+        raise DIException(f"multiple candidates for type {self.type}")
 
     def __str__(self):
         return f"AmbiguousProvider({self.type})"
@@ -217,7 +227,7 @@ class Scopes:
     def get(cls, scope: str, environment: Environment):
         scope_type = Scopes.scopes.get(scope, None)
         if scope_type is None:
-            raise InjectorException(f"unknown scope type {scope}")
+            raise DIRegistrationException(f"unknown scope type {scope}")
 
         return environment.get(scope_type)
 
@@ -285,7 +295,7 @@ class EnvironmentInstanceProvider(AbstractInstanceProvider):
         for dependency in self.provider.get_dependencies():
             instance_provider = providers.get(dependency.get_type(), None)
             if instance_provider is None:
-                raise InjectorException(f"missing import for {dependency.get_type()} ")
+                raise DIRegistrationException(f"missing import for {dependency.get_type()} ")
 
             self.dependencies.append(instance_provider)
 
@@ -318,7 +328,6 @@ class ClassInstanceProvider(InstanceProvider):
 
     def check_factories(self):
         register_factories(self.host)
-        pass
 
     def resolve(self, context: Providers.Context):
         context.add(self)
@@ -330,7 +339,7 @@ class ClassInstanceProvider(InstanceProvider):
 
             init = TypeDescriptor.for_type(self.type).get_method("__init__")
             if init is None:
-                raise InjectorException(f"{self.type.__name__} does not implement __init__")
+                raise DIRegistrationException(f"{self.type.__name__} does not implement __init__")
 
             for param in init.param_types:
                 provider = Providers.get_provider(param)
@@ -429,7 +438,6 @@ class FactoryInstanceProvider(InstanceProvider):
             provider = Providers.get_provider(self.host)
             if self.add_dependency(provider):
                 provider.resolve(context)
-
         else: # check if the dependencies crate a cycle
             context.add(*self.dependencies)
 
@@ -507,7 +515,7 @@ class Providers:
         def add(self, *providers: AbstractInstanceProvider):
             for provider in providers:
                 if next((p for p in self.dependencies if p.get_type() is provider.get_type()), None) is not None:
-                    raise InjectorException(self.cycle_report(provider))
+                    raise DIRegistrationException(self.cycle_report(provider))
 
                 self.dependencies.append(provider)
 
@@ -572,7 +580,7 @@ class Providers:
 
             else:
                 if type is provider.get_type():
-                    raise InjectorException(f"{type} already registered in {location(existing_provider)}, override in {location(provider)}")
+                    raise DIRegistrationException(f"{type} already registered in {location(existing_provider)}, override in {location(provider)}")
 
                 if isinstance(existing_provider, AmbiguousProvider):
                     cast(AmbiguousProvider, existing_provider).add_provider(provider)
@@ -615,7 +623,7 @@ class Providers:
     def get_provider(cls, type: Type) -> AbstractInstanceProvider:
         provider = Providers.cache.get(type, None)
         if provider is None:
-            raise InjectorException(f"{type.__name__} not registered as injectable")
+            raise DIException(f"{type.__name__} not registered as injectable")
 
         return provider
 
@@ -627,7 +635,7 @@ def register_factories(cls: Type):
             create_decorator = method.get_decorator(create)
             return_type = method.return_type
             if return_type is None:
-                raise InjectorException(f"{cls.__name__}.{method.method.__name__} expected to have a return type")
+                raise DIRegistrationException(f"{cls.__name__}.{method.method.__name__} expected to have a return type")
 
             Providers.register(FunctionInstanceProvider(cls, method.method, return_type, create_decorator.args[0],
                                                         create_decorator.args[1]))
@@ -775,8 +783,8 @@ class Environment:
 
         self.type = env
         self.parent = parent
-        if self.parent is None and env is not BootEnvironment:
-            self.parent = BootEnvironment.get_instance() # inherit environment including its manged instances!
+        if self.parent is None and env is not Boot:
+            self.parent = Boot.get_environment() # inherit environment including its manged instances!
 
         self.providers: Dict[Type, AbstractInstanceProvider] = {}
         self.lifecycle_processors: list[LifecycleProcessor] = []
@@ -802,7 +810,7 @@ class Environment:
 
         # bootstrapping hack, they will be overwritten by the "real" providers
 
-        if env is BootEnvironment:
+        if env is Boot:
             add_provider(SingletonScope, SingletonScopeInstanceProvider())
             add_provider(RequestScope, RequestScopeInstanceProvider())
 
@@ -816,7 +824,7 @@ class Environment:
 
                 decorator = TypeDescriptor.for_type(env).get_decorator(environment)
                 if decorator is None:
-                    raise InjectorException(f"{env.__name__} is not an environment class")
+                    raise DIRegistrationException(f"{env.__name__} is not an environment class")
 
                 scan = env.__module__
                 if "." in scan:
@@ -951,7 +959,7 @@ class Environment:
 
     def get(self, type: Type[T]) -> T:
         """
-        Return and possibly create a new instance of the given type.
+        Create or return a cached instance for the given type.
 
         Arguments:
             type (Type): The desired type
@@ -961,7 +969,7 @@ class Environment:
         provider = self.providers.get(type, None)
         if provider is None:
             Environment.logger.error("%s is not supported", type)
-            raise InjectorException(f"{type} is not supported")
+            raise DIRuntimeException(f"{type} is not supported")
 
         return provider.create(self)
 
@@ -1194,7 +1202,7 @@ class SingletonScope(Scope):
                     self.value = provider.create(environment, *arg_provider())
 
         return self.value
-    
+
 @scope("thread")
 class ThreadScope(Scope):
     __slots__ = [
@@ -1215,17 +1223,17 @@ class ThreadScope(Scope):
 # internal class that is required to import technical instance providers
 
 @environment()
-class BootEnvironment:
+class Boot:
     # class
 
     environment = None
 
     @classmethod
-    def get_instance(cls):
-        if BootEnvironment.environment is None:
-            BootEnvironment.environment = Environment(BootEnvironment)
+    def get_environment(cls):
+        if Boot.environment is None:
+            Boot.environment = Environment(Boot)
 
-        return BootEnvironment.environment
+        return Boot.environment
 
     # properties
 

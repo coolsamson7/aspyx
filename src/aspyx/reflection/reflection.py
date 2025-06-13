@@ -25,6 +25,9 @@ class DecoratorDescriptor:
         return f"@{self.decorator.__name__}({','.join(self.args)})"
 
 class Decorators:
+    """
+    Utility class that caches decorators ( Python does not have a feature for this )
+    """
     @classmethod
     def add(cls, func, decorator, *args):
         decorators = getattr(func, '__decorators__', None)
@@ -38,9 +41,17 @@ class Decorators:
         return getattr(func, '__decorators__', [])
 
 class TypeDescriptor:
+    """
+    This class provides a way to introspect Python classes, their methods, decorators, and type hints.
+    """
     # inner class
 
     class MethodDescriptor:
+        """
+        This class represents a method of a class, including its decorators, parameter types, and return type.
+        """
+        # constructor
+
         def __init__(self, cls, method: Callable):
             self.clazz = cls
             self.method = method
@@ -55,6 +66,8 @@ class TypeDescriptor:
                     self.param_types.append(type_hints.get(name, object))
 
             self.return_type = type_hints.get('return', None)
+
+        # public
 
         def get_decorator(self, decorator: Callable) -> Optional[DecoratorDescriptor]:
             for dec in self.decorators:
@@ -82,6 +95,9 @@ class TypeDescriptor:
 
     @classmethod
     def for_type(cls, clazz: Type) -> TypeDescriptor:
+        """
+        Returns a TypeDescriptor for the given class, using a cache to avoid redundant introspection.
+        """
         descriptor = cls._cache.get(clazz)
         if descriptor is None:
             with cls._lock:
@@ -126,6 +142,9 @@ class TypeDescriptor:
     # public
 
     def get_decorator(self, decorator: Callable) -> Optional[DecoratorDescriptor]:
+        """
+        Returns the first decorator of the given type, or None if not found.
+        """
         for dec in self.decorators:
             if dec.decorator is decorator:
                 return dec
@@ -133,6 +152,8 @@ class TypeDescriptor:
         return None
 
     def has_decorator(self, decorator: Callable) -> bool:
+        """
+        Checks if the class has a decorator of the given type."""
         for dec in self.decorators:
             if dec.decorator is decorator:
                 return True
@@ -140,12 +161,20 @@ class TypeDescriptor:
         return False
 
     def get_methods(self, local = False) ->  list[TypeDescriptor.MethodDescriptor]:
+        """
+        Returns a list of MethodDescriptor objects for the class.
+        If local is True, only returns methods defined in the class itself, otherwise includes inherited methods.
+        """
         if local:
             return list(self.local_methods.values())
         else:
             return list(self.methods.values())
 
     def get_method(self, name: str, local = False) -> Optional[TypeDescriptor.MethodDescriptor]:
+        """
+        Returns a MethodDescriptor for the method with the given name.
+        If local is True, only searches for methods defined in the class itself, otherwise includes inherited methods.
+        """
         if local:
             return self.local_methods.get(name, None)
         else:

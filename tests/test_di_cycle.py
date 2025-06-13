@@ -6,7 +6,7 @@ from __future__ import annotations
 import unittest
 
 from aspyx.di import injectable, environment, Environment
-from aspyx.di.di import InjectorException
+from aspyx.di.di import DIException
 
 
 @injectable()
@@ -28,7 +28,7 @@ class SampleEnvironment:
 
 class TestCycle(unittest.TestCase):
     def test_cycle(self):
-        with self.assertRaises(InjectorException):
+        with self.assertRaises(DIException):
             Environment(SampleEnvironment)
 
 

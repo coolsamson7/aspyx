@@ -8,8 +8,7 @@ import logging
 import unittest
 from typing import Dict
 
-from aspyx.di import InjectorException, injectable, on_init, on_running, on_destroy, inject_environment, inject, Factory, create, environment, Environment, PostProcessor, factory
-from aspyx.di.di import order, on_running
+from aspyx.di import DIException, injectable, order, on_init, on_running, on_destroy, inject_environment, inject, Factory, create, environment, Environment, PostProcessor, factory
 
 from .di_import import ImportedEnvironment
 
@@ -172,12 +171,12 @@ class TestDI(unittest.TestCase):
         self.assertEqual(type(base), Bar)
 
     def test_inject_ambiguous_class(self):
-        with self.assertRaises(InjectorException):
+        with self.assertRaises(DIException):
             env = TestDI.testEnvironment
             env.get(Ambiguous)
 
     def test_create_unknown(self):
-        with self.assertRaises(InjectorException):
+        with self.assertRaises(DIException):
             env = TestDI.testEnvironment
             env.get(Unknown)
 

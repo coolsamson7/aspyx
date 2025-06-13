@@ -423,7 +423,7 @@ Both add the fluent methods:
 
 The fluent methods `named`, `matches` and `of_type` can be called multiple times!
 
-**Example**:
+**Example**: react on both `transactional` decorators on methods or classes
 
 ```python
 @injectable()
@@ -446,10 +446,12 @@ class Foo:
     def __init__(self):
         pass
 
-    @value("OS")
-    def inject_value(self, os: str):
+    @value("HOME")
+    def inject_home(self, os: str):
         ...
 ```
+
+If required a coercion will be executed.
 
 This concept relies on a central object `ConfigurationManager` that stores the overall configuration values as provided by so called configuration sources that are defined as follows.
 
@@ -462,14 +464,24 @@ class ConfigurationSource(ABC):
 
     @abstractmethod
     def load(self) -> dict:
-        pass
 ```
 
 The `load` method is able to return a tree-like structure by returning a `dict`.
 
-As a default environment variables are already supported.
+Configuration variables are retrieved with the method
 
-Other sources can be added dynamically by just registering them.
+```python
+def get(self, path: str, type: Type[T], default : Optional[T]=None) -> T:
+ ```
+
+- `path`  
+  a '.' separeted path
+- `type`  
+  the desired type
+- `default`  
+  a default, if no value is registered
+  
+Sources can be added dynamically by registering them.
 
 **Example**:
 ```python
@@ -487,6 +499,31 @@ class SampleConfigurationSource(ConfigurationSource):
                 "f": 4
                 }
             }
+```
+
+Two specific source are already implemented:
+- `EnvConfigurationSource`  
+   reads the os environment variables
+- `YamlConfigurationSource`  
+   reads a specific yaml file
+
+Typically you create the required configuration sources in an environemnt class, e.g.
+
+```python
+@environment()
+class SampleEnvironment:
+    # constructor
+
+    def __init__(self):
+        pass
+
+    @create()
+    def create_env_source(self) -> EnvConfigurationSource:
+        return EnvConfigurationSource()
+
+    @create()
+    def create_yaml_source(self) -> YamlConfigurationSource:
+        return YamlConfigurationSource("config.yaml")
 ```
 
 # Reflection
@@ -513,9 +550,9 @@ The returned method descriptors offer:
 - `param_types`  
    list of arg types
 - `return_type`  
-   the retur type
+   the return type
 - `has_decorator(decorator: Callable) -> bool` 
-   return `True`, if the method is decorated with the specified decrator
+   return `True`, if the method is decorated with the specified decorator
 - `get_decorator(decorator: Callable) -> Optional[DecoratorDescriptor]`  
    return a descriptor covering the decorator. In addition to the callable, it also stores the supplied args in the `args` property
 
@@ -525,9 +562,9 @@ Whenver you define a custom decorator, you will need to register it accordingly.
 
 **Example**:
 ```python
-def transactional():
+def transactional(scope):
     def decorator(func):
-        Decorators.add(func, transactional)
+        Decorators.add(func, transactional, scope) # also add all parameters in order to cache them
         return func
 
     return decorator
