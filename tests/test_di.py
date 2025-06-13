@@ -26,14 +26,15 @@ def configure_logging(levels: Dict[str, int]) -> None:
 
 #configure_logging({"aspyx": logging.DEBUG})
 
-# not here
-
-
 @injectable()
 @order(10)
 class SamplePostProcessor(PostProcessor):
     def process(self, instance: object, environment: Environment):
         pass #print(f"created a {instance}")
+
+class Baa:
+    def init(self):
+        pass
 
 class Foo:
     def __init__(self):
@@ -95,6 +96,10 @@ class Bar(Base):
         self.running = False
         self.destroyed = False
         self.environment = None
+
+    @create()
+    def create_baa(self) -> Baa:
+        return Baa()
 
     @on_init()
     def init(self):
@@ -197,7 +202,9 @@ class TestDI(unittest.TestCase):
     def test_create_factory(self):
         env = TestDI.testEnvironment
         baz = env.get(Baz)
+        baa= env.get(Baa)
         self.assertIsNotNone(baz)
+        self.assertIsNotNone(baa)
 
     def test_singleton(self):
         env = TestDI.testEnvironment

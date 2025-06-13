@@ -40,6 +40,9 @@ class AbstractInstanceProvider(ABC, Generic[T]):
     def get_module(self) -> str:
         pass
 
+    def get_host(self) -> Type[T]:
+        return type(self)
+
     @abstractmethod
     def get_type(self) -> Type[T]:
         pass
@@ -62,6 +65,9 @@ class AbstractInstanceProvider(ABC, Generic[T]):
 
     @abstractmethod
     def resolve(self, context: Providers.Context):
+        pass
+
+    def check_factories(self):
         pass
 
 
@@ -92,6 +98,13 @@ class InstanceProvider(AbstractInstanceProvider):
         return self.dependencies is not None
 
     # implement AbstractInstanceProvider
+
+    def get_host(self):
+        return self.host
+
+    def check_factories(self):
+        #register_factories(self.host)
+        pass
 
     def resolve(self, context: Providers.Context):
         pass
@@ -302,6 +315,10 @@ class ClassInstanceProvider(InstanceProvider):
         self.params = 0
 
     # implement
+
+    def check_factories(self):
+        register_factories(self.host)
+        pass
 
     def resolve(self, context: Providers.Context):
         context.add(self)
@@ -542,13 +559,20 @@ class Providers:
             return True
 
         def cache_provider_for_type(provider: AbstractInstanceProvider, type: Type):
+            def location(provider: AbstractInstanceProvider):
+                host = provider.get_host()
+                file = inspect.getfile(host)
+                line = inspect.getsourcelines(host)[1]
+
+                return f"{file}:{line}"
+
             existing_provider = Providers.cache.get(type)
             if existing_provider is None:
                 Providers.cache[type] = provider
 
             else:
                 if type is provider.get_type():
-                    raise InjectorException(f"{type} already registered")
+                    raise InjectorException(f"{type} already registered in {location(existing_provider)}, override in {location(provider)}")
 
                 if isinstance(existing_provider, AmbiguousProvider):
                     cast(AmbiguousProvider, existing_provider).add_provider(provider)
@@ -573,10 +597,14 @@ class Providers:
 
     @classmethod
     def resolve(cls):
-        for provider in Providers.check:
-            provider.resolve(Providers.Context())
 
-        Providers.check.clear()
+        for check in  Providers.check:
+            check.check_factories()
+
+        # in the loop additional providers may be added
+        while len(Providers.check) > 0:
+            check = Providers.check.pop(0)
+            check.resolve(Providers.Context())
 
     @classmethod
     def report(cls):
@@ -597,7 +625,11 @@ def register_factories(cls: Type):
     for method in descriptor.get_methods():
         if method.has_decorator(create):
             create_decorator = method.get_decorator(create)
-            Providers.register(FunctionInstanceProvider(cls, method.method, method.return_type, create_decorator.args[0],
+            return_type = method.return_type
+            if return_type is None:
+                raise InjectorException(f"{cls.__name__}.{method.method.__name__} expected to have a return type")
+
+            Providers.register(FunctionInstanceProvider(cls, method.method, return_type, create_decorator.args[0],
                                                         create_decorator.args[1]))
 def order(prio = 0):
     def decorator(cls):
@@ -685,8 +717,6 @@ def environment(imports: Optional[list[Type]] = None):
 
         Decorators.add(cls, environment, imports)
         Decorators.add(cls, injectable) # do we need that?
-
-        register_factories(cls)
 
         return cls
 

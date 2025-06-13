@@ -160,9 +160,9 @@ The decorator accepts the keyword arguments
  - `singleton`  
    objects are created once inside an environment and cached. This is the default.
  - `request`  
-   obejcts are created on every injection request
+   objects are created on every injection request
  - `thread`  
-   objects are cerated and cached with respect to the current thread.
+   objects are created and cached with respect to the current thread.
 
  Other scopes - e.g. session related scopes - can be defined dynamically. Please check the corresponding chapter.
 
