@@ -124,11 +124,11 @@ Let's look at the details
 
 # Installation
 
+Just install from PyPI with 
+
 `pip install aspyx`
 
-The library is tested with all Python version > 3.9
-
-Ready to go...
+The library is tested with all Python version >= 3.9
 
 # Registration
 
@@ -411,11 +411,21 @@ All methods are expected to have single `Invocation` parameter, that stores
 - `result` the result ( initially `None`)
 - `exception` a possible caught excpetion ( initially `None`)
 
-
 It is essential for `around` methods to call `proceed()` on the invocation, which will call the next around method in the chain and finally the original method.
 If the `proceed` is called with parameters, they will replace the original parameters! 
 
-The argument list to the corresponding decorators control, how aspects are associated with which methods.
+**Example**: Parameter modifications
+
+```python
+@around(methods().named("say"))
+def call_around(self, invocation: Invocation):
+    args = [invocation.args[0],invocation.args[1] + "!"] # 0 is self!
+
+    return invocation.proceed(*args)
+```
+
+The argument list to the corresponding decorators control which methods are targeted by the advice.
+
 A fluent interface is used describe the mapping. 
 The parameters restrict either methods or classes and are constructed by a call to either `methods()` or `classes()`.
 
