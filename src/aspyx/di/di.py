@@ -547,7 +547,7 @@ class Providers:
 
                 first = False
 
-                cycle += f"{p.get_type().report()}"
+                cycle += f"{p.report()}"
 
             cycle += f" <> {provider.report()}"
 
