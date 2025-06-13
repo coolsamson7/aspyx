@@ -616,8 +616,6 @@ def injectable(eager=True, scope="singleton"):
 
         Providers.register(ClassInstanceProvider(cls, eager, scope))
 
-        #TODO registerFactories(cls)
-
         return cls
 
     return decorator
@@ -890,9 +888,9 @@ class Environment:
         # providers
 
         builder.append("Providers \n")
-        for _, provider in self.providers.items():
+        for result_type, provider in self.providers.items():
             if cast(EnvironmentInstanceProvider, provider).environment is self:
-                builder.append(f"- {cast(EnvironmentInstanceProvider, provider).provider}\n")
+                builder.append(f"- {result_type.__name__}: {cast(EnvironmentInstanceProvider, provider).provider}\n")
 
         # instances
 
