@@ -396,13 +396,20 @@ Different aspects - with the appropriate decorator - are possible:
 - `before`  
    methods that will be executed _prior_ to the original method
 - `around`  
-   methods that will be executed _around_ to the original method giving it the possibility add side effects or even change the parameters.
+   methods that will be executed _around_ to the original method giving it the possibility to add side effects or even change the parameters.
 - `after`  
-    methods that will be executed _after_ to the original method
+   methods that will be executed _after_ to the original method
 - `error`  
-   methods that will be executed in case of a caught exception, which can be retrieved by `invocation.exception`
+   methods that will be executed in case of a caught exception
 
-All methods are expected to hava single `Invocation` parameter, that stores, the function, args and kwargs, the return value and possible exceptions.
+All methods are expected to have single `Invocation` parameter, that stores
+
+- `func` the target function
+- `args` the suppliued args
+- `kwargs` the keywords args
+- `result` the result ( initially `None`)
+- `exception` a possible caught excpetion ( initially `None`)
+
 
 It is essential for `around` methods to call `proceed()` on the invocation, which will call the next around method in the chain and finally the original method.
 If the `proceed` is called with parameters, they will replace the original parameters! 
@@ -585,6 +592,8 @@ def transactional(scope):
 **1.2.0**
 
 - added `YamlConfigurationSource`
+
+**1.2.1**
 
 
       

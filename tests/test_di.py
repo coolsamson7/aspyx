@@ -158,6 +158,7 @@ class TestDI(unittest.TestCase):
         env = TestDI.testEnvironment
 
         print(env.report())
+        print(env.parent.report())
 
         baz = env.get(Baz)
         foo = env.get(Foo)

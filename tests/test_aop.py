@@ -30,16 +30,16 @@ class Bar:
         pass
 
     #@transactional()
-    def say(self, hello: str):
-        return hello
+    def say(self, message: str):
+        return f"hello {message}"
 
 @injectable()
 class Foo:
     def __init__(self, bar: Bar):
         self.bar = bar
 
-    def say(self, hello: str):
-        return hello
+    def say(self, message: str):
+        return f"hello {message}"
 
     def throw_error(self):
         raise Exception("ouch")
@@ -90,7 +90,9 @@ class SampleAdvice:
     def call_around(self, invocation: Invocation):
         self.around_calls += 1
 
-        return invocation.proceed()
+        args = [invocation.args[0],invocation.args[1] + "!"]
+
+        return invocation.proceed(*args)
 
     @around(methods().decorated_with(transactional), classes().decorated_with(transactional))
     def call_transactional1(self, invocation: Invocation):
@@ -120,9 +122,9 @@ class TestAdvice(unittest.TestCase):
 
         # foo
 
-        result = foo.say("hello")
+        result = foo.say("world")
 
-        self.assertEqual(result, "hello")
+        self.assertEqual(result, "hello world!")
 
         self.assertEqual(advice.before_calls, 1)
         self.assertEqual(advice.around_calls, 1)
@@ -132,9 +134,9 @@ class TestAdvice(unittest.TestCase):
 
         # bar
 
-        result = foo.bar.say("hello")
+        result = foo.bar.say("world")
 
-        self.assertEqual(result, "hello")
+        self.assertEqual(result, "hello world!")
 
         self.assertEqual(advice.before_calls, 1)
         self.assertEqual(advice.around_calls, 2)

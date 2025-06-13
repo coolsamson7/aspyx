@@ -454,7 +454,7 @@ class FactoryInstanceProvider(InstanceProvider):
 
 class Lifecycle(Enum):
     """
-    This enum defines the lifecycle events that can be processed by lifecycle processors.
+    This enum defines the lifecycle phases that can be processed by lifecycle processors.
     """
 
     __slots__ = []
@@ -466,7 +466,7 @@ class Lifecycle(Enum):
 
 class LifecycleProcessor(ABC):
     """
-    A LifecycleProcessor is used to perform any side effects on managed objects during their lifecycle.
+    A LifecycleProcessor is used to perform any side effects on managed objects during different lifecycle phases.
     """
     __slots__ = [
         "order"
@@ -779,6 +779,9 @@ class Environment:
             env (Type): The environment class that controls the scanning of managed objects.
             parent (Optional[Environment]): Optional parent environment, whose objects are inherited.
         """
+
+        Environment.logger.debug("create environment for class %s", env.__qualname__)
+
         # initialize
 
         self.type = env
@@ -927,8 +930,9 @@ class Environment:
 
         builder.append("Providers \n")
         for result_type, provider in self.providers.items():
-            if cast(EnvironmentInstanceProvider, provider).environment is self:
-                builder.append(f"- {result_type.__name__}: {cast(EnvironmentInstanceProvider, provider).provider}\n")
+            if isinstance(provider, EnvironmentInstanceProvider):
+                if cast(EnvironmentInstanceProvider, provider).environment is self:
+                    builder.append(f"- {result_type.__name__}: {cast(EnvironmentInstanceProvider, provider).provider}\n")
 
         # instances
 
@@ -1155,20 +1159,20 @@ class InjectLifecycleCallable(LifecycleCallable):
     def args(self, decorator: DecoratorDescriptor,  method: TypeDescriptor.MethodDescriptor, environment: Environment):
         return [environment.get(type) for type in method.param_types]
 
-def scope(name: str):
+def scope(name: str, register=True):
     def decorator(cls):
         Scopes.register(cls, name)
 
         Decorators.add(cls, scope)
-        # Decorators.add(cls, injectable)
 
-        Providers.register(ClassInstanceProvider(cls, eager=True, scope="request"))
+        if register:
+            Providers.register(ClassInstanceProvider(cls, eager=True, scope="request"))
 
         return cls
 
     return decorator
 
-@scope("request")
+@scope("request", register=False)
 class RequestScope(Scope):
     # properties
 
@@ -1180,7 +1184,7 @@ class RequestScope(Scope):
     def get(self, provider: AbstractInstanceProvider, environment: Environment, arg_provider: Callable[[],list]):
         return provider.create(environment, *arg_provider())
 
-@scope("singleton")
+@scope("singleton", register=False)
 class SingletonScope(Scope):
     # properties
 
