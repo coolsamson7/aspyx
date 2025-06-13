@@ -446,7 +446,7 @@ class Foo:
     def __init__(self):
         pass
 
-    @value("HOME")
+    @inject_value("HOME")
     def inject_home(self, os: str):
         ...
 ```
@@ -475,12 +475,12 @@ def get(self, path: str, type: Type[T], default : Optional[T]=None) -> T:
  ```
 
 - `path`  
-  a '.' separeted path
+  a '.' separated path
 - `type`  
   the desired type
 - `default`  
   a default, if no value is registered
-  
+
 Sources can be added dynamically by registering them.
 
 **Example**:
@@ -507,7 +507,7 @@ Two specific source are already implemented:
 - `YamlConfigurationSource`  
    reads a specific yaml file
 
-Typically you create the required configuration sources in an environemnt class, e.g.
+Typically you create the required configuration sources in an environment class, e.g.
 
 ```python
 @environment()
@@ -542,7 +542,7 @@ it offers the methods
 - `get_method(name: str, local=False)`  
    return a single either local or overall method
 - `has_decorator(decorator: Callable) -> bool`  
-   return `True`, if the class is decorated with the specified decrator
+   return `True`, if the class is decorated with the specified decorator
 - `get_decorator(decorator) -> Optional[DecoratorDescriptor]`  
    return a descriptor covering the decorator. In addition to the callable, it also stores the supplied args in the `args` property
 
@@ -564,7 +564,7 @@ Whenver you define a custom decorator, you will need to register it accordingly.
 ```python
 def transactional(scope):
     def decorator(func):
-        Decorators.add(func, transactional, scope) # also add all parameters in order to cache them
+        Decorators.add(func, transactional, scope) # also add _all_ parameters in order to cache them
         return func
 
     return decorator
@@ -581,6 +581,10 @@ def transactional(scope):
 
 - added `@on_running()` callback
 - added `thread` scope
+
+**1.2.0**
+
+- added `YamlConfigurationSource`
 
 
       
