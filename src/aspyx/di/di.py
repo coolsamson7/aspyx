@@ -77,6 +77,9 @@ class AbstractInstanceProvider(ABC, Generic[T]):
     def resolve(self, context: Providers.Context):
         pass
 
+    def report(self) -> str:
+        return str(self)
+
     def check_factories(self):
         pass
 
@@ -213,6 +216,9 @@ class AmbiguousProvider(AbstractInstanceProvider):
     def create(self, environment: Environment, *args):
         raise DIException(f"multiple candidates for type {self.type}")
 
+    def report(self) -> str:
+        return "ambiguous: " + ",".join([provider.report() for provider in self.providers])
+
     def __str__(self):
         return f"AmbiguousProvider({self.type})"
 
@@ -289,6 +295,9 @@ class EnvironmentInstanceProvider(AbstractInstanceProvider):
     def get_scope(self) -> str:
         return self.provider.get_scope()
 
+    def report(self) -> str:
+        return self.provider.report()
+
     # custom logic
 
     def tweak_dependencies(self, providers: dict[Type, AbstractInstanceProvider]):
@@ -364,6 +373,9 @@ class ClassInstanceProvider(InstanceProvider):
 
         return environment.created(self.type(*args[:self.params]))
 
+    def report(self) -> str:
+        return f"{self.host.__name__}.__init__"
+
     # object
 
     def __str__(self):
@@ -406,6 +418,9 @@ class FunctionInstanceProvider(InstanceProvider):
 
         return environment.created(instance)
 
+    def report(self) -> str:
+        return f"{self.host.__name__}.{self.method.__name__}"
+
     def __str__(self):
         return f"FunctionInstanceProvider({self.host.__name__}.{self.method.__name__} -> {self.type.__name__})"
 
@@ -447,6 +462,9 @@ class FactoryInstanceProvider(InstanceProvider):
         Environment.logger.debug("%s create class %s", self, self.type.__qualname__)
 
         return environment.created(args[0].create())
+
+    def report(self) -> str:
+        return f"{self.host.__name__}.create"
 
     def __str__(self):
         return f"FactoryInstanceProvider({self.host.__name__} -> {self.type.__name__})"
@@ -529,9 +547,9 @@ class Providers:
 
                 first = False
 
-                cycle += f"{p.get_type().__name__}"
+                cycle += f"{p.get_type().report()}"
 
-            cycle += f" <> {provider.get_type().__name__}"
+            cycle += f" <> {provider.report()}"
 
             return cycle
 
@@ -932,7 +950,7 @@ class Environment:
         for result_type, provider in self.providers.items():
             if isinstance(provider, EnvironmentInstanceProvider):
                 if cast(EnvironmentInstanceProvider, provider).environment is self:
-                    builder.append(f"- {result_type.__name__}: {cast(EnvironmentInstanceProvider, provider).provider}\n")
+                    builder.append(f"- {result_type.__name__}: {provider.report()}\n")
 
         # instances
 
