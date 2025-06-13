@@ -301,9 +301,11 @@ class Foo:
 
 ## Lifecycle methods
 
-It is possible to mark specific lifecle methods. 
+It is possible to mark specific lifecyle methods. 
 - `@on_init()` 
    called after the constructor and all other injections.
+- `@on_running()` 
+   called an environment has initialized all eager objects.
 - `@on_destroy()` 
    called during shutdown of the environment
 
@@ -538,7 +540,7 @@ def transactional():
 
 - some internal refactorings
 
-**1.0.2**
+**1.1.0**
 
 - added `@on_running()` callback
 - added `thread` scope
