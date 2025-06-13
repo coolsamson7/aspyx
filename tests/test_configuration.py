@@ -25,11 +25,11 @@ class SampleEnvironment:
 
     @create()
     def create_yaml_source(self) -> YamlConfigurationSource:
-        file_path = Path(__file__)
+        file_path = f"{Path(__file__).parent}/config.yaml"
 
         print(f"###### my local path is {file_path}")
 
-        return YamlConfigurationSource("config.yaml")
+        return YamlConfigurationSource(file_path)
 
 @injectable()
 class SampleConfigurationSource1(ConfigurationSource):
