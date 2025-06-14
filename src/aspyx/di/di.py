@@ -81,6 +81,14 @@ class AbstractInstanceProvider(ABC, Generic[T]):
     def report(self) -> str:
         return str(self)
 
+    def location(self) -> str:
+        host = self.get_host()
+
+        file = inspect.getfile(host)
+        line = inspect.getsourcelines(host)[1]
+
+        return f"{file}:{line}"
+
     def check_factories(self):
         pass
 
@@ -587,34 +595,38 @@ class Providers:
         else:
             candidates.append(provider)
 
+    # add factories lazily
+
+    @classmethod
+    def check_factories(cls):
+        for check in Providers.check:
+            check.check_factories()
+
+        Providers.check.clear()
+
     @classmethod
     def filter(cls, environment: Environment) -> Dict[Type,AbstractInstanceProvider]:
         cache: Dict[Type,AbstractInstanceProvider] = {}
 
         context: ConditionContext = {
-            "has_feature": lambda feature : environment.has_feature(feature),
-            "known_class": lambda clazz : cache.get(clazz, None) is not None #Providers.providers.get(clazz, None) is not None, TODO
+            "requires_feature": lambda feature : environment.has_feature(feature),
+            "requires_class": lambda clazz : cache.get(clazz, None) is not None # ?
         }
 
-        # check for additional factories
+        Providers.check_factories() # check for additional factories
 
-        for check in Providers.check:
-            check.check_factories()
-
-        Providers.check.clear()
+        # local methods
 
         def filter_type(clazz: Type) -> Optional[AbstractInstanceProvider]:
             result = None
             for provider in Providers.providers[clazz]:
                 if provider_applies(provider):
                     if result is not None:
-                        raise DIRegistrationException("provider already registered")
+                        raise DIRegistrationException(f"provider for type {clazz.__name__} already registered")
                     else:
                         result = provider
 
             return result
-
-        # -> environment
 
         def provider_applies(provider: AbstractInstanceProvider) -> bool:
             descriptor = TypeDescriptor.for_type(provider.get_host())
@@ -635,22 +647,9 @@ class Providers:
             if inspect.isabstract(type):
                 return False
 
-            # for decorator in Decorators.get(type):
-            #    if decorator.decorator is injectable:
-            #        return True
-
-            # darn
-
             return True
 
         def cache_provider_for_type(provider: AbstractInstanceProvider, type: Type):
-            def location(provider: AbstractInstanceProvider):
-                host = provider.get_host()
-                file = inspect.getfile(host)
-                line = inspect.getsourcelines(host)[1]
-
-                return f"{file}:{line}"
-
             existing_provider = cache.get(type)
             if existing_provider is None:
                 cache[type] = provider
@@ -658,7 +657,7 @@ class Providers:
             else:
                 if type is provider.get_type():
                     raise DIRegistrationException(
-                        f"{type} already registered in {location(existing_provider)}, override in {location(provider)}")
+                        f"{type} already registered in {existing_provider.location()}, override in {provider.location()}")
 
                 if isinstance(existing_provider, AmbiguousProvider):
                     cast(AmbiguousProvider, existing_provider).add_provider(provider)
@@ -671,20 +670,15 @@ class Providers:
                 if is_injectable(super_class):
                     cache_provider_for_type(provider, super_class)
 
-        # filter
-
-        provider_context = Providers.Context(cache)
+        # filter conditional providers and fill base classes as well
 
         for provider_type, providers in Providers.providers.items():
             matching_provider = filter_type(provider_type)
             if matching_provider is not None:
                 cache_provider_for_type(matching_provider, provider_type)
 
-                #provider.resolve(provider_context)
-                provider_context.clear()
-            else:
-                print(f" rejected {provider_type}")
-
+        # TODO do we need to move the resolve out of here
+        provider_context = Providers.Context(cache)
         for provider_type, provider in cache.items():
             provider.resolve(provider_context)
             provider_context.clear()
@@ -819,8 +813,8 @@ def inject_environment():
 # conditional stuff
 
 class ConditionContext(TypedDict):
-    has_feature: Callable[[str], bool]
-    known_class: Callable[[Type], bool]
+    requires_feature: Callable[[str], bool]
+    requires_class: Callable[[Type], bool]
 
 class Condition(ABC):
     @abstractmethod
@@ -834,7 +828,7 @@ class FeatureCondition(Condition):
         self.feature = feature
 
     def apply(self, context: ConditionContext) -> bool:
-        return context["has_feature"](self.feature)
+        return context["requires_feature"](self.feature)
 
 class ClassCondition(Condition):
     def __init__(self, clazz: Type):
@@ -843,12 +837,12 @@ class ClassCondition(Condition):
         self.clazz = clazz
 
     def apply(self, context: ConditionContext) -> bool:
-        return context["known_class"](self.clazz)
+        return context["requires_class"](self.clazz)
 
-def has_feature(feature: str):
+def requires_feature(feature: str):
     return FeatureCondition(feature)
 
-def known_class(clazz: Type):
+def requires_class(clazz: Type):
     return ClassCondition(clazz)
 
 def conditional(*conditions: Condition):
@@ -967,7 +961,7 @@ class Environment:
 
                     add_provider(type, environment_provider)
 
-                # tweak dependencies TODO
+                # replace ny environment dependencies
 
                 for type, provider in module_providers.items():
                     cast(EnvironmentInstanceProvider, self.providers[type]).replace_by_environment_dependencies(self.providers)
