@@ -8,7 +8,8 @@ import logging
 import unittest
 from typing import Dict
 
-from aspyx.di import DIException, injectable, order, on_init, on_running, on_destroy, inject_environment, inject, Factory, create, environment, Environment, PostProcessor, factory
+from aspyx.di import DIException, injectable, order, on_init, on_running, on_destroy, inject_environment, inject, \
+    Factory, create, environment, Environment, PostProcessor, factory, has_feature, conditional, known_class
 
 from .di_import import ImportedEnvironment
 
@@ -53,6 +54,24 @@ class Baz:
 
 @injectable()
 class Bazong:
+    def __init__(self):
+        pass
+
+@injectable()
+@conditional(has_feature("dev"))
+class DevClass:
+    def __init__(self):
+        pass
+
+@injectable()
+@conditional(known_class(DevClass))
+class DevDependantClass:
+    def __init__(self):
+        pass
+
+@injectable()
+@conditional(has_feature("prod"))
+class ProdClass:
     def __init__(self):
         pass
 
@@ -152,7 +171,22 @@ class ComplexEnvironment:
         pass
 
 class TestDI(unittest.TestCase):
-    testEnvironment = Environment(SimpleEnvironment)
+    testEnvironment = Environment(SimpleEnvironment, features=["dev"])
+
+    def test_conditional(self):
+        env = TestDI.testEnvironment
+
+        dev = env.get(DevClass)
+        dep = env.get(DevDependantClass)
+
+        try:
+            prod = env.get(ProdClass)
+            self.fail(f" should not return conditional class")
+        except Exception:
+            pass
+
+        self.assertIsNotNone(dev)
+        self.assertIsNotNone(dep)
 
     def test_process_factory_instances(self):
         env = TestDI.testEnvironment

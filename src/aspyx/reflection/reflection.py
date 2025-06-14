@@ -17,7 +17,7 @@ class DecoratorDescriptor:
         "args"
     ]
 
-    def __init__(self, decorator, *args):
+    def __init__(self, decorator: Callable, *args):
         self.decorator = decorator
         self.args = args
 
