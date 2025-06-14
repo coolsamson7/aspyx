@@ -11,7 +11,7 @@ from aspyx.di.aop import advice, around, methods, Invocation
 
 def synchronized():
     """
-    decorate methods in order to synchronize them based on an instance related RLock
+    decorate methods to synchronize them based on an instance related `RLock`
     """
     def decorator(func):
         Decorators.add(func, synchronized)
@@ -26,14 +26,14 @@ class SynchronizeAdvice():
     # constructor
 
     def __init__(self):
-        self.locks= WeakKeyDictionary()
+        self.locks = WeakKeyDictionary()
 
     # internal
 
     def get_lock(self, instance) -> threading.RLock:
         lock = self.locks.get(instance, None)
         if lock is None:
-            lock = threading.Lock()
+            lock = threading.RLock()
             self.locks[instance] = lock
 
         return lock

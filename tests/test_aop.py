@@ -5,10 +5,10 @@ from __future__ import annotations
 
 import unittest
 
+from aspyx.di.threading import synchronized
 from aspyx.reflection import Decorators
 from aspyx.di import injectable, Environment, environment
 from aspyx.di.aop import advice, before, after, around, methods, Invocation, error, classes
-
 
 def transactional():
     def decorator(func):
@@ -29,7 +29,7 @@ class Bar:
     def __init__(self):
         pass
 
-    #@transactional()
+    @synchronized()
     def say(self, message: str):
         return f"hello {message}"
 
@@ -38,6 +38,7 @@ class Foo:
     def __init__(self, bar: Bar):
         self.bar = bar
 
+    @synchronized()
     def say(self, message: str):
         return f"hello {message}"
 

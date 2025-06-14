@@ -9,7 +9,7 @@ import unittest
 from typing import Dict
 
 from aspyx.di import DIException, injectable, order, on_init, on_running, on_destroy, inject_environment, inject, \
-    Factory, create, environment, Environment, PostProcessor, factory, has_feature, conditional, known_class
+    Factory, create, environment, Environment, PostProcessor, factory, requires_feature, conditional, requires_class
 
 from .di_import import ImportedEnvironment
 
@@ -57,22 +57,31 @@ class Bazong:
     def __init__(self):
         pass
 
+class ConditionalBase:
+    pass
+
 @injectable()
-@conditional(has_feature("dev"))
-class DevClass:
+@conditional(requires_feature("dev"))
+class DevClass(ConditionalBase):
     def __init__(self):
         pass
 
 @injectable()
-@conditional(known_class(DevClass))
+@conditional(requires_class(DevClass))
 class DevDependantClass:
     def __init__(self):
         pass
 
 @injectable()
-@conditional(has_feature("prod"))
-class ProdClass:
+@conditional(requires_feature("prod"))
+class ProdClass(ConditionalBase):
     def __init__(self):
+        pass
+
+@injectable()
+@conditional(requires_class(ConditionalBase))
+class RequiresBase:
+    def __init__(self, base: ConditionalBase):
         pass
 
 class Base:
@@ -124,7 +133,7 @@ class Bar(Base):
         self.inited = True
 
     @on_running()
-    def running(self):
+    def set_running(self):
         self.running = True
 
     @on_destroy()
@@ -176,17 +185,21 @@ class TestDI(unittest.TestCase):
     def test_conditional(self):
         env = TestDI.testEnvironment
 
+        base = env.get(ConditionalBase)
         dev = env.get(DevClass)
         dep = env.get(DevDependantClass)
 
         try:
-            prod = env.get(ProdClass)
-            self.fail(f" should not return conditional class")
+            env.get(ProdClass)
+            self.fail("should not return conditional class")
         except Exception:
             pass
 
+        self.assertIs(base, dev)
         self.assertIsNotNone(dev)
         self.assertIsNotNone(dep)
+
+
 
     def test_process_factory_instances(self):
         env = TestDI.testEnvironment

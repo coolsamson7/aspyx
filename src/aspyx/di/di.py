@@ -66,16 +66,11 @@ class AbstractInstanceProvider(ABC, Generic[T]):
     def get_scope(self) -> str:
         pass
 
-    @abstractmethod
-    def get_dependencies(self) -> list[AbstractInstanceProvider]:
-        pass
+    def get_dependencies(self) -> (list[Type],int):
+        return [],1
 
     @abstractmethod
     def create(self, environment: Environment, *args):
-        pass
-
-    @abstractmethod
-    def resolve(self, context: Providers.Context):
         pass
 
     def report(self) -> str:
@@ -101,8 +96,7 @@ class InstanceProvider(AbstractInstanceProvider):
         "host",
         "type",
         "eager",
-        "scope",
-        "dependencies"
+        "scope"
     ]
 
     # constructor
@@ -112,12 +106,6 @@ class InstanceProvider(AbstractInstanceProvider):
         self.type = t
         self.eager = eager
         self.scope = scope
-        self.dependencies : Optional[list[AbstractInstanceProvider]] = None
-
-    # internal
-
-    def _is_resolved(self) -> bool:
-        return self.dependencies is not None
 
     # implement AbstractInstanceProvider
 
@@ -125,10 +113,6 @@ class InstanceProvider(AbstractInstanceProvider):
         return self.host
 
     def check_factories(self):
-        #register_factories(self.host)
-        pass
-
-    def resolve(self, context: Providers.Context):
         pass
 
     def get_module(self) -> str:
@@ -143,21 +127,10 @@ class InstanceProvider(AbstractInstanceProvider):
     def get_scope(self) -> str:
         return self.scope
 
-    def get_dependencies(self) -> list[AbstractInstanceProvider]:
-        return self.dependencies
-
     # public
 
     def module(self) -> str:
         return self.host.__module__
-
-    def add_dependency(self, provider: AbstractInstanceProvider):
-        if any(issubclass(provider.get_type(), dependency.get_type()) for dependency in self.dependencies):
-            return False
-
-        self.dependencies.append(provider)
-
-        return True
 
     @abstractmethod
     def create(self, environment: Environment, *args):
@@ -216,12 +189,6 @@ class AmbiguousProvider(AbstractInstanceProvider):
     def get_scope(self) -> str:
         return "singleton"
 
-    def get_dependencies(self) -> list[AbstractInstanceProvider]:
-        return []
-
-    def resolve(self, context: Providers.Context):
-        pass
-
     def create(self, environment: Environment, *args):
         raise DIException(f"multiple candidates for type {self.type}")
 
@@ -272,8 +239,8 @@ class EnvironmentInstanceProvider(AbstractInstanceProvider):
     __slots__ = [
         "environment",
         "scope_instance",
-        "provider",
         "dependencies",
+        "provider"
     ]
 
     # constructor
@@ -283,14 +250,30 @@ class EnvironmentInstanceProvider(AbstractInstanceProvider):
 
         self.environment = environment
         self.provider = provider
-        self.dependencies : list[AbstractInstanceProvider] = []
-
+        self.dependencies = []
         self.scope_instance = Scopes.get(provider.get_scope(), environment)
 
     # implement
 
-    def resolve(self, context: Providers.Context):
-        pass # noop
+    def resolve(self, context: Providers.ResolveContext):
+        context.add(self)
+
+        if not context.is_resolved(self):
+            context.provider_dependencies[self] = [] #?
+
+            type_and_params = self.provider.get_dependencies()
+            params = type_and_params[1]
+            for type in type_and_params[0]:
+                if params > 0:
+                    params -= 1
+                    self.dependencies.append(context.get_provider(type))
+
+                provider = context.add_provider_dependency(self, type)
+                if provider is not None:
+                    provider.resolve(context)
+
+        else:
+            context.add(*context.get_provider_dependencies(self))
 
     def get_module(self) -> str:
         return self.provider.get_module()
@@ -308,17 +291,6 @@ class EnvironmentInstanceProvider(AbstractInstanceProvider):
         return self.provider.report()
 
     # own logic
-
-    def replace_by_environment_dependencies(self, providers: dict[Type, AbstractInstanceProvider]):
-        for dependency in self.provider.get_dependencies():
-            instance_provider = providers.get(dependency.get_type(), None)
-            if instance_provider is None:
-                raise DIRegistrationException(f"missing import for {dependency.get_type()} ")
-
-            self.dependencies.append(instance_provider)
-
-    def get_dependencies(self) -> list[AbstractInstanceProvider]:
-        return self.provider.get_dependencies()
 
     def create(self, environment: Environment, *args):
         return self.scope_instance.get(self.provider, self.environment, lambda: [provider.create(environment) for provider in self.dependencies]) # already scope property!
@@ -347,35 +319,27 @@ class ClassInstanceProvider(InstanceProvider):
     def check_factories(self):
         register_factories(self.host)
 
-    def resolve(self, context: Providers.Context):
-        context.add(self)
+    def get_dependencies(self) -> (list[Type],int):
+        types : list[Type] = []
 
-        if not self._is_resolved():
-            self.dependencies = []
+        # check constructor
 
-            # check constructor
+        init = TypeDescriptor.for_type(self.type).get_method("__init__")
+        if init is None:
+            raise DIRegistrationException(f"{self.type.__name__} does not implement __init__")
 
-            init = TypeDescriptor.for_type(self.type).get_method("__init__")
-            if init is None:
-                raise DIRegistrationException(f"{self.type.__name__} does not implement __init__")
+        self.params = len(init.param_types)
+        for param in init.param_types:
+            types.append(param)
 
-            for param in init.param_types:
-                provider = context.get_provider(param)
-                self.params += 1
-                if self.add_dependency(provider): # a dependency can occur multiple times, e.g in __init__ and in an injected method
-                    provider.resolve(context)
+        # check @inject
 
-            # check @inject
+        for method in TypeDescriptor.for_type(self.type).get_methods():
+            if method.has_decorator(inject):
+                for param in method.param_types:
+                    types.append(param)
 
-            for method in TypeDescriptor.for_type(self.type).get_methods():
-                if method.has_decorator(inject):
-                    for param in method.param_types:
-                        provider = context.get_provider(param)
-
-                        if self.add_dependency(provider):
-                            provider.resolve(context)
-        else: # check if the dependencies create a cycle
-            context.add(*self.dependencies)
+        return (types, self.params)
 
     def create(self, environment: Environment, *args):
         Environment.logger.debug("%s create class %s", self, self.type.__qualname__)
@@ -408,22 +372,13 @@ class FunctionInstanceProvider(InstanceProvider):
 
     # implement
 
-    def resolve(self, context: Providers.Context):
-        context.add(self)
-
-        if not self._is_resolved():
-            self.dependencies = []
-
-            provider = context.get_provider(self.host)
-            if self.add_dependency(provider):
-                provider.resolve(context)
-        else: # check if the dependencies crate a cycle
-            context.add(*self.dependencies)
+    def get_dependencies(self) -> (list[Type],int):
+        return [self.host], 1
 
     def create(self, environment: Environment, *args):
         Environment.logger.debug("%s create class %s", self, self.type.__qualname__)
 
-        instance = self.method(*args)
+        instance = self.method(*args) # args[0]=self
 
         return environment.created(instance)
 
@@ -453,19 +408,8 @@ class FactoryInstanceProvider(InstanceProvider):
 
     # implement
 
-    def resolve(self, context: Providers.Context):
-        context.add(self)
-
-        if  not self._is_resolved():
-            self.dependencies = []
-
-            provider = context.get_provider(self.host)
-            if self.add_dependency(provider):
-                provider.resolve(context)
-        else: # check if the dependencies crate a cycle
-            context.add(*self.dependencies)
-
-        return self
+    def get_dependencies(self) -> (list[Type],int):
+        return [self.host],1
 
     def create(self, environment: Environment, *args):
         Environment.logger.debug("%s create class %s", self, self.type.__qualname__)
@@ -533,27 +477,54 @@ class Providers:
     """
     # local class
 
-    class Context:
+    class ResolveContext:
         __slots__ = [
             "dependencies",
-            "providers"
+            "providers",
+            "provider_dependencies"
         ]
 
-        def __init__(self, providers: Dict[Type, AbstractInstanceProvider]):
-            self.dependencies : list[AbstractInstanceProvider] = []
-            self.providers = providers
+        # constructor
 
-        def clear(self):
+        def __init__(self, providers: Dict[Type, EnvironmentInstanceProvider]):
+            self.dependencies : list[EnvironmentInstanceProvider] = []
+            self.providers = providers
+            self.provider_dependencies : dict[EnvironmentInstanceProvider, list[EnvironmentInstanceProvider]] = {}
+
+        # public
+
+        def is_resolved(self, provider: EnvironmentInstanceProvider) -> bool:
+            return self.provider_dependencies.get(provider, None) is not None
+
+        def get_provider_dependencies(self, provider: EnvironmentInstanceProvider) -> list[EnvironmentInstanceProvider]:
+            return self.provider_dependencies[provider]
+
+        def add_provider_dependency(self, provider: EnvironmentInstanceProvider, type: Type) -> Optional[EnvironmentInstanceProvider]:
+            provider_dependencies = self.provider_dependencies.get(provider, None)
+            if provider_dependencies is None:
+                provider_dependencies = []
+                self.provider_dependencies[provider] = provider_dependencies
+
+            provider = self.get_provider(type)
+
+            if any(issubclass(provider.get_type(), dependency.get_type()) for dependency in provider_dependencies):
+                return None
+
+            provider_dependencies.append(provider)
+
+            return provider
+
+        def next(self):
             self.dependencies.clear()
 
-        def get_provider(self, type: Type) -> AbstractInstanceProvider:
+        def get_provider(self, type: Type) -> EnvironmentInstanceProvider:
             provider = self.providers.get(type, None)
             if provider is None:
                 raise DIRegistrationException(f"Provider for {type} is not defined")
 
             return provider
 
-        def add(self, *providers: AbstractInstanceProvider):
+        def add(self, *providers: EnvironmentInstanceProvider):
             for provider in providers:
                 if next((p for p in self.dependencies if p.get_type() is provider.get_type()), None) is not None:
                     raise DIRegistrationException(self.cycle_report(provider))
@@ -618,7 +589,7 @@ class Providers:
         # local methods
 
         def filter_type(clazz: Type) -> Optional[AbstractInstanceProvider]:
-            result = None
+            result = None # TODO
             for provider in Providers.providers[clazz]:
                 if provider_applies(provider):
                     if result is not None:
@@ -677,15 +648,28 @@ class Providers:
             if matching_provider is not None:
                 cache_provider_for_type(matching_provider, provider_type)
 
-        # TODO do we need to move the resolve out of here
-        provider_context = Providers.Context(cache)
+        # replace by EnvironmentInstanceProvider
+
+        mapped = {}
+        result = {}
         for provider_type, provider in cache.items():
+            environment_provider = mapped.get(provider, None)
+            if environment_provider is None:
+                environment_provider = EnvironmentInstanceProvider(environment,  provider)
+                mapped[provider] = environment_provider
+
+            result[provider_type] = environment_provider
+
+        # and resolve
+
+        provider_context = Providers.ResolveContext(result)
+        for provider in mapped.values():
             provider.resolve(provider_context)
-            provider_context.clear()
+            provider_context.next() # clear dependencies
 
         # done
 
-        return cache
+        return result
 
 def register_factories(cls: Type):
     descriptor = TypeDescriptor.for_type(cls)
@@ -900,6 +884,9 @@ class Environment:
         if self.parent is not None:
             self.providers |= self.parent.providers
             self.lifecycle_processors += self.parent.lifecycle_processors
+        else: #if self.type is Boot:
+            self.providers[SingletonScope] = SingletonScopeInstanceProvider()
+            self.providers[RequestScope]   = RequestScopeInstanceProvider()
 
         self.instances = []
 
@@ -907,7 +894,7 @@ class Environment:
 
         # filter conditional providers
 
-        providers = Providers.filter(self)
+        overall_providers = Providers.filter(self)
 
         loaded = set()
 
@@ -915,12 +902,6 @@ class Environment:
             Environment.logger.debug("\tadd provider %s for %s", provider, type)
 
             self.providers[type] = provider
-
-        # bootstrapping hack, they will be overwritten by the "real" providers
-
-        if env is Boot:
-            add_provider(SingletonScope, SingletonScopeInstanceProvider())
-            add_provider(RequestScope, RequestScopeInstanceProvider())
 
         def load_environment(env: Type):
             if env not in loaded:
@@ -945,36 +926,16 @@ class Environment:
 
                 # filter and load providers according to their module
 
-                module_providers = {type: provider for type, provider in providers.items() if provider.get_module().startswith(scan)}
+                for type, provider in overall_providers.items():
+                    if provider.get_module().startswith(scan):
+                        add_provider(type, provider)
+        # go
 
-                # register providers wrapping them in EnvironmentInstanceProvider s
-
-                # make sure, that for every type only a single EnvironmentInstanceProvider is created!
-                # otherwise inheritance will fuck it up
-
-                environment_providers : dict[AbstractInstanceProvider, EnvironmentInstanceProvider] = {}
-                for type, provider in module_providers.items():
-                    environment_provider = environment_providers.get(provider, None)
-                    if environment_provider is None:
-                        environment_provider =  EnvironmentInstanceProvider(self, provider)
-                        environment_providers[provider] = environment_provider
-
-                    add_provider(type, environment_provider)
-
-                # replace ny environment dependencies
-
-                for type, provider in module_providers.items():
-                    cast(EnvironmentInstanceProvider, self.providers[type]).replace_by_environment_dependencies(self.providers)
-
-                # return local providers
-
-                return environment_providers.values()
-            else:
-                return []
+        load_environment(env)
 
         # construct eager objects for local providers
 
-        for provider in load_environment(env):
+        for provider in set(self.providers.values()):
             if provider.is_eager():
                 provider.create(self)
 

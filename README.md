@@ -9,7 +9,8 @@
 
 ## Table of Contents
 
-- [Introduction](#aspyx)
+- [Motivation](#motivation)
+- [Introduction](#introduction)
 - [Installation](#installation)
 - [Registration](#registration)
   - [Class](#class)
@@ -28,6 +29,14 @@
 - [Configuration](#configuration)
 - [Reflection](#reflection)
 - [Version History](#version-history)
+
+# Motivation
+
+While working on some AI related topics in Python, i required a simple DI framework. 
+Looking at the existing solutions - there are quite a number of solutions - i was not that impressed. Either the solutions 
+lacked functionality, that i am accustomed to from other languages, or the API was in my mind too clumsy and "technical".
+
+So, why not develop one on my own...Having done that in other languages previously, the task was not hard, and...it is fun :-) 
 
 # Introduction
 
