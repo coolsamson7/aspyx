@@ -15,6 +15,7 @@
   - [Class](#class)
   - [Class Factory](#class-factory)
   - [Method](#method)
+  - [Conditional](#conditional)
 - [Environment](#environment)
   - [Definition](#definition)
   - [Retrieval](#retrieval)
@@ -32,17 +33,24 @@
 
 Aspyx is a small python libary, that adds support for both dependency injection and aop.
 
-The following features are supported 
+The following di features are supported 
 - constructor and setter injection
+- possibility to define custom injections
 - post processors
-- factory classes and methods
+- support for factory classes and methods
 - support for eager construction
-- support for singleton and request scopes
+- support for scopes singleton, request and thread
 - possibilty to add custom scopes
-- lifecycle events methods
-- bundling of injectable object sets by environment classes including recursive imports and inheritance
-- container instances that relate to environment classes and manage the lifecylce of related objects
+- conditional registration of classes and factories 
+- lifecycle events methods `on_init`, `on_destroy`
+- bundling of injectable objects according to their module location including recursive imports and inheritance
+- instatiation of - possibly multiple - container instances - so called environments -  that manage the lifecylce of related objects
+- filtering of classes by associating "features" sets to environment ( similar to spring profiles )
 - hierarchical environments
+
+With respect to aop:
+- support for before, around, after and error aspects 
+- `synchronized` decorator that adds locking to methods
 
 The library is thread-safe!
 
@@ -202,6 +210,22 @@ class Foo:
 
  The same arguments as in `@injectable` are possible.
 
+## Conditional
+
+All `@injectable` declarations can be supplemented with 
+
+```python
+@conditional(<condition>, ..., <condition>)
+```
+
+decorators that act as filters in the context of an environment.
+
+Valid conditions are created by:
+- `requires_class(clazz: Type)`  
+  the injectable is valid, if the specified class is registered as well.
+- `requires_feature(feature: str)`  
+  the injectable is valid, if the environment defines the specified feature.
+
 # Environment
 
 ## Definition
@@ -219,6 +243,24 @@ environment = Environment(SampleEnvironment)
 ```
 
 The default is that all eligible classes, that are implemented in the containing module or in any submodule will be managed.
+
+By adding the parameter `features: list[str]`, it is possible to filter injectables by evaluating the corresponding `@conditional` decorators.
+
+**Example**: 
+```python
+
+@injectable()
+@conditional(requires_feature("dev"))
+class DevOnly:
+     def __init__(self):
+        pass
+
+@environment()
+class SampleEnvironmen(features=["dev"])):
+    def __init__(self):
+        pass
+```
+
 
 By adding an `imports: list[Type]` parameter, specifying other environment types, it will register the appropriate classes recursively.
 
@@ -453,6 +495,8 @@ class TransactionAdvice:
     def establish_transaction(self, invocation: Invocation):
         ...
 ```
+
+A handy decorator `@synchronized` is implemented that automatically synchronizes methods with a `RLock` associated with the instance.
 
 # Configuration 
 
