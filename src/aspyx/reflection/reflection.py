@@ -69,6 +69,9 @@ class TypeDescriptor:
 
         # public
 
+        def is_async(self) -> bool:
+            return inspect.iscoroutinefunction(self.method)
+
         def get_decorator(self, decorator: Callable) -> Optional[DecoratorDescriptor]:
             for dec in self.decorators:
                 if dec.decorator is decorator:

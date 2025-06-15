@@ -33,10 +33,10 @@
 # Motivation
 
 While working on some AI related topics in Python, i required a simple DI framework. 
-Looking at the existing solutions - there are quite a number of solutions - i was not that impressed. Either the solutions 
-lacked functionality, that i am accustomed to from other languages, or the API was in my mind too clumsy and "technical".
+Looking at the existing solutions - there are quite a number of - i was not quite happy. Either the solutions 
+lacked functionality - starting with that usually aop and di are separate libraries -, that i am accustomed to from other languages, or the API was in my mind too clumsy and "technical".
 
-So, why not develop one on my own...Having done that in other languages previously, the task was not hard, and...it is fun :-) 
+So, why not develop one on my own...Having done that in other languages previously, the task was not that hard, and last but not least...it is fun :-) 
 
 # Introduction
 
@@ -59,6 +59,7 @@ The following di features are supported
 
 With respect to aop:
 - support for before, around, after and error aspects 
+- sync and async method support
 - `synchronized` decorator that adds locking to methods
 
 The library is thread-safe!
@@ -265,9 +266,11 @@ class DevOnly:
         pass
 
 @environment()
-class SampleEnvironmen(features=["dev"])):
+class SampleEnvironmen()):
     def __init__(self):
         pass
+
+environment = Environment(SampleEnvironment, features=["dev"])
 ```
 
 
@@ -485,6 +488,8 @@ Both add the fluent methods:
    defines the matching classes
 - `named(name: str)`  
    defines method or class names
+- `that_are_async()`  
+   defines async methods
 - `matches(re: str)`  
    defines regular expressions for methods or classes
 - `decorated_with(type: Type)`  
@@ -504,6 +509,8 @@ class TransactionAdvice:
     def establish_transaction(self, invocation: Invocation):
         ...
 ```
+
+With respect to async methods, you need to make sure, to replace a `proceeed()` with a `await proceed_async()` to have the overall chain async!
 
 A handy decorator `@synchronized` is implemented that automatically synchronizes methods with a `RLock` associated with the instance.
 

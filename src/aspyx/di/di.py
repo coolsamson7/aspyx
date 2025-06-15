@@ -32,16 +32,31 @@ class DIException(Exception):
     """
     Exception raised for errors in the injector.
     """
+    def __init__(self, message: str):
+        super().__init__(message)
 
 class DIRegistrationException(DIException):
     """
     Exception raised during the registration of dependencies.
     """
+    def __init__(self, message: str):
+        super().__init__(message)
+
+class ProviderCollisionException(DIRegistrationException):
+    def __init__(self, message: str, *providers: AbstractInstanceProvider):
+         super().__init__(message)
+
+         self.providers = providers
+
+    def __str__(self):
+        return f"[{self.args[0]} {self.providers[1].location()} collides with {self.providers[0].location()}"
 
 class DIRuntimeException(DIException):
     """
     Exception raised during the runtime.
     """
+    def __init__(self, message: str):
+        super().__init__(message)
 
 class AbstractInstanceProvider(ABC, Generic[T]):
     """
@@ -581,7 +596,7 @@ class Providers:
 
         context: ConditionContext = {
             "requires_feature": lambda feature : environment.has_feature(feature),
-            "requires_class": lambda clazz : cache.get(clazz, None) is not None # ?
+            "requires_class": lambda clazz : cache.get(clazz, None) is not None # ? only works if the class is in the cache already?
         }
 
         Providers.check_factories() # check for additional factories
@@ -589,11 +604,12 @@ class Providers:
         # local methods
 
         def filter_type(clazz: Type) -> Optional[AbstractInstanceProvider]:
-            result = None # TODO
+            result = None
             for provider in Providers.providers[clazz]:
                 if provider_applies(provider):
                     if result is not None:
-                        raise DIRegistrationException(f"provider for type {clazz.__name__} already registered")
+                        raise ProviderCollisionException(f"type {clazz.__name__} already registered", result, provider)
+
                     else:
                         result = provider
 
@@ -627,8 +643,7 @@ class Providers:
 
             else:
                 if type is provider.get_type():
-                    raise DIRegistrationException(
-                        f"{type} already registered in {existing_provider.location()}, override in {provider.location()}")
+                    raise ProviderCollisionException(f"type {type.__name__} already registered", existing_provider, provider)
 
                 if isinstance(existing_provider, AmbiguousProvider):
                     cast(AmbiguousProvider, existing_provider).add_provider(provider)
@@ -1044,6 +1059,9 @@ class Environment:
             raise DIRuntimeException(f"{type} is not supported")
 
         return provider.create(self)
+
+    def __str__(self):
+        return f"Environment({self.type.__name__})"
 
 class LifecycleCallable:
     __slots__ = [

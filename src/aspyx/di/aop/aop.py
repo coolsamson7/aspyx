@@ -50,7 +50,7 @@ class AspectTarget(ABC):
     __slots__ = [
         "_function",
         "_type",
-
+        "_async",
         "_clazz",
         "_instance",
         "names",
@@ -65,6 +65,7 @@ class AspectTarget(ABC):
     def __init__(self):
         self._clazz = None
         self._instance = None
+        self._async = False
         self._function = None
         self._type = None
 
@@ -106,6 +107,10 @@ class AspectTarget(ABC):
     def type(self, type: AspectType):
         self._type = type
 
+        return self
+
+    def that_are_async(self):
+        self._async = True
         return self
 
     def of_type(self, type: Type):
@@ -178,6 +183,14 @@ class MethodAspectTarget(AspectTarget):
 
         method_descriptor = descriptor.get_method(func.__name__)
 
+        # async
+
+        name = method_descriptor.method.__name__
+        is_async = method_descriptor.is_async()
+
+        if self._async is not method_descriptor.is_async():
+            return False
+
         # type
 
         if len(self.types) > 0:
@@ -234,6 +247,9 @@ class JoinPoint:
     def call(self, invocation: 'Invocation'):
         pass
 
+    async def call_async(self, invocation: 'Invocation'):
+        pass
+
 class FunctionJoinPoint(JoinPoint):
     __slots__ = [
         "instance",
@@ -251,6 +267,11 @@ class FunctionJoinPoint(JoinPoint):
 
         return self.func(self.instance, invocation)
 
+    async def call_async(self, invocation: 'Invocation'):
+        invocation.current_join_point = self
+
+        return await self.func(self.instance, invocation)
+
 class MethodJoinPoint(FunctionJoinPoint):
     __slots__ = []
 
@@ -261,6 +282,11 @@ class MethodJoinPoint(FunctionJoinPoint):
         invocation.current_join_point = self
 
         return self.func(*invocation.args, **invocation.kwargs)
+
+    async def call_async(self, invocation: 'Invocation'):
+        invocation.current_join_point = self
+
+        return await self.func(*invocation.args, **invocation.kwargs)
 
 @dataclass
 class JoinPoints:
@@ -328,6 +354,37 @@ class Invocation:
 
         return self.result
 
+    async def call_async(self, *args, **kwargs):
+        # remember args
+
+        self.args = args
+        self.kwargs = kwargs
+
+        # run all before
+
+        for join_point in self.join_points.before:
+            join_point.call(self)
+
+        # run around's with the method being the last aspect!
+
+        try:
+            self.result = await self.join_points.around[0].call_async(self) # will follow the proceed chain
+
+        except Exception as e:
+            self.exception = e
+            for join_point in self.join_points.error:
+                join_point.call(self)
+
+        # run all before
+
+        for join_point in self.join_points.after:
+            join_point.call(self)
+
+        if self.exception is not None:
+            raise self.exception # rethrow the error
+
+        return self.result
+
     def proceed(self, *args, **kwargs):
         """
         Proceed to the next join point in the around chain up to the original method.
@@ -339,6 +396,18 @@ class Invocation:
         # next one please...
 
         return self.current_join_point.next.call(self)
+
+    async def proceed_async(self, *args, **kwargs):
+        """
+        Proceed to the next join point in the around chain up to the original method.
+        """
+        if len(args) > 0 or len(kwargs) > 0:  # as soon as we have args, we replace the current ones
+            self.args = args
+            self.kwargs = kwargs
+
+        # next one please...
+
+        return await self.current_join_point.next.call_async(self)
 
 @injectable()
 class Advice:
@@ -381,13 +450,14 @@ class Advice:
 
                 if result is None:
                     result = {}
+                    self.cache[clazz] = result
 
                     for _, member in inspect.getmembers(clazz, predicate=inspect.isfunction):
                         join_points = self.compute_join_points(clazz, member, environment)
                         if join_points is not None:
                             result[member] = join_points
 
-                    self.cache[clazz] = result
+
 
         # add around methods
 
@@ -537,6 +607,18 @@ class AdviceProcessor(PostProcessor):
             Environment.logger.debug("add aspects for %s:%s", type(instance), member.__name__)
 
             def wrap(jp):
-                return lambda *args, **kwargs: Invocation(member, jp).call(*args, **kwargs)
+                def sync_wrapper(*args, **kwargs):
+                    return Invocation(member, jp).call(*args, **kwargs)
 
-            setattr(instance, member.__name__, types.MethodType(wrap(join_points), instance))
+                return sync_wrapper
+
+            def wrap_async(jp):
+                async def async_wrapper(*args, **kwargs):
+                    return await Invocation(member, jp).call_async(*args, **kwargs)
+
+                return async_wrapper
+
+            if inspect.iscoroutinefunction(member):
+                setattr(instance, member.__name__, types.MethodType(wrap_async(join_points), instance))
+            else:
+                setattr(instance, member.__name__, types.MethodType(wrap(join_points), instance))

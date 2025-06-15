@@ -3,12 +3,26 @@ Tests for the AOP (Aspect-Oriented Programming) functionality in the aspyx.di mo
 """
 from __future__ import annotations
 
+import asyncio
+import logging
 import unittest
+from typing import Dict
 
 from aspyx.di.threading import synchronized
 from aspyx.reflection import Decorators
 from aspyx.di import injectable, Environment, environment
 from aspyx.di.aop import advice, before, after, around, methods, Invocation, error, classes
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='[%(asctime)s] %(levelname)s in %(filename)s:%(lineno)d - %(message)s'
+)
+
+def configure_logging(levels: Dict[str, int]) -> None:
+    for name in levels:
+        logging.getLogger(name).setLevel(levels[name])
+
+configure_logging({"aspyx": logging.DEBUG})
 
 def transactional():
     def decorator(func):
@@ -28,6 +42,11 @@ class SampleEnvironment:
 class Bar:
     def __init__(self):
         pass
+
+    async def say_async(self, message: str):
+        await asyncio.sleep(0.01)
+
+        return f"hello {message}"
 
     @synchronized()
     def say(self, message: str):
@@ -87,6 +106,14 @@ class SampleAdvice:
     def call_after(self, invocation: Invocation):
         self.after_calls += 1
 
+    @around(methods().that_are_async())
+    async def call_around_async(self, invocation: Invocation):
+        self.around_calls += 1
+
+        print("call_around_async")
+
+        return await invocation.proceed_async()
+
     @around(methods().named("say"))
     def call_around(self, invocation: Invocation):
         self.around_calls += 1
@@ -107,14 +134,19 @@ class SampleAdvice:
 
         return invocation.proceed()
 
-#logging.basicConfig(level=logging.DEBUG)
+environment = Environment(SampleEnvironment)
+
+class TestAsyncAdvice(unittest.IsolatedAsyncioTestCase):
+    async def xtest_async(self):
+        bar = environment.get(Bar)
+
+        result = await bar.say_async("world")
+
+        self.assertEqual(result, "hello world")
 
 class TestAdvice(unittest.TestCase):
-    testEnvironment = Environment(SampleEnvironment)
 
     def test_advice(self):
-        environment = TestAdvice.testEnvironment
-
         advice = environment.get(SampleAdvice)
 
         foo = environment.get(Foo)
@@ -144,9 +176,6 @@ class TestAdvice(unittest.TestCase):
         self.assertEqual(advice.after_calls, 1)
 
     def test_error(self):
-        environment = TestAdvice.testEnvironment
-
-
         foo = environment.get(Foo)
         advice = environment.get(SampleAdvice)
 
