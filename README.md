@@ -605,7 +605,7 @@ class SampleEnvironment:
 
 As the library heavily relies on type introspection of classes and methods, a utility class `TypeDescriptor` is available that covers type information on classes. 
 
-After beeing instatiated with
+After beeing instantiated with
 
 ```python
 TypeDescriptor.for_type(<type>)

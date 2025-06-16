@@ -229,14 +229,14 @@ def classes():
     return ClassAspectTarget()
 
 
-class JoinPoint:
+class Aspect:
     __slots__ = [
         "next",
     ]
 
     # constructor
 
-    def __init__(self, next: 'JoinPoint'):
+    def __init__(self, next: 'Aspect'):
         self.next = next
 
     # public
@@ -247,55 +247,58 @@ class JoinPoint:
     async def call_async(self, invocation: 'Invocation'):
         pass
 
-class FunctionJoinPoint(JoinPoint):
+class FunctionAspect(Aspect):
     __slots__ = [
         "instance",
         "func",
+        "order",
     ]
 
-    def __init__(self, instance, func, next: Optional['JoinPoint']):
-        super().__init__(next)
+    def __init__(self, instance, func, next_aspect: Optional['Aspect']):
+        super().__init__(next_aspect)
 
         self.instance = instance
         self.func = func
 
+        self.order = next((decorator.args[0] for decorator in Decorators.get(func) if decorator.decorator is order), 100)
+
     def call(self, invocation: 'Invocation'):
-        invocation.current_join_point = self
+        invocation.current_aspect = self
 
         return self.func(self.instance, invocation)
 
     async def call_async(self, invocation: 'Invocation'):
-        invocation.current_join_point = self
+        invocation.current_aspect = self
 
         return await self.func(self.instance, invocation)
 
-class MethodJoinPoint(FunctionJoinPoint):
+class MethodAspect(FunctionAspect):
     __slots__ = []
 
     def __init__(self, instance, func):
         super().__init__(instance, func, None)
 
     def call(self, invocation: 'Invocation'):
-        invocation.current_join_point = self
+        invocation.current_aspect = self
 
         return self.func(*invocation.args, **invocation.kwargs)
 
     async def call_async(self, invocation: 'Invocation'):
-        invocation.current_join_point = self
+        invocation.current_aspect = self
 
         return await self.func(*invocation.args, **invocation.kwargs)
 
 @dataclass
-class JoinPoints:
-    before: list[JoinPoint]
-    around: list[JoinPoint]
-    error: list[JoinPoint]
-    after: list[JoinPoint]
+class Aspects:
+    before: list[Aspect]
+    around: list[Aspect]
+    error: list[Aspect]
+    after: list[Aspect]
 
 class Invocation:
     """
     Invocation stores the relevant data of a single method invocation.
-    It holds the arguments, keyword arguments, result, error, and the join points that define the aspect behavior.
+    It holds the arguments, keyword arguments, result, error, and the aspects that define the aspect behavior.
     """
     # properties
 
@@ -305,20 +308,20 @@ class Invocation:
         "kwargs",
         "result",
         "exception",
-        "join_points",
-        "current_join_point",
+        "aspects",
+        "current_aspect",
     ]
 
     # constructor
 
-    def __init__(self, func, join_points: JoinPoints):
+    def __init__(self, func, aspects: Aspects):
         self.func = func
         self.args : list[object] = []
         self.kwargs = None
         self.result = None
         self.exception = None
-        self.join_points = join_points
-        self.current_join_point = None
+        self.aspects = aspects
+        self.current_aspect = None
 
     def call(self, *args, **kwargs):
         # remember args
@@ -328,23 +331,23 @@ class Invocation:
 
         # run all before
 
-        for join_point in self.join_points.before:
-            join_point.call(self)
+        for aspect in self.aspects.before:
+            aspect.call(self)
 
         # run around's with the method being the last aspect!
 
         try:
-            self.result = self.join_points.around[0].call(self) # will follow the proceed chain
+            self.result = self.aspects.around[0].call(self) # will follow the proceed chain
 
         except Exception as e:
             self.exception = e
-            for join_point in self.join_points.error:
-                join_point.call(self)
+            for aspect in self.aspects.error:
+                aspect.call(self)
 
         # run all before
 
-        for join_point in self.join_points.after:
-            join_point.call(self)
+        for aspect in self.aspects.after:
+            aspect.call(self)
 
         if self.exception is not None:
             raise self.exception # rethrow the error
@@ -359,23 +362,23 @@ class Invocation:
 
         # run all before
 
-        for join_point in self.join_points.before:
-            join_point.call(self)
+        for aspect in self.aspects.before:
+            aspect.call(self)
 
         # run around's with the method being the last aspect!
 
         try:
-            self.result = await self.join_points.around[0].call_async(self) # will follow the proceed chain
+            self.result = await self.aspects.around[0].call_async(self) # will follow the proceed chain
 
         except Exception as e:
             self.exception = e
-            for join_point in self.join_points.error:
-                join_point.call(self)
+            for aspect in self.aspects.error:
+                aspect.call(self)
 
         # run all before
 
-        for join_point in self.join_points.after:
-            join_point.call(self)
+        for aspect in self.aspects.after:
+            aspect.call(self)
 
         if self.exception is not None:
             raise self.exception # rethrow the error
@@ -392,7 +395,7 @@ class Invocation:
 
         # next one please...
 
-        return self.current_join_point.next.call(self)
+        return self.current_aspect.next.call(self)
 
     async def proceed_async(self, *args, **kwargs):
         """
@@ -404,7 +407,7 @@ class Invocation:
 
         # next one please...
 
-        return await self.current_join_point.next.call_async(self)
+        return await self.current_aspect.next.call_async(self)
 
 @injectable()
 class Advice:
@@ -420,13 +423,17 @@ class Advice:
     # constructor
 
     def __init__(self):
-        self.cache : Dict[Type, Dict[Callable,JoinPoints]] = {}
+        self.cache : Dict[Type, Dict[Callable,Aspects]] = {}
         self.lock = threading.RLock()
 
     # methods
 
     def collect(self, clazz, member, type: AspectType, environment: Environment):
-        aspects = [FunctionJoinPoint(environment.get(target._clazz), target._function, None) for target in Advice.targets if target._type == type and target._matches(clazz, member)]
+        aspects = [FunctionAspect(environment.get(target._clazz), target._function, None) for target in Advice.targets if target._type == type and environment.providers.get(target._clazz) is not None  and target._matches(clazz, member)]
+
+        # sort according to order
+
+        aspects = sorted(aspects, key=lambda aspect: aspect.order)
 
         # link
 
@@ -437,7 +444,7 @@ class Advice:
 
         return aspects
 
-    def join_points4(self, instance, environment: Environment) -> Dict[Callable,JoinPoints]:
+    def aspects_for(self, instance, environment: Environment) -> Dict[Callable,Aspects]:
         clazz = type(instance)
 
         result = self.cache.get(clazz, None)
@@ -450,9 +457,9 @@ class Advice:
                     self.cache[clazz] = result
 
                     for _, member in inspect.getmembers(clazz, predicate=inspect.isfunction):
-                        join_points = self.compute_join_points(clazz, member, environment)
-                        if join_points is not None:
-                            result[member] = join_points
+                        aspects = self.compute_aspects(clazz, member, environment)
+                        if aspects is not None:
+                            result[member] = aspects
 
 
 
@@ -461,7 +468,7 @@ class Advice:
         value = {}
 
         for key, cjp in result.items():
-            jp = JoinPoints(
+            jp = Aspects(
                 before=cjp.before,
                 around=cjp.around,
                 error=cjp.error,
@@ -469,7 +476,7 @@ class Advice:
 
             # add method to around
 
-            jp.around.append(MethodJoinPoint(instance, key))
+            jp.around.append(MethodAspect(instance, key))
             if len(jp.around) > 1:
                 jp.around[len(jp.around) - 2].next = jp.around[len(jp.around) - 1]
 
@@ -479,14 +486,14 @@ class Advice:
 
         return value
 
-    def compute_join_points(self, clazz, member, environment: Environment) -> Optional[JoinPoints]:
+    def compute_aspects(self, clazz, member, environment: Environment) -> Optional[Aspects]:
         befores = self.collect(clazz, member, AspectType.BEFORE, environment)
         arounds = self.collect(clazz, member, AspectType.AROUND, environment)
         afters = self.collect(clazz, member, AspectType.AFTER, environment)
         errors = self.collect(clazz, member, AspectType.ERROR, environment)
 
         if len(befores) > 0 or len(arounds) > 0 or len(afters) > 0  or len(errors) > 0:
-            return JoinPoints(
+            return Aspects(
                 before=befores,
                 around=arounds,
                 error=errors,
@@ -514,7 +521,7 @@ def advice(cls):
     for name, member in TypeDescriptor.for_type(cls).methods.items():
         decorator = next((decorator for decorator in member.decorators if decorator.decorator in [before, after, around, error]), None)
         if decorator is not None:
-            target = decorator.args[0]
+            target = decorator.args[0] # ? ...??
             target._clazz = cls
             sanity_check(cls, name)
             Advice.targets.append(target)
@@ -598,9 +605,9 @@ class AdviceProcessor(PostProcessor):
     # implement
 
     def process(self, instance: object, environment: Environment):
-        join_point_dict = self.advice.join_points4(instance, environment)
+        aspect_dict = self.advice.aspects_for(instance, environment)
 
-        for member, join_points in join_point_dict.items():
+        for member, aspects in aspect_dict.items():
             Environment.logger.debug("add aspects for %s:%s", type(instance), member.__name__)
 
             def wrap(jp):
@@ -616,6 +623,6 @@ class AdviceProcessor(PostProcessor):
                 return async_wrapper
 
             if inspect.iscoroutinefunction(member):
-                setattr(instance, member.__name__, types.MethodType(wrap_async(join_points), instance))
+                setattr(instance, member.__name__, types.MethodType(wrap_async(aspects), instance))
             else:
-                setattr(instance, member.__name__, types.MethodType(wrap(join_points), instance))
+                setattr(instance, member.__name__, types.MethodType(wrap(aspects), instance))

@@ -10,7 +10,7 @@ from typing import Dict
 
 from aspyx.di.threading import synchronized
 from aspyx.reflection import Decorators
-from aspyx.di import injectable, Environment, environment
+from aspyx.di import injectable, Environment, environment, order
 from aspyx.di.aop import advice, before, after, around, methods, Invocation, error, classes
 
 logging.basicConfig(
@@ -97,6 +97,11 @@ class SampleAdvice:
     @before(methods().named("say").of_type(Foo).matches(".*"))
     def call_before_foo(self, invocation: Invocation):
         self.before_calls += 1
+
+    @before(methods().named("say").of_type(Foo).matches(".*"))
+    @order(10)
+    def other_before_foo(self, invocation: Invocation):
+        pass
 
     @before(methods().named("say").of_type(Bar))
     def call_before_bar(self, invocation: Invocation):
