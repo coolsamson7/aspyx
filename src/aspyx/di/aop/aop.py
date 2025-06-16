@@ -415,21 +415,17 @@ class Advice:
 
     targets: list[AspectTarget] = []
 
-    __slots__ = [
-        "cache",
-        "lock"
-    ]
+    __slots__ = []
 
     # constructor
 
     def __init__(self):
-        self.cache : Dict[Type, Dict[Callable,Aspects]] = {}
-        self.lock = threading.RLock()
+        pass
 
     # methods
 
     def collect(self, clazz, member, type: AspectType, environment: Environment):
-        aspects = [FunctionAspect(environment.get(target._clazz), target._function, None) for target in Advice.targets if target._type == type and environment.providers.get(target._clazz) is not None  and target._matches(clazz, member)]
+        aspects = [FunctionAspect(environment.get(target._clazz), target._function, None) for target in Advice.targets if target._type == type and target._clazz is not clazz and environment.providers.get(target._clazz) is not None  and target._matches(clazz, member)]
 
         # sort according to order
 
@@ -447,21 +443,12 @@ class Advice:
     def aspects_for(self, instance, environment: Environment) -> Dict[Callable,Aspects]:
         clazz = type(instance)
 
-        result = self.cache.get(clazz, None)
-        if result is None:
-            with self.lock:
-                result = self.cache.get(clazz, None)
+        result = {}
 
-                if result is None:
-                    result = {}
-                    self.cache[clazz] = result
-
-                    for _, member in inspect.getmembers(clazz, predicate=inspect.isfunction):
-                        aspects = self.compute_aspects(clazz, member, environment)
-                        if aspects is not None:
-                            result[member] = aspects
-
-
+        for _, member in inspect.getmembers(clazz, predicate=inspect.isfunction):
+            aspects = self.compute_aspects(clazz, member, environment)
+            if aspects is not None:
+                result[member] = aspects
 
         # add around methods
 
@@ -593,6 +580,8 @@ class AdviceProcessor(PostProcessor):
 
     __slots__ = [
         "advice",
+        "lock",
+        "cache"
     ]
 
     # constructor
@@ -601,11 +590,25 @@ class AdviceProcessor(PostProcessor):
         super().__init__()
 
         self.advice = advice
+        self.cache : Dict[Type, Dict[Callable,Aspects]] = {}
+        self.lock = threading.RLock()
+
+    # local
+
+    def aspects_for(self, instance, environment: Environment) -> Dict[Callable,Aspects]:
+        clazz = type(instance)
+        result = self.cache.get(clazz, None)
+        if result is None:
+            with self.lock:
+                result = self.advice.aspects_for(instance, environment)
+                self.cache[clazz] = result
+
+        return result
 
     # implement
 
     def process(self, instance: object, environment: Environment):
-        aspect_dict = self.advice.aspects_for(instance, environment)
+        aspect_dict = self.aspects_for(instance, environment)
 
         for member, aspects in aspect_dict.items():
             Environment.logger.debug("add aspects for %s:%s", type(instance), member.__name__)
