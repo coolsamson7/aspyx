@@ -185,9 +185,6 @@ class MethodAspectTarget(AspectTarget):
 
         # async
 
-        name = method_descriptor.method.__name__
-        is_async = method_descriptor.is_async()
-
         if self._async is not method_descriptor.is_async():
             return False
 

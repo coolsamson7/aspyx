@@ -360,7 +360,7 @@ It is possible to mark specific lifecyle methods.
 - `@on_init()` 
    called after the constructor and all other injections.
 - `@on_running()` 
-   called an environment has initialized all eager objects.
+   called after an environment has initialized completely ( e.g. created all eager objects ).
 - `@on_destroy()` 
    called during shutdown of the environment
 
@@ -437,6 +437,7 @@ class SampleAdvice:
 
     @error(methods().named("hello").of_type(Foo))
     def call_error(self, invocation: Invocation):
+         # error: invocation.exception
         print("error Foo.hello(...)")
         print(invocation.exception)
 
@@ -460,10 +461,10 @@ Different aspects - with the appropriate decorator - are possible:
 All methods are expected to have single `Invocation` parameter, that stores
 
 - `func` the target function
-- `args` the suppliued args
+- `args` the supplied args
 - `kwargs` the keywords args
 - `result` the result ( initially `None`)
-- `exception` a possible caught excpetion ( initially `None`)
+- `exception` a possible caught exppetion ( initially `None`)
 
 It is essential for `around` methods to call `proceed()` on the invocation, which will call the next around method in the chain and finally the original method.
 If the `proceed` is called with parameters, they will replace the original parameters! 
@@ -473,9 +474,7 @@ If the `proceed` is called with parameters, they will replace the original param
 ```python
 @around(methods().named("say"))
 def call_around(self, invocation: Invocation):
-    args = [invocation.args[0],invocation.args[1] + "!"] # 0 is self!
-
-    return invocation.proceed(*args)
+    return invocation.proceed(invocation.args[0], invocation.args[1] + "!") # 0 is self!
 ```
 
 The argument list to the corresponding decorators control which methods are targeted by the advice.

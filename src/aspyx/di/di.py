@@ -9,7 +9,6 @@ import logging
 from abc import abstractmethod, ABC
 from enum import Enum
 import threading
-from operator import truediv
 from typing import Type, Dict, TypeVar, Generic, Optional, cast, Callable, TypedDict
 
 from aspyx.di.util import StringBuilder
@@ -44,9 +43,9 @@ class DIRegistrationException(DIException):
 
 class ProviderCollisionException(DIRegistrationException):
     def __init__(self, message: str, *providers: AbstractInstanceProvider):
-         super().__init__(message)
+        super().__init__(message)
 
-         self.providers = providers
+        self.providers = providers
 
     def __str__(self):
         return f"[{self.args[0]} {self.providers[1].location()} collides with {self.providers[0].location()}"
@@ -610,8 +609,7 @@ class Providers:
                     if result is not None:
                         raise ProviderCollisionException(f"type {clazz.__name__} already registered", result, provider)
 
-                    else:
-                        result = provider
+                    result = provider
 
             return result
 
@@ -658,7 +656,7 @@ class Providers:
 
         # filter conditional providers and fill base classes as well
 
-        for provider_type, providers in Providers.providers.items():
+        for provider_type, _ in Providers.providers.items():
             matching_provider = filter_type(provider_type)
             if matching_provider is not None:
                 cache_provider_for_type(matching_provider, provider_type)

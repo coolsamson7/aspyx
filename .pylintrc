@@ -456,7 +456,8 @@ disable=raw-checker-failed,
         protected-access,
         unused-argument,
         disallowed-name,
-        useless-parent-delegation
+        useless-parent-delegation,
+        too-many-locals
 
 
 # Enable the message, report, category or checker with the given id(s). You can

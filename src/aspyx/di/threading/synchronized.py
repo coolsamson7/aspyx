@@ -21,7 +21,9 @@ def synchronized():
 
 @advice
 class SynchronizeAdvice():
-    __slots__ = ("locks")
+    __slots__ = [
+        "locks"
+    ]
 
     # constructor
 
@@ -41,6 +43,11 @@ class SynchronizeAdvice():
     # around
 
     @around(methods().decorated_with(synchronized))
-    def synchronize(self, invocation: Invocation):
+    def synchronize_sync(self, invocation: Invocation):
         with self.get_lock(invocation.args[0]):
             return invocation.proceed()
+
+    @around(methods().decorated_with(synchronized).that_are_async())
+    async def synchronize_async(self, invocation: Invocation):
+        with self.get_lock(invocation.args[0]):
+            return await invocation.proceed_async()
