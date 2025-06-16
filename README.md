@@ -32,37 +32,34 @@
 
 # Motivation
 
-While working on some AI related topics in Python, i required a simple DI framework. 
-Looking at the existing solutions - there are quite a number of - i was not quite happy. Either the solutions 
-lacked functionality - starting with that usually aop and di are separate libraries -, that i am accustomed to from other languages, or the API was in my mind too clumsy and "technical".
+While working on AI-related projects in Python, I was looking for a lightweight dependency injection (DI) framework. After evaluating existing options, I found that many either lacked key features — such as integrated AOP — or had APIs that felt overly technical or cumbersome.
 
 So, why not develop one on my own...Having done that in other languages previously, the task was not that hard, and last but not least...it is fun :-) 
 
 # Introduction
 
-Aspyx is a small python libary, that adds support for both dependency injection and aop.
+Aspyx is a lightweight Python library that provides both Dependency Injection (DI) and Aspect-Oriented Programming (AOP) support.
 
 The following di features are supported 
 - constructor and setter injection
 - possibility to define custom injections
 - post processors
 - support for factory classes and methods
-- support for eager construction
+- support for eager and lazy construction
 - support for scopes singleton, request and thread
 - possibilty to add custom scopes
-- conditional registration of classes and factories 
-- lifecycle events methods `on_init`, `on_destroy`
+- conditional registration of classes and factories ( aka profiles in spring )
+- lifecycle events methods `on_init`, `on_destroy`, `on_running`
 - bundling of injectable objects according to their module location including recursive imports and inheritance
-- instatiation of - possibly multiple - container instances - so called environments -  that manage the lifecylce of related objects
-- filtering of classes by associating "features" sets to environment ( similar to spring profiles )
+- instantiation of - possibly multiple - container instances - so called environments - that manage the lifecycle of related objects
 - hierarchical environments
 
-With respect to aop:
+With respect to AOP:
 - support for before, around, after and error aspects 
 - sync and async method support
 - `synchronized` decorator that adds locking to methods
 
-The library is thread-safe and heavily performance optimized as the crucial information is precomputed and cached!
+The library is thread-safe and heavily performance optimized as most of the runtime information is precomputed and cached!
 
 Let's look at a simple example
 
@@ -74,7 +71,7 @@ class Foo:
     def __init__(self):
         pass
 
-    def hello(msg: str):
+    def hello(self, msg: str):
         print(f"hello {msg}")
 
 @injectable()  # eager and singleton by default
@@ -95,9 +92,11 @@ class SampleEnvironment:
     def __init__(self):
         pass
 
-# go, forrest
+# create environment
 
 environment = Environment(SampleEnvironment)
+
+# fetch an instance
 
 bar = env.get(Bar)
 
@@ -117,17 +116,15 @@ class SampleAdvice:
 
     @before(methods().named("hello").of_type(Foo))
     def call_before(self, invocation: Invocation):
-        print("before Foo.hello(...)")
+        ...
 
     @error(methods().named("hello").of_type(Foo))
     def call_error(self, invocation: Invocation):
-        print("error Foo.hello(...)")
-        print(invocation.exception)
+        ... # exception accessible in invocation.exception
 
     @around(methods().named("hello"))
     def call_around(self, invocation: Invocation):
-        print("around Foo.hello()")
-
+        ...
         return invocation.proceed()
 ```
 
@@ -164,7 +161,7 @@ class Foo:
     def __init__(self):
         pass
 ```
-Please make sure, that the class defines a local constructor, as this is required to determine injected instances. 
+⚠️ **Attention:** Please make sure, that the class defines a local constructor, as this is _required_ to determine injected instances. 
 All referenced types will be injected by the environemnt. 
 
 Only eligible types are allowed, of course!
@@ -266,7 +263,7 @@ class DevOnly:
         pass
 
 @environment()
-class SampleEnvironmen()):
+class SampleEnvironmen():
     def __init__(self):
         pass
 
@@ -279,7 +276,7 @@ By adding an `imports: list[Type]` parameter, specifying other environment types
 **Example**: 
 ```python
 @environment()
-class SampleEnvironmen(imports=[OtherEnvironment])):
+class SampleEnvironmen(imports=[OtherEnvironment]):
     def __init__(self):
         pass
 ```
@@ -325,7 +322,7 @@ Constructing a new instance involves a number of steps executed in this order
   different decorators can mark methods that should be called during the lifecycle ( here the construction ) of an instance.
   These are various injection possibilities as well as an optional final `on_init` call
 - PostProcessors  
-  Any custom post processors, that can add isde effects or modify the instances
+  Any custom post processors, that can add side effects or modify the instances
 
 ## Injection methods
 
@@ -395,7 +392,7 @@ def get(self, provider: AbstractInstanceProvider, environment: Environment, argP
 Arguments are:
 - `provider` the actual provider that will create an instance
 - `environment`the requesting environment
-- `argPovider` a function that can be called to compute the required arguments recursively
+- `argProvider` a function that can be called to compute the required arguments recursively
 
 **Example**: The simplified code of the singleton provider ( disregarding locking logic )
 
@@ -425,7 +422,7 @@ It is possible to define different Aspects, that will be part of method calling 
 Advice classes need to be part of classes that add a `@advice()` decorator and can define methods that add aspects.
 
 ```python
-@advice()
+@advice
 class SampleAdvice:
     def __init__(self):  # could inject dependencies
         pass
@@ -452,7 +449,7 @@ Different aspects - with the appropriate decorator - are possible:
 - `before`  
    methods that will be executed _prior_ to the original method
 - `around`  
-   methods that will be executed _around_ to the original method giving it the possibility to add side effects or even change the parameters.
+   methods that will be executed _around_ to the original method allowing you to add side effects or even modify parameters.
 - `after`  
    methods that will be executed _after_ to the original method
 - `error`  
@@ -464,9 +461,10 @@ All methods are expected to have single `Invocation` parameter, that stores
 - `args` the supplied args
 - `kwargs` the keywords args
 - `result` the result ( initially `None`)
-- `exception` a possible caught exppetion ( initially `None`)
+- `exception` a possible caught exception ( initially `None`)
 
-It is essential for `around` methods to call `proceed()` on the invocation, which will call the next around method in the chain and finally the original method.
+⚠️ **Attention:** It is essential for `around` methods to call `proceed()` on the invocation, which will call the next around method in the chain and finally the original method.
+
 If the `proceed` is called with parameters, they will replace the original parameters! 
 
 **Example**: Parameter modifications
@@ -499,7 +497,7 @@ The fluent methods `named`, `matches` and `of_type` can be called multiple times
 **Example**: react on both `transactional` decorators on methods or classes
 
 ```python
-@injectable()
+@advice
 class TransactionAdvice:
     def __init__(self):
         pass
@@ -509,7 +507,7 @@ class TransactionAdvice:
         ...
 ```
 
-With respect to async methods, you need to make sure, to replace a `proceeed()` with a `await proceed_async()` to have the overall chain async!
+With respect to async methods, you need to make sure, to replace a `proceed()` with a `await proceed_async()` to have the overall chain async!
 
 A handy decorator `@synchronized` is implemented that automatically synchronizes methods with a `RLock` associated with the instance.
 
@@ -530,7 +528,7 @@ class Foo:
 
 If required a coercion will be executed.
 
-This concept relies on a central object `ConfigurationManager` that stores the overall configuration values as provided by so called configuration sources that are defined as follows.
+Configuration values are managed centrally using a `ConfigurationManager`, which aggregates values from various configuration sources that are defined as follows.
 
 ```python
 class ConfigurationSource(ABC):
@@ -665,7 +663,7 @@ def transactional(scope):
 **1.3.0**
 
 - added `@conditional`
-- adde supoort for `async` advices
+- added support for `async` advices
 
 
       
