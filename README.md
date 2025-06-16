@@ -62,7 +62,7 @@ With respect to aop:
 - sync and async method support
 - `synchronized` decorator that adds locking to methods
 
-The library is thread-safe!
+The library is thread-safe and heavily performance optimized as the crucial information is precomputed and cached!
 
 Let's look at a simple example
 
@@ -647,7 +647,6 @@ def transactional(scope):
     return decorator
 ```
 
-
 # Version History
 
 **1.0.1**
@@ -663,7 +662,10 @@ def transactional(scope):
 
 - added `YamlConfigurationSource`
 
-**1.2.1**
+**1.3.0**
+
+- added `@conditional`
+- adde supoort for `async` advices
 
 
       
