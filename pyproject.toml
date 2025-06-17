@@ -20,5 +20,5 @@ where = ["src"]
 
 [project.optional-dependencies]
 dev = [
-#    "handsdown"
+    "mkdocstrings-python"
 ]
