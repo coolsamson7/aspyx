@@ -1,0 +1,25 @@
+site_name: Aspyx
+site_url: https://coolsamson7.github.io/aspyx/
+repo_url: https://github.com/coolsamson7/aspyx
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.indexes
+    - content.code.copy
+
+nav:
+  - Home: index.md
+  - Docs: api.md
+
+markdown_extensions:
+  - toc:
+      permalink: true
+  - admonition
+  - codehilite
+  - footnotes
+  - pymdownx.superfences
+  - pymdownx.tabbed
+
+plugins:
+  - search
