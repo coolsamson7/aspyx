@@ -23,3 +23,4 @@ markdown_extensions:
 
 plugins:
   - search
+  - mkdocstrings

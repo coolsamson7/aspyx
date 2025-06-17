@@ -75,6 +75,7 @@ class SampleAdvice:
         self.after_calls = 0
         self.around_calls = 0
         self.error_calls = 0
+        self.afters = []
 
         self.exception = None
 
@@ -85,6 +86,8 @@ class SampleAdvice:
         self.after_calls = 0
         self.around_calls = 0
         self.error_calls = 0
+
+        self.afters.clear()
 
         self.exception = None
 
@@ -110,6 +113,19 @@ class SampleAdvice:
     @after(methods().named("say"))
     def call_after(self, invocation: Invocation):
         self.after_calls += 1
+        self.afters.append(0)
+
+    @after(methods().named("say"))
+    @order(2)
+    def call_after2(self, invocation: Invocation):
+        self.after_calls += 1
+        self.afters.append(2)
+
+    @after(methods().named("say"))
+    @order(1)
+    def call_after1(self, invocation: Invocation):
+        self.after_calls += 1
+        self.afters.append(1)
 
     @around(methods().that_are_async())
     async def call_around_async(self, invocation: Invocation):
@@ -150,10 +166,20 @@ class TestAsyncAdvice(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result, "hello world")
 
 class TestAdvice(unittest.TestCase):
+    def test_order(self):
+        advice = environment.get(SampleAdvice)
+
+        advice.reset()
+        foo = environment.get(Foo)
+
+        foo.say("world")
+
+        self.assertTrue( advice.afters == sorted( advice.afters))
 
     def test_advice(self):
         advice = environment.get(SampleAdvice)
 
+        advice.reset()
         foo = environment.get(Foo)
 
         self.assertIsNotNone(foo)
@@ -166,7 +192,7 @@ class TestAdvice(unittest.TestCase):
 
         self.assertEqual(advice.before_calls, 1)
         self.assertEqual(advice.around_calls, 1)
-        self.assertEqual(advice.after_calls, 1)
+        self.assertEqual(advice.after_calls, 3)
 
         advice.reset()
 
@@ -178,11 +204,13 @@ class TestAdvice(unittest.TestCase):
 
         self.assertEqual(advice.before_calls, 1)
         self.assertEqual(advice.around_calls, 2)
-        self.assertEqual(advice.after_calls, 1)
+        self.assertEqual(advice.after_calls, 3)
 
     def test_error(self):
         foo = environment.get(Foo)
         advice = environment.get(SampleAdvice)
+
+        advice.reset()
 
         try:
             foo.throw_error()

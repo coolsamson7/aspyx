@@ -1,3 +1,3 @@
 # API Documentation
 
-::: aspyx.di
+::: aspyx

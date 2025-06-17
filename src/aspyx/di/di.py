@@ -5,6 +5,9 @@ from __future__ import annotations
 
 import inspect
 import logging
+import importlib
+import pkgutil
+import sys
 
 from abc import abstractmethod, ABC
 from enum import Enum
@@ -916,6 +919,30 @@ class Environment:
 
             self.providers[type] = provider
 
+        def get_type_package(type: Type):
+            module_name = type.__module__
+            module = sys.modules[module_name]
+
+            return module.__package__
+
+        def import_package(name: str):
+            """Import a package and all its submodules recursively."""
+            package = importlib.import_module(name)
+            results = {name: package}
+
+            if hasattr(package, '__path__'):  # it's a package, not a single file
+                for finder, name, ispkg in pkgutil.walk_packages(package.__path__, prefix=package.__name__ + "."):
+                    try:
+                        Environment.logger.debug("import module %s", name)
+
+                        print("######## import " + name)
+                        submodule = importlib.import_module(name)
+                        results[name] = submodule
+                    except Exception as e:
+                        print(f"Failed to import {name}: {e}")
+
+            return results
+
         def load_environment(env: Type):
             if env not in loaded:
                 Environment.logger.debug("load environment %s", env.__qualname__)
@@ -928,9 +955,11 @@ class Environment:
                 if decorator is None:
                     raise DIRegistrationException(f"{env.__name__} is not an environment class")
 
-                scan = env.__module__
-                if "." in scan:
-                    scan = scan.rsplit('.', 1)[0]
+                # package
+
+                package_name = get_type_package(env)
+
+                #import_package(package_name) TODO
 
                 # recursion
 
@@ -940,7 +969,7 @@ class Environment:
                 # filter and load providers according to their module
 
                 for type, provider in overall_providers.items():
-                    if provider.get_module().startswith(scan):
+                    if provider.get_module().startswith(package_name):
                         add_provider(type, provider)
         # go
 
@@ -956,6 +985,14 @@ class Environment:
 
         for instance in self.instances:
             self.execute_processors(Lifecycle.ON_RUNNING, instance)
+
+    def is_registered_type(self, type: Type) -> bool:
+        provider = self.providers.get(type, None)
+        return provider is not None and not isinstance(provider, AmbiguousProvider)
+
+    def registered_types(self,  predicate: Callable[[Type], bool]) -> list[Type]:
+        return [provider.get_type() for provider in self.providers.values()
+                if predicate(provider.get_type())]
 
     # internal
 

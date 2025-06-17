@@ -29,12 +29,16 @@ class Decorators:
     Utility class that caches decorators ( Python does not have a feature for this )
     """
     @classmethod
-    def add(cls, func, decorator, *args):
+    def add(cls, func, decorator: Callable, *args):
         decorators = getattr(func, '__decorators__', None)
         if decorators is None:
             setattr(func, '__decorators__', [DecoratorDescriptor(decorator, *args)])
         else:
             decorators.append(DecoratorDescriptor(decorator, *args))
+
+    @classmethod
+    def has_decorator(cls, func, callable: Callable) -> bool:
+        return any(decorator.decorator is callable for decorator in Decorators.get(func))
 
     @classmethod
     def get(cls, func) -> list[DecoratorDescriptor]:
@@ -68,6 +72,12 @@ class TypeDescriptor:
             self.return_type = type_hints.get('return', None)
 
         # public
+
+        def get_name(self) -> str:
+            return self.method.__name__
+
+        def get_doc(self, default = "") -> str:
+            return self.method.__doc__ or default
 
         def is_async(self) -> bool:
             return inspect.iscoroutinefunction(self.method)

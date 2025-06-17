@@ -16,7 +16,7 @@ from .di_import import ImportedEnvironment, ImportedClass
 # not here
 
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format='[%(asctime)s] %(levelname)s in %(filename)s:%(lineno)d - %(message)s'
 )
 
@@ -24,7 +24,7 @@ def configure_logging(levels: Dict[str, int]) -> None:
     for name in levels:
         logging.getLogger(name).setLevel(levels[name])
 
-#configure_logging({"aspyx": logging.DEBUG})
+configure_logging({"aspyx": logging.DEBUG})
 
 @injectable()
 @order(10)

@@ -260,7 +260,7 @@ class FunctionAspect(Aspect):
         self.instance = instance
         self.func = func
 
-        self.order = next((decorator.args[0] for decorator in Decorators.get(func) if decorator.decorator is order), 100)
+        self.order = next((decorator.args[0] for decorator in Decorators.get(func) if decorator.decorator is order), 0)
 
     def call(self, invocation: 'Invocation'):
         invocation.current_aspect = self
