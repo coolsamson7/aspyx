@@ -14,6 +14,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: pip install -r requirements.txt
+      - run: pip install -e
       - run: pip install pytest
       - run: echo "PYTHONPATH=$PWD/src:$PWD/tests" >> $GITHUB_ENV
       - run: pytest
