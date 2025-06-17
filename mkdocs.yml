@@ -10,7 +10,14 @@ theme:
 
 nav:
   - Home: index.md
-  - Docs: api.md
+  - API Reference:
+      - Util: api/util.md
+      - Reflection: api/reflection.md
+      - Util: api/util.md
+      - Configuration: api/configuration.md
+      - Threading: api/threading.md
+      - DI: api/di.md
+      - AOP: api/aop.md
 
 markdown_extensions:
   - toc:
