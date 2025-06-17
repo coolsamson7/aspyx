@@ -8,7 +8,7 @@
 [![PyPI](https://img.shields.io/pypi/v/aspyx)](https://pypi.org/project/aspyx/)
 [![Docs](https://img.shields.io/badge/docs-online-blue?logo=github)](https://yourusername.coolsamson7.io/aspyx/)
 
-## Table of Contents
+## Table of Contents 
 
 - [Motivation](#motivation)
 - [Introduction](#introduction)
