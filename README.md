@@ -6,7 +6,7 @@
 ![License](https://img.shields.io/github/license/coolsamson7/aspyx)
 ![coverage](https://img.shields.io/badge/coverage-94%25-brightgreen)
 [![PyPI](https://img.shields.io/pypi/v/aspyx)](https://pypi.org/project/aspyx/)
-[![Docs](https://img.shields.io/badge/docs-online-blue?logo=github)](https://yourusername.coolsamson7.io/aspyx/)
+[![Docs](https://img.shields.io/badge/docs-online-blue?logo=github)](https://coolsamson7.github.io/aspyx/)
 
 ## Table of Contents 
 
