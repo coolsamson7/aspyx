@@ -6,6 +6,7 @@
 ![License](https://img.shields.io/github/license/coolsamson7/aspyx)
 ![coverage](https://img.shields.io/badge/coverage-94%25-brightgreen)
 [![PyPI](https://img.shields.io/pypi/v/aspyx)](https://pypi.org/project/aspyx/)
+[![Docs](https://img.shields.io/badge/docs-online-blue?logo=github)](https://yourusername.coolsamson7.io/aspyx/)
 
 ## Table of Contents
 
@@ -26,22 +27,29 @@
   - [Post Processors](#post-processors)
 - [Custom scopes](#custom-scopes)
 - [AOP](#aop)
+- [Threading](#threading)
 - [Configuration](#configuration)
 - [Reflection](#reflection)
 - [Version History](#version-history)
 
 # Motivation
 
-While working on AI-related projects in Python, I was looking for a lightweight dependency injection (DI) framework. After evaluating existing options, I found that many either lacked key features — such as integrated AOP — or had APIs that felt overly technical or cumbersome.
+While working on AI-related projects in Python, I was looking for a lightweight dependency injection (DI) framework. After evaluating existing options, I found that the most either lacked key features — such as integrated AOP — or had APIs that felt overly technical and complex, which made me develop a lightweight libary on my own with the following goals
 
-So, why not develop one on my own...Having done that in other languages previously, the task was not that hard, and last but not least...it is fun :-) 
+- bring both di and aop features together,
+- be as minimal invasive as possible,
+- offering mechanisms to easily extend and customize features without touching the core,
+- while still offering a _simple_ and _readable_ api that doesnt overwhelm developers
+
+Especially the AOP integration definitely makes sense, as aspects on their own also usually require a context, which in a DI world is simply injected.
 
 # Introduction
 
 Aspyx is a lightweight Python library that provides both Dependency Injection (DI) and Aspect-Oriented Programming (AOP) support.
 
-The following di features are supported 
+The following DI features are supported 
 - constructor and setter injection
+- injection of configuration variables
 - possibility to define custom injections
 - post processors
 - support for factory classes and methods
@@ -57,7 +65,6 @@ The following di features are supported
 With respect to AOP:
 - support for before, around, after and error aspects 
 - sync and async method support
-- `synchronized` decorator that adds locking to methods
 
 The library is thread-safe and heavily performance optimized as most of the runtime information is precomputed and cached!
 
@@ -250,6 +257,8 @@ environment = Environment(SampleEnvironment)
 ```
 
 The default is that all eligible classes, that are implemented in the containing module or in any submodule will be managed.
+THe container will import the module and its children automatically. No need to add artifical improt statements!
+
 
 By adding the parameter `features: list[str]`, it is possible to filter injectables by evaluating the corresponding `@conditional` decorators.
 
@@ -429,20 +438,26 @@ class SampleAdvice:
 
     @before(methods().named("hello").of_type(Foo))
     def call_before(self, invocation: Invocation):
-        # arguments: invocation.args
-        print("before Foo.hello(...)")
+        # arguments: invocation.args and invocation.kwargs
+        ...
+
+     @after(methods().named("hello").of_type(Foo))
+    def call_after(self, invocation: Invocation):
+        # arguments: invocation.args and invocation.kwargs
+        ...
 
     @error(methods().named("hello").of_type(Foo))
     def call_error(self, invocation: Invocation):
          # error: invocation.exception
-        print("error Foo.hello(...)")
-        print(invocation.exception)
+        ...
 
     @around(methods().named("hello"))
     def call_around(self, invocation: Invocation):
-        print("around Foo.hello()")
-
-        return invocation.proceed()  # will leave a result in invocation.result or invocation.exception in case of an exception
+        try:
+            ...
+            return invocation.proceed()  # will leave a result in invocation.result or invocation.exception in case of an exception
+        finally:
+            ...
 ```
 
 Different aspects - with the appropriate decorator - are possible:
@@ -455,10 +470,12 @@ Different aspects - with the appropriate decorator - are possible:
 - `error`  
    methods that will be executed in case of a caught exception
 
+The different aspcets can be supplemented with an `@order(<prio>)` decorator that controls the execution order based on the passed number. Smaller values get executed first. 
+
 All methods are expected to have single `Invocation` parameter, that stores
 
 - `func` the target function
-- `args` the supplied args
+- `args` the supplied args ( including the `self` instance as the first element)
 - `kwargs` the keywords args
 - `result` the result ( initially `None`)
 - `exception` a possible caught exception ( initially `None`)
@@ -509,7 +526,21 @@ class TransactionAdvice:
 
 With respect to async methods, you need to make sure, to replace a `proceed()` with a `await proceed_async()` to have the overall chain async!
 
-A handy decorator `@synchronized` is implemented that automatically synchronizes methods with a `RLock` associated with the instance.
+# Threading
+
+A handy decorator `@synchronized` in combination with the respective advice is implemented that automatically synchronizes methods with a `RLock` associated with the instance.
+
+**Example**:
+```python
+@injectable()
+class Foo:
+    def __init__(self):
+        pass
+
+    @synchronized()
+    def execute_synchronized(self):
+        ...
+```
 
 # Configuration 
 
