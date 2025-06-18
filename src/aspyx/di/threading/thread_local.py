@@ -1,3 +1,7 @@
+"""
+Some threading related utilities.
+"""
+
 import threading
 
 from typing import Callable, Optional, TypeVar, Generic

@@ -52,7 +52,7 @@ class Bar:
     def say(self, message: str):
         return f"hello {message}"
 
-@injectable()
+@injectable(eager=False)
 class Foo:
     def __init__(self, bar: Bar):
         self.bar = bar

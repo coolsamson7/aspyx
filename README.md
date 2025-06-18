@@ -34,9 +34,9 @@
 
 # Motivation
 
-While working on AI-related projects in Python, I was looking for a lightweight dependency injection (DI) framework. After evaluating existing options, I found that the most either lacked key features — such as integrated AOP — or had APIs that felt overly technical and complex, which made me develop a lightweight libary on my own with the following goals
+While working on AI-related projects in Python, I was looking for a dependency injection (DI) framework. After evaluating existing options, my impression was that the most either lacked key features — such as integrated AOP — or had APIs that felt overly technical and complex, which made me develop a library on my own with the following goals
 
-- bring both di and aop features together,
+- bring both di and AOP features together in a lightweight library,
 - be as minimal invasive as possible,
 - offering mechanisms to easily extend and customize features without touching the core,
 - while still offering a _simple_ and _readable_ api that doesnt overwhelm developers
@@ -55,7 +55,7 @@ The following DI features are supported
 - support for factory classes and methods
 - support for eager and lazy construction
 - support for scopes singleton, request and thread
-- possibilty to add custom scopes
+- possibility to add custom scopes
 - conditional registration of classes and factories ( aka profiles in spring )
 - lifecycle events methods `on_init`, `on_destroy`, `on_running`
 - bundling of injectable objects according to their module location including recursive imports and inheritance
@@ -64,6 +64,7 @@ The following DI features are supported
 
 With respect to AOP:
 - support for before, around, after and error aspects 
+- simple fluent interface to specify which methods are targeted by an aspect
 - sync and async method support
 
 The library is thread-safe and heavily performance optimized as most of the runtime information is precomputed and cached!
@@ -110,7 +111,7 @@ bar = env.get(Bar)
 bar.foo.hello("world")
 ```
 
-The concepts should be pretty familiar as well as the names which are a combination of Spring and Angular names :-)
+The concepts should be pretty familiar as well as the names as they are inspired by both Spring and Angular.
 
 Let's add some aspects...
 
@@ -169,7 +170,7 @@ class Foo:
         pass
 ```
 ⚠️ **Attention:** Please make sure, that the class defines a local constructor, as this is _required_ to determine injected instances. 
-All referenced types will be injected by the environemnt. 
+All referenced types will be injected by the environment. 
 
 Only eligible types are allowed, of course!
 
@@ -257,7 +258,7 @@ environment = Environment(SampleEnvironment)
 ```
 
 The default is that all eligible classes, that are implemented in the containing module or in any submodule will be managed.
-THe container will import the module and its children automatically. No need to add artifical improt statements!
+THe container will import the module and its children automatically. No need to add artificial import statements!
 
 
 By adding the parameter `features: list[str]`, it is possible to filter injectables by evaluating the corresponding `@conditional` decorators.
@@ -318,7 +319,7 @@ The container knows about class hierarchies and is able to `get` base classes, a
 
 In case of ambiguities, it will throw an exception.
 
-Please be aware, that a base class are not _required_ to be annotated with `@injectable`, as this would mean, that it could be created on its own as well. ( Which is possible as well, btw. ) 
+Note that a base class are not _required_ to be annotated with `@injectable`, as this would mean, that it could be created on its own as well. ( Which is possible as well, btw. ) 
 
 # Instantiation logic
 
@@ -384,7 +385,7 @@ class SamplePostProcessor(PostProcessor):
 
 Any implementing class of `PostProcessor` that is eligible for injection will be called by passing the new instance.
 
-Please be aware, that a post processor will only handle instances _after_ its _own_ registration.
+Note that a post processor will only handle instances _after_ its _own_ registration.
 
 As injectables within a single file will be handled in the order as they are declared, a post processor will only take effect for all classes after its declaration!
 
@@ -426,7 +427,7 @@ class SingletonScope(Scope):
 
 # AOP
 
-It is possible to define different Aspects, that will be part of method calling flow. This logic fits nicely in the library, since the DI framework controls the instantiation logic and can handle aspects within a regular post processor. 
+It is possible to define different aspects, that will be part of method calling flow. This logic fits nicely in the library, since the DI framework controls the instantiation logic and can handle aspects within a regular post processor. 
 
 Advice classes need to be part of classes that add a `@advice()` decorator and can define methods that add aspects.
 
@@ -470,7 +471,7 @@ Different aspects - with the appropriate decorator - are possible:
 - `error`  
    methods that will be executed in case of a caught exception
 
-The different aspcets can be supplemented with an `@order(<prio>)` decorator that controls the execution order based on the passed number. Smaller values get executed first. 
+The different aspects can be supplemented with an `@order(<prio>)` decorator that controls the execution order based on the passed number. Smaller values get executed first. 
 
 All methods are expected to have single `Invocation` parameter, that stores
 
@@ -557,7 +558,7 @@ class Foo:
         ...
 ```
 
-If required a coercion will be executed.
+If required type coercion will be applied.
 
 Configuration values are managed centrally using a `ConfigurationManager`, which aggregates values from various configuration sources that are defined as follows.
 
@@ -636,7 +637,7 @@ class SampleEnvironment:
 
 As the library heavily relies on type introspection of classes and methods, a utility class `TypeDescriptor` is available that covers type information on classes. 
 
-After beeing instantiated with
+After being instantiated with
 
 ```python
 TypeDescriptor.for_type(<type>)
@@ -652,7 +653,7 @@ it offers the methods
 - `get_decorator(decorator) -> Optional[DecoratorDescriptor]`  
    return a descriptor covering the decorator. In addition to the callable, it also stores the supplied args in the `args` property
 
-The returned method descriptors offer:
+The returned method descriptors provide:
 - `param_types`  
    list of arg types
 - `return_type`  

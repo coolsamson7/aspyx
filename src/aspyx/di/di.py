@@ -161,6 +161,13 @@ class SingletonScopeInstanceProvider(InstanceProvider):
     def create(self, environment: Environment, *args):
         return SingletonScope()
 
+class EnvironmentScopeInstanceProvider(InstanceProvider):
+    def __init__(self):
+        super().__init__(SingletonScopeInstanceProvider, SingletonScope, False, "request")
+
+    def create(self, environment: Environment, *args):
+        return EnvironmentScope()
+
 class RequestScopeInstanceProvider(InstanceProvider):
     def __init__(self):
         super().__init__(RequestScopeInstanceProvider, RequestScope, False, "singleton")
@@ -898,11 +905,25 @@ class Environment:
         self.lifecycle_processors: list[LifecycleProcessor] = []
 
         if self.parent is not None:
-            self.providers |= self.parent.providers
-            self.lifecycle_processors += self.parent.lifecycle_processors
-        else: #if self.type is Boot:
+            # inherit providers from parent
+
+            for provider_type, inherited_provider in self.parent.providers.items():
+                if inherited_provider.get_scope() == "environment":
+                    # replace with own environment instance provider
+                    self.providers[provider_type] = EnvironmentInstanceProvider(self, cast(EnvironmentInstanceProvider, inherited_provider).provider)
+                else:
+                    self.providers[provider_type] = inherited_provider
+
+            # inherit processors unless they have an environment scope
+
+            for processor in self.parent.lifecycle_processors:
+                # environment related instances will be recreated in the own environment
+                if self.providers[type(processor)].get_scope() != "environment":
+                    self.lifecycle_processors.append(processor)
+        else:
             self.providers[SingletonScope] = SingletonScopeInstanceProvider()
             self.providers[RequestScope]   = RequestScopeInstanceProvider()
+            self.providers[EnvironmentScope] = EnvironmentScopeInstanceProvider()
 
         self.instances = []
 
@@ -935,11 +956,18 @@ class Environment:
                     try:
                         Environment.logger.debug("import module %s", name)
 
-                        print("######## import " + name)
-                        submodule = importlib.import_module(name)
-                        results[name] = submodule
+                        loaded = sys.modules
+
+                        if loaded.get(name, None) is None:
+                            print(f"## import module {name}")
+                            submodule = importlib.import_module(name)
+                            results[name] = submodule
+                        else:
+                            print(f"## skip module {name}")
+                            results[name] = loaded[name]
+
                     except Exception as e:
-                        print(f"Failed to import {name}: {e}")
+                        print(f"Failed to import moudle {name}: {e}")
 
             return results
 
@@ -959,12 +987,15 @@ class Environment:
 
                 package_name = get_type_package(env)
 
-                #import_package(package_name) TODO
-
                 # recursion
 
                 for import_environment in decorator.args[0] or []:
                     load_environment(import_environment)
+
+                # import package
+
+                if package_name is not None and len(package_name) > 0: # files outside of a package return None pr ""
+                    import_package(package_name)
 
                 # filter and load providers according to their module
 
@@ -1331,6 +1362,19 @@ class SingletonScope(Scope):
                     self.value = provider.create(environment, *arg_provider())
 
         return self.value
+
+@scope("environment", register=False)
+class EnvironmentScope(SingletonScope):
+    # properties
+
+    __slots__ = [
+    ]
+
+    # constructor
+
+    def __init__(self):
+        super().__init__()
+
 
 @scope("thread")
 class ThreadScope(Scope):

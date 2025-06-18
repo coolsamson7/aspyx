@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from enum import auto, Enum
 from typing import Optional, Dict, Type, Callable
 
-from aspyx.di.di import order
+from aspyx.di.di import order, EnvironmentScope
 from aspyx.reflection import Decorators, TypeDescriptor
 from aspyx.di import injectable, Providers, ClassInstanceProvider, Environment, PostProcessor
 
@@ -409,8 +409,7 @@ class Invocation:
 
         return await self.current_aspect.next.call_async(self)
 
-@injectable()
-class Advice:
+class Advices:
     # static data
 
     targets: list[AspectTarget] = []
@@ -424,8 +423,9 @@ class Advice:
 
     # methods
 
-    def collect(self, clazz, member, type: AspectType, environment: Environment):
-        aspects = [FunctionAspect(environment.get(target._clazz), target._function, None) for target in Advice.targets if target._type == type and target._clazz is not clazz and environment.providers.get(target._clazz) is not None  and target._matches(clazz, member)]
+    @classmethod
+    def collect(cls, clazz, member, type: AspectType, environment: Environment):
+        aspects = [FunctionAspect(environment.get(target._clazz), target._function, None) for target in Advices.targets if target._type == type and target._clazz is not clazz and environment.providers.get(target._clazz) is not None and target._matches(clazz, member)]
 
         # sort according to order
 
@@ -440,13 +440,14 @@ class Advice:
 
         return aspects
 
-    def aspects_for(self, instance, environment: Environment) -> Dict[Callable,Aspects]:
+    @classmethod
+    def aspects_for(cls, instance, environment: Environment) -> Dict[Callable,Aspects]:
         clazz = type(instance)
 
         result = {}
 
         for _, member in inspect.getmembers(clazz, predicate=inspect.isfunction):
-            aspects = self.compute_aspects(clazz, member, environment)
+            aspects = cls.compute_aspects(clazz, member, environment)
             if aspects is not None:
                 result[member] = aspects
 
@@ -473,11 +474,12 @@ class Advice:
 
         return value
 
-    def compute_aspects(self, clazz, member, environment: Environment) -> Optional[Aspects]:
-        befores = self.collect(clazz, member, AspectType.BEFORE, environment)
-        arounds = self.collect(clazz, member, AspectType.AROUND, environment)
-        afters = self.collect(clazz, member, AspectType.AFTER, environment)
-        errors = self.collect(clazz, member, AspectType.ERROR, environment)
+    @classmethod
+    def compute_aspects(cls, clazz, member, environment: Environment) -> Optional[Aspects]:
+        befores = cls.collect(clazz, member, AspectType.BEFORE, environment)
+        arounds = cls.collect(clazz, member, AspectType.AROUND, environment)
+        afters = cls.collect(clazz, member, AspectType.AFTER, environment)
+        errors = cls.collect(clazz, member, AspectType.ERROR, environment)
 
         if len(befores) > 0 or len(arounds) > 0 or len(afters) > 0  or len(errors) > 0:
             return Aspects(
@@ -498,7 +500,7 @@ def sanity_check(clazz: Type, name: str):
 
 def advice(cls):
     """
-    Classes decorated with @advice are treated as aspect classes.
+    Classes decorated with @advice are treated as advice classes.
     They can contain methods decorated with @before, @after, @around, or @error to define aspects.
     """
     Providers.register(ClassInstanceProvider(cls, True))
@@ -508,10 +510,10 @@ def advice(cls):
     for name, member in TypeDescriptor.for_type(cls).methods.items():
         decorator = next((decorator for decorator in member.decorators if decorator.decorator in [before, after, around, error]), None)
         if decorator is not None:
-            target = decorator.args[0] # ? ...??
+            target = decorator.args[0] # ? ...?? TODO, can be multiple
             target._clazz = cls
             sanity_check(cls, name)
-            Advice.targets.append(target)
+            Advices.targets.append(target) #??
 
     return cls
 
@@ -573,23 +575,21 @@ def around(*targets: AspectTarget):
 
     return decorator
 
-@injectable()
+@injectable(scope="environment")
 @order(0)
 class AdviceProcessor(PostProcessor):
     # properties
 
     __slots__ = [
-        "advice",
         "lock",
         "cache"
     ]
 
     # constructor
 
-    def __init__(self, advice: Advice):
+    def __init__(self):
         super().__init__()
 
-        self.advice = advice
         self.cache : Dict[Type, Dict[Callable,Aspects]] = {}
         self.lock = threading.RLock()
 
@@ -600,8 +600,8 @@ class AdviceProcessor(PostProcessor):
         result = self.cache.get(clazz, None)
         if result is None:
             with self.lock:
-                result = self.advice.aspects_for(instance, environment)
-                self.cache[clazz] = result
+                result = Advices.aspects_for(instance, environment)
+                self.cache[clazz] = result # TOID der cache ist zu dick?????
 
         return result
 
