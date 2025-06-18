@@ -182,7 +182,7 @@ class ComplexEnvironment:
 class TestDI(unittest.TestCase):
     testEnvironment = Environment(SimpleEnvironment, features=["dev"])
 
-    def xtest_conditional(self):
+    def test_conditional(self):
         env = TestDI.testEnvironment
 
         base = env.get(ConditionalBase)
