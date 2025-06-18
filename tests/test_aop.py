@@ -158,7 +158,7 @@ class SampleAdvice:
 environment = Environment(SampleEnvironment)
 
 class TestAsyncAdvice(unittest.IsolatedAsyncioTestCase):
-    async def xtest_async(self):
+    async def test_async(self):
         bar = environment.get(Bar)
 
         result = await bar.say_async("world")

@@ -302,8 +302,8 @@ class TestDI(unittest.TestCase):
 
         self.assertIsNot(ns, ns1)
 
-    def xtest_import_configurations(self):
-        env = TestDI.testEnvironment
+    def test_import_configurations(self):
+        env = Environment(ImportedEnvironment)
 
         imported = env.get(ImportedClass)
         self.assertIsNotNone(imported)
