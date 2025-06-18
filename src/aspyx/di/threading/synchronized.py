@@ -20,11 +20,7 @@ def synchronized():
     return decorator
 
 @advice
-class SynchronizeAdvice():
-    __slots__ = [
-        "locks"
-    ]
-
+class SynchronizeAdvice:
     # constructor
 
     def __init__(self):

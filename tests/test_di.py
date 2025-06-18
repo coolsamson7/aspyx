@@ -11,7 +11,7 @@ from typing import Dict
 from aspyx.di import DIException, injectable, order, on_init, on_running, on_destroy, inject_environment, inject, \
     Factory, create, environment, Environment, PostProcessor, factory, requires_feature, conditional, requires_class
 
-from .di_import import ImportedEnvironment, ImportedClass
+from di_import import ImportedEnvironment, ImportedClass
 
 # not here
 

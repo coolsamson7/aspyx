@@ -163,7 +163,7 @@ class SingletonScopeInstanceProvider(InstanceProvider):
 
 class EnvironmentScopeInstanceProvider(InstanceProvider):
     def __init__(self):
-        super().__init__(SingletonScopeInstanceProvider, SingletonScope, False, "request")
+        super().__init__(SingletonScopeInstanceProvider, SingletonScope, False, "request") # TODO?
 
     def create(self, environment: Environment, *args):
         return EnvironmentScope()
@@ -174,7 +174,6 @@ class RequestScopeInstanceProvider(InstanceProvider):
 
     def create(self, environment: Environment, *args):
         return RequestScope()
-
 
 class AmbiguousProvider(AbstractInstanceProvider):
     """
@@ -600,7 +599,7 @@ class Providers:
         Providers.check.clear()
 
     @classmethod
-    def filter(cls, environment: Environment) -> Dict[Type,AbstractInstanceProvider]:
+    def filter(cls, environment: Environment, provider_filter: Callable) -> Dict[Type,AbstractInstanceProvider]:
         cache: Dict[Type,AbstractInstanceProvider] = {}
 
         context: ConditionContext = {
@@ -624,6 +623,13 @@ class Providers:
             return result
 
         def provider_applies(provider: AbstractInstanceProvider) -> bool:
+            # is it in the right module?
+
+            if not provider_filter(provider):
+                return False
+
+            # check conditionals
+
             descriptor = TypeDescriptor.for_type(provider.get_host())
             if descriptor.has_decorator(conditional):
                 conditions: list[Condition] = [*descriptor.get_decorator(conditional).args]
@@ -685,7 +691,11 @@ class Providers:
 
         # and resolve
 
-        provider_context = Providers.ResolveContext(result)
+        providers = result
+        if environment.parent is not None:
+            providers = providers | environment.parent.providers # add parent providers
+
+        provider_context = Providers.ResolveContext(providers)
         for provider in mapped.values():
             provider.resolve(provider_context)
             provider_context.next() # clear dependencies
@@ -902,6 +912,7 @@ class Environment:
 
         self.features = features
         self.providers: Dict[Type, AbstractInstanceProvider] = {}
+        self.instances = []
         self.lifecycle_processors: list[LifecycleProcessor] = []
 
         if self.parent is not None:
@@ -914,24 +925,22 @@ class Environment:
                 else:
                     self.providers[provider_type] = inherited_provider
 
-            # inherit processors unless they have an environment scope
+            # inherit processors as is unless they have an environment scope
 
             for processor in self.parent.lifecycle_processors:
-                # environment related instances will be recreated in the own environment
                 if self.providers[type(processor)].get_scope() != "environment":
                     self.lifecycle_processors.append(processor)
+                else:
+                    # create and remember
+                    self.lifecycle_processors.append(self.get(type(processor)))
         else:
             self.providers[SingletonScope] = SingletonScopeInstanceProvider()
             self.providers[RequestScope]   = RequestScopeInstanceProvider()
             self.providers[EnvironmentScope] = EnvironmentScopeInstanceProvider()
 
-        self.instances = []
-
         Environment.instance = self
 
-        # filter conditional providers
-
-        overall_providers = Providers.filter(self)
+        prefix_list : list[str] = []
 
         loaded = set()
 
@@ -954,20 +963,19 @@ class Environment:
             if hasattr(package, '__path__'):  # it's a package, not a single file
                 for finder, name, ispkg in pkgutil.walk_packages(package.__path__, prefix=package.__name__ + "."):
                     try:
-                        Environment.logger.debug("import module %s", name)
-
                         loaded = sys.modules
 
                         if loaded.get(name, None) is None:
-                            print(f"## import module {name}")
+                            Environment.logger.debug("import module %s", name)
+
                             submodule = importlib.import_module(name)
                             results[name] = submodule
                         else:
-                            print(f"## skip module {name}")
+                            # skip import
                             results[name] = loaded[name]
 
                     except Exception as e:
-                        print(f"Failed to import moudle {name}: {e}")
+                        Environment.logger.info("failed to import module %s due to %s", name, str(e))
 
             return results
 
@@ -999,12 +1007,26 @@ class Environment:
 
                 # filter and load providers according to their module
 
-                for type, provider in overall_providers.items():
-                    if provider.get_module().startswith(package_name):
-                        add_provider(type, provider)
+                module_prefix = package_name
+                if len(module_prefix) == 0:
+                    module_prefix = env.__module__
+
+                prefix_list.append(module_prefix)
+
         # go
 
         load_environment(env)
+
+        # filter according to the prefix list
+
+        def filter_provider(provider: AbstractInstanceProvider) -> bool:
+            for prefix in prefix_list:
+                if provider.get_host().__module__.startswith(prefix):
+                    return True
+
+            return False
+
+        self.providers.update(Providers.filter(self, filter_provider))
 
         # construct eager objects for local providers
 
