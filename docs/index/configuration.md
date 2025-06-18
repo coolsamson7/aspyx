@@ -34,8 +34,9 @@ The `load` method is able to return a tree-like structure by returning a `dict`.
 Configuration variables are retrieved with the method
 
 ```python
-def get(self, path: str, type: Type[T], default : Optional[T]=None) -> T:
- ```
+def get(self, path: str, type: Type[T], default : Optional[T]=None) -> T
+```
+
 
 - `path`  
   a '.' separated path
@@ -65,6 +66,7 @@ class SampleConfigurationSource(ConfigurationSource):
 ```
 
 Two specific source are already implemented:
+
 - `EnvConfigurationSource`  
    reads the os environment variables
 - `YamlConfigurationSource`  

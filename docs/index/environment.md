@@ -21,12 +21,14 @@ All referenced types will be injected by the environment.
 Only eligible types are allowed, of course!
 
 The decorator accepts the keyword arguments
+
 - `eager : boolean`  
   if `True`, the container will create the instances automatically while booting the environment. This is the default.
 - `scope: str`  
   the name of a - registered - scope which will determine how often instances will be created.
 
  The following scopes are implemented out of the box:
+
  - `singleton`  
    objects are created once inside an environment and cached. This is the default.
  - `request`  
@@ -82,6 +84,7 @@ All `@injectable` declarations can be supplemented with
 decorators that act as filters in the context of an environment.
 
 Valid conditions are created by:
+
 - `requires_class(clazz: Type)`  
   the injectable is valid, if the specified class is registered as well.
 - `requires_feature(feature: str)`  
@@ -170,6 +173,7 @@ Note that a base class are not _required_ to be annotated with `@injectable`, as
 # Instantiation logic
 
 Constructing a new instance involves a number of steps executed in this order
+
 - Constructor call  
   the constructor is called with the resolved parameters
 - Advice injection  
@@ -210,6 +214,7 @@ class Foo:
 ## Lifecycle methods
 
 It is possible to mark specific lifecyle methods. 
+
 - `@on_init()` 
    called after the constructor and all other injections.
 - `@on_running()` 
@@ -246,6 +251,7 @@ def get(self, provider: AbstractInstanceProvider, environment: Environment, argP
 ```
 
 Arguments are:
+
 - `provider` the actual provider that will create an instance
 - `environment`the requesting environment
 - `argProvider` a function that can be called to compute the required arguments recursively

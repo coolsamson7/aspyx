@@ -10,6 +10,7 @@ TypeDescriptor.for_type(<type>)
 ```
 
 it offers the methods
+
 - `get_methods(local=False)`  
    return a list of either local or overall methods
 - `get_method(name: str, local=False)`  
@@ -20,6 +21,7 @@ it offers the methods
    return a descriptor covering the decorator. In addition to the callable, it also stores the supplied args in the `args` property
 
 The returned method descriptors provide:
+
 - `param_types`  
    list of arg types
 - `return_type`  

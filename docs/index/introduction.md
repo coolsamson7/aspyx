@@ -3,7 +3,8 @@
 
 Aspyx is a lightweight Python library that provides both Dependency Injection (DI) and Aspect-Oriented Programming (AOP) support.
 
-The following DI features are supported 
+The following DI features are supported:
+
 - constructor and setter injection
 - injection of configuration variables
 - possibility to define custom injections
@@ -19,6 +20,7 @@ The following DI features are supported
 - hierarchical environments
 
 With respect to AOP:
+
 - support for before, around, after and error aspects 
 - simple fluent interface to specify which methods are targeted by an aspect
 - sync and async method support
