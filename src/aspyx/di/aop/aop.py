@@ -98,7 +98,7 @@ class AspectTarget(ABC):
 
      # fluent
 
-    def function(self, func):
+    def function(self, func) -> AspectTarget:
         self._function = func
         return self
 
@@ -107,30 +107,34 @@ class AspectTarget(ABC):
 
         return self
 
-    def that_are_async(self):
+    def that_are_async(self) -> AspectTarget:
         """
         matches methods that are async
-        :
-            self
+        
+        Returns:
+            AspectTarget: self
         """
         self._async = True
         return self
 
-    def of_type(self, type: Type):
+    def of_type(self, type: Type) -> AspectTarget:
         """
         matches methods belonging to a class or classes that are subclasses of the specified type
 
+        Args:
+            type (Type): the type to match against
         Returns:
             AspectTarget: self
         """
         self.types.append(type)
         return self
 
-    def decorated_with(self, decorator):
+    def decorated_with(self, decorator: Callable) -> AspectTarget:
         """
         matches methods or classes that are decorated with the specified decorator
+
         Args:
-         decorator: the decorator callable
+            decorator (Callable): the decorator callable
 
         Returns:
             AspectTarget: self
@@ -138,14 +142,29 @@ class AspectTarget(ABC):
         self.decorators.append(decorator)
         return self
 
-    def matches(self, pattern: str):
+    def matches(self, pattern: str) -> AspectTarget:
         """
         Matches the target against a pattern.
+
+        Args:
+            pattern (str): the pattern
+
+        Returns:
+            AspectTarget: self
         """
         self.patterns.append(re.compile(pattern))
         return self
 
-    def named(self, name: str):
+    def named(self, name: str) -> AspectTarget:
+        """
+        Matches the target against a name.
+
+        Args:
+            name (str): the name
+
+        Returns:
+            AspectTarget: self
+        """
         self.names.append(name)
         return self
 
