@@ -2,12 +2,10 @@
 threading utilities
 """
 from .synchronized import synchronized, SynchronizeAdvice
-from .thread_local import ThreadLocal
 
-imports = [synchronized, SynchronizeAdvice, ThreadLocal]
+imports = [synchronized, SynchronizeAdvice]
 
 __all__ = [
     "synchronized",
     "SynchronizeAdvice",
-    "ThreadLocal",
 ]

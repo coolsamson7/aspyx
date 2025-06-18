@@ -14,7 +14,7 @@ from enum import Enum
 import threading
 from typing import Type, Dict, TypeVar, Generic, Optional, cast, Callable, TypedDict
 
-from aspyx.di.util import StringBuilder
+from aspyx.util import StringBuilder
 from aspyx.reflection import Decorators, TypeDescriptor, DecoratorDescriptor
 
 T = TypeVar("T")

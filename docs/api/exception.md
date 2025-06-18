@@ -1,0 +1,3 @@
+# Util Module
+
+::: aspyx.exception

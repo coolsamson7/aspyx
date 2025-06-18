@@ -30,3 +30,7 @@ class ThreadLocal(Generic[T]):
 
     def set(self, value: T) -> None:
         self.local.value = value
+
+    def clear(self) -> None:
+        if hasattr(self.local, "value"):
+            del self.local.value

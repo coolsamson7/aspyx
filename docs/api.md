@@ -8,6 +8,10 @@
 
 ::: aspyx.di.configuration
 
-::: aspyx.di.util
+::: aspyx.util
 
 ::: aspyx.reflection
+
+::: aspyx.exception
+
+::: aspyx.threading
