@@ -1,7 +1,7 @@
 """
 AOP module
 """
-from .aop import before, after, classes, around, error, advice, methods, Invocation
+from .aop import before, after, classes, around, error, advice, methods, Invocation, AspectTarget
 __all__ = [
     "before",
     "after",
@@ -11,4 +11,5 @@ __all__ = [
     "classes",
     "methods",
     "Invocation",
+    "AspectTarget"
 ]

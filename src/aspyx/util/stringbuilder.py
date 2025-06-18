@@ -17,8 +17,12 @@ class StringBuilder:
     def append(self, s: str) -> "StringBuilder":
         """
         append a string to the end of the string builder
-        :param s:  the string
-        :return: self
+
+        Args:
+            s (str): the string
+
+        Returns:
+            StringBuilder: self
         """
         self._parts.append(str(s))
 

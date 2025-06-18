@@ -1139,7 +1139,8 @@ class Environment:
         Arguments:
             type (Type): The desired type
 
-        Returns: The requested instance
+        Returns:
+            T: The requested instance
         """
         provider = self.providers.get(type, None)
         if provider is None:

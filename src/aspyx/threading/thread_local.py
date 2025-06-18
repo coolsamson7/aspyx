@@ -22,7 +22,9 @@ class ThreadLocal(Generic[T]):
     def get(self) -> Optional[T]:
         """
         return the current value or invoke the optional factory to compute one
-        :return: the value associated with the current thread
+
+        Returns:
+            Optional[T]: the value associated with the current thread
         """
         if not hasattr(self.local, "value"):
             if self.factory is not None:
@@ -35,7 +37,8 @@ class ThreadLocal(Generic[T]):
     def set(self, value: T) -> None:
         """
         set a value in the current thread
-        :param value: the value
+        Args:
+            value: the value
         """
         self.local.value = value
 

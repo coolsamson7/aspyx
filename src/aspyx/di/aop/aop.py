@@ -110,7 +110,8 @@ class AspectTarget(ABC):
     def that_are_async(self):
         """
         matches methods that are async
-        :return: self
+        :
+            self
         """
         self._async = True
         return self
@@ -118,7 +119,9 @@ class AspectTarget(ABC):
     def of_type(self, type: Type):
         """
         matches methods belonging to a class or classes that are subclasses of the specified type
-        :return: self
+
+        Returns:
+            AspectTarget: self
         """
         self.types.append(type)
         return self
@@ -126,8 +129,11 @@ class AspectTarget(ABC):
     def decorated_with(self, decorator):
         """
         matches methods or classes that are decorated with the specified decorator
-        :param decorator:  the decorator callable
-        :return:
+        Args:
+         decorator: the decorator callable
+
+        Returns:
+            AspectTarget: self
         """
         self.decorators.append(decorator)
         return self
@@ -234,15 +240,21 @@ class MethodAspectTarget(AspectTarget):
 
         return True
 
-def methods():
+def methods() -> AspectTarget:
     """
     Create a new AspectTarget instance to define method aspect targets.
+
+    Returns:
+         AspectTarget: the method target
     """
     return MethodAspectTarget()
 
-def classes():
+def classes() -> AspectTarget:
     """
     Create a new AspectTarget instance to define class aspect targets.
+
+    Returns:
+        AspectTarget: the method target
     """
     return ClassAspectTarget()
 

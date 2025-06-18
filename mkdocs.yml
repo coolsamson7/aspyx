@@ -46,4 +46,6 @@ plugins:
         python:
           paths: [src]
           options:
-            show_source: true
+            show_source: false
+            docstring_style: google
+            follow_imports: true

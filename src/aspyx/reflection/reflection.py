@@ -79,30 +79,40 @@ class TypeDescriptor:
         def get_name(self) -> str:
             """
             return the method name
-            :return: the method name
+
+            Returns:
+                str: the method name
             """
             return self.method.__name__
 
         def get_doc(self, default = "") -> str:
             """
             return the method docstring
-            :param default: the default if no docstring is found
-            :return:  the docstring
+            Args:
+                default: the default if no docstring is found
+
+            Returns:
+                str: the docstring
             """
             return self.method.__doc__ or default
 
         def is_async(self) -> bool:
             """
             return true if the method is asynchronous
-            :return: async flag
+
+            Returns:
+                bool: async flag
             """
             return inspect.iscoroutinefunction(self.method)
 
         def get_decorator(self, decorator: Callable) -> Optional[DecoratorDescriptor]:
             """
             return the DecoratorDescriptor - if any - associated with the passed Callable
-            :param decorator:
-            :return:  the DecoratorDescriptor or None
+            Args:
+                decorator: the decorator
+
+            Returns:
+                Optional[DecoratorDescriptor]: the DecoratorDescriptor or None
             """
             for dec in self.decorators:
                 if dec.decorator is decorator:
@@ -113,8 +123,11 @@ class TypeDescriptor:
         def has_decorator(self, decorator: Callable) -> bool:
             """
             return True if the method is decorated with the decorator
-            :param decorator: the decorator callable
-            :return:  True if the method is decorated with the decorator
+            Args:
+                decorator: the decorator callable
+
+            Returns:
+                bool: True if the method is decorated with the decorator
             """
             for dec in self.decorators:
                 if dec.decorator is decorator:
