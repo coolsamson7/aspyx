@@ -1,3 +1,7 @@
+"""
+Exception handling code
+"""
+from threading import RLock
 from typing import Any, Callable, Dict, Optional, Type
 
 from aspyx.di import injectable, Environment, inject_environment, on_running
@@ -62,6 +66,10 @@ class Invocation:
 
 @injectable()
 class ExceptionManager:
+    """
+    An exception manager collects all registered handlers and is able to handle an exception
+    by dispatching it to the most applicable handler ( according to mro )
+    """
     # static data
 
     exception_handler_classes = []
@@ -84,6 +92,7 @@ class ExceptionManager:
         self.environment : Optional[Environment] = None
         self.handler : list[Handler] = []
         self.cache: Dict[Type, Chain] = {}
+        self.lock = RLock()
         self.current_context: Optional[ErrorContext] = None
 
     # internal
@@ -101,20 +110,26 @@ class ExceptionManager:
             # analyze methods
 
             for method in type_descriptor.get_methods():
-                if method.has_decorator(handle): # TODO sanity
-                    exception_type = method.param_types[0]
+                if method.has_decorator(handle):
+                    if len(method.param_types) == 1:
+                        exception_type = method.param_types[0]
 
-                    self.handler.append(Handler(
-                        exception_type,
-                        instance,
-                        method.method,
-                    ))
+                        self.handler.append(Handler(
+                            exception_type,
+                            instance,
+                            method.method,
+                        ))
+                    else:
+                        print(f"handler {method.method} expected to have one parameter")
 
     def get_handlers(self, clazz: Type) -> Optional[Chain]:
-        chain = self.cache.get(clazz, None) #TODO sync
-        if not chain:
-            chain = self.compute_handlers(clazz)
-            self.cache[clazz] = chain
+        chain = self.cache.get(clazz, None)
+        if chain is None:
+            with self.lock:
+                chain = self.cache.get(clazz, None)
+                if chain is None:
+                    chain = self.compute_handlers(clazz)
+                    self.cache[clazz] = chain
 
         return chain
 
@@ -139,6 +154,10 @@ class ExceptionManager:
             return None
 
     def handle(self, exception: Exception):
+        """
+        handle an exception by invoking the most applicable handler ( according to mro )
+        :param exception: the exception
+        """
         chain = self.get_handlers(type(exception))
         if chain is not None:
 

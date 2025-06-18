@@ -12,6 +12,9 @@ from weakref import WeakKeyDictionary
 
 
 class DecoratorDescriptor:
+    """
+    A DecoratorDescriptor covers the decorator - a callable - and the passed arguments
+    """
     __slots__ = [
         "decorator",
         "args"
@@ -74,15 +77,33 @@ class TypeDescriptor:
         # public
 
         def get_name(self) -> str:
+            """
+            return the method name
+            :return: the method name
+            """
             return self.method.__name__
 
         def get_doc(self, default = "") -> str:
+            """
+            return the method docstring
+            :param default: the default if no docstring is found
+            :return:  the docstring
+            """
             return self.method.__doc__ or default
 
         def is_async(self) -> bool:
+            """
+            return true if the method is asynchronous
+            :return: async flag
+            """
             return inspect.iscoroutinefunction(self.method)
 
         def get_decorator(self, decorator: Callable) -> Optional[DecoratorDescriptor]:
+            """
+            return the DecoratorDescriptor - if any - associated with the passed Callable
+            :param decorator:
+            :return:  the DecoratorDescriptor or None
+            """
             for dec in self.decorators:
                 if dec.decorator is decorator:
                     return dec
@@ -90,6 +111,11 @@ class TypeDescriptor:
             return None
 
         def has_decorator(self, decorator: Callable) -> bool:
+            """
+            return True if the method is decorated with the decorator
+            :param decorator: the decorator callable
+            :return:  True if the method is decorated with the decorator
+            """
             for dec in self.decorators:
                 if dec.decorator is decorator:
                     return True

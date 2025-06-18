@@ -11,7 +11,7 @@ The following DI features are supported
 * support for factory classes and methods
 * support for eager and lazy construction
 * support for scopes singleton, request and thread
-* possibilty to add custom scopes
+* possibility to add custom scopes
 * conditional registration of classes and factories ( aka profiles in spring )
 * lifecycle events methods `on_init`, `on_destroy`, `on_running`
 * bundling of injectable objects according to their module location including recursive imports and inheritance

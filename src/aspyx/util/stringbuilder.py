@@ -2,6 +2,9 @@
 Utility class for Java lovers
 """
 class StringBuilder:
+    """
+    A StringBuilder is used to build a string by multiple append calls.
+    """
     ___slots__ = ("_parts",)
 
     # constructor
@@ -12,6 +15,11 @@ class StringBuilder:
     # public
 
     def append(self, s: str) -> "StringBuilder":
+        """
+        append a string to the end of the string builder
+        :param s:  the string
+        :return: self
+        """
         self._parts.append(str(s))
 
         return self
@@ -23,6 +31,9 @@ class StringBuilder:
         return self
 
     def clear(self):
+        """
+        clear the content
+        """
         self._parts.clear()
 
     # object

@@ -12,10 +12,8 @@ from dataclasses import dataclass
 from enum import auto, Enum
 from typing import Optional, Dict, Type, Callable
 
-from aspyx.di.di import order, EnvironmentScope
 from aspyx.reflection import Decorators, TypeDescriptor
-from aspyx.di import injectable, Providers, ClassInstanceProvider, Environment, PostProcessor
-
+from aspyx.di import injectable, order, Providers, ClassInstanceProvider, Environment, PostProcessor
 
 class AOPException(Exception):
     """
@@ -110,14 +108,27 @@ class AspectTarget(ABC):
         return self
 
     def that_are_async(self):
+        """
+        matches methods that are async
+        :return: self
+        """
         self._async = True
         return self
 
     def of_type(self, type: Type):
+        """
+        matches methods belonging to a class or classes that are subclasses of the specified type
+        :return: self
+        """
         self.types.append(type)
         return self
 
     def decorated_with(self, decorator):
+        """
+        matches methods or classes that are decorated with the specified decorator
+        :param decorator:  the decorator callable
+        :return:
+        """
         self.decorators.append(decorator)
         return self
 
@@ -133,6 +144,9 @@ class AspectTarget(ABC):
         return self
 
 class ClassAspectTarget(AspectTarget):
+    """
+    An AspectTarget matching classes
+    """
     # properties
 
     __slots__ = [
@@ -172,6 +186,10 @@ class ClassAspectTarget(AspectTarget):
     # fluent
 
 class MethodAspectTarget(AspectTarget):
+    """
+       An AspectTarget matching methods
+       """
+
     # properties
 
     __slots__ = [ ]
