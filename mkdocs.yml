@@ -9,12 +9,24 @@ theme:
     - content.code.copy
 
 nav:
-  - Home: index.md
+  - Home:
+      - Motivation: index/motivation.md
+      - Introduction: index/introduction.md
+      - Installation: index/installation.md
+      - Environment: index/environment.md
+      - Configuration: index/configuration.md
+      - AOP: index/aop.md
+      - Reflection: index/reflection.md
+      - Exceptions: index/exceptions.md
+      - Threading: index/threading.md
+      - Version History: index/versions.md
+
   - API Reference:
       - Util: api/util.md
       - Reflection: api/reflection.md
       - Configuration: api/configuration.md
       - Threading: api/threading.md
+      - Exception: api/exception.md
       - DI: api/di.md
       - AOP: api/aop.md
 

@@ -1,3 +1,3 @@
 # Threading Module
 
-::: aspyx.di.threading
+::: aspyx.threading

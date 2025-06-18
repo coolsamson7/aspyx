@@ -405,7 +405,7 @@ class Invocation:
 
     def proceed(self, *args, **kwargs):
         """
-        Proceed to the next join point in the around chain up to the original method.
+        Proceed to the next aspect in the around chain up to the original method.
         """
         if len(args) > 0 or len(kwargs) > 0:  # as soon as we have args, we replace the current ones
             self.args = args
@@ -417,7 +417,7 @@ class Invocation:
 
     async def proceed_async(self, *args, **kwargs):
         """
-        Proceed to the next join point in the around chain up to the original method.
+        Proceed to the next aspect in the around chain up to the original method.
         """
         if len(args) > 0 or len(kwargs) > 0:  # as soon as we have args, we replace the current ones
             self.args = args
@@ -428,6 +428,9 @@ class Invocation:
         return await self.current_aspect.next.call_async(self)
 
 class Advices:
+    """
+    Internal utility class that collects all advice s
+    """
     # static data
 
     targets: list[AspectTarget] = []
@@ -443,7 +446,13 @@ class Advices:
 
     @classmethod
     def collect(cls, clazz, member, type: AspectType, environment: Environment):
-        aspects = [FunctionAspect(environment.get(target._clazz), target._function, None) for target in Advices.targets if target._type == type and target._clazz is not clazz and environment.providers.get(target._clazz) is not None and target._matches(clazz, member)]
+        aspects = [
+            FunctionAspect(environment.get(target._clazz), target._function, None) for target in Advices.targets
+            if target._type == type
+               and target._clazz is not clazz
+               and environment.providers.get(target._clazz) is not None
+               and target._matches(clazz, member)
+        ]
 
         # sort according to order
 
@@ -528,7 +537,7 @@ def advice(cls):
     for name, member in TypeDescriptor.for_type(cls).methods.items():
         decorator = next((decorator for decorator in member.decorators if decorator.decorator in [before, after, around, error]), None)
         if decorator is not None:
-            target = decorator.args[0] # ? ...?? TODO, can be multiple
+            target = decorator.args[0] # multiple targets are already merged in a single! check _register
             target._clazz = cls
             sanity_check(cls, name)
             Advices.targets.append(target) #??

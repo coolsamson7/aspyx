@@ -163,7 +163,7 @@ class SingletonScopeInstanceProvider(InstanceProvider):
 
 class EnvironmentScopeInstanceProvider(InstanceProvider):
     def __init__(self):
-        super().__init__(SingletonScopeInstanceProvider, SingletonScope, False, "request") # TODO?
+        super().__init__(SingletonScopeInstanceProvider, SingletonScope, False, "request")
 
     def create(self, environment: Environment, *args):
         return EnvironmentScope()

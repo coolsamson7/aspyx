@@ -1,3 +1,3 @@
-# Util Module
+# Exception Module
 
 ::: aspyx.exception
