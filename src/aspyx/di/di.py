@@ -449,6 +449,11 @@ class FactoryInstanceProvider(InstanceProvider):
 class Lifecycle(Enum):
     """
     This enum defines the lifecycle phases that can be processed by lifecycle processors.
+    Phases are:
+    - ON_INJECT
+    - ON_INIT
+    - ON_RUNNING
+    - ON_DESTROY
     """
 
     __slots__ = []
@@ -740,6 +745,10 @@ def injectable(eager=True, scope="singleton"):
 def factory(eager=True, scope="singleton"):
     """
     Decorator that needs to be used on a class that implements the Factory interface.
+
+    Args:
+        eager (bool): If True, the corresponding object will be created eagerly when the environment is created.
+        scope (str): The scope of the factory, e.g. "singleton", "request", "environment".
     """
     def decorator(cls):
         Decorators.add(cls, factory)
@@ -754,6 +763,10 @@ def factory(eager=True, scope="singleton"):
 def create(eager=True, scope="singleton"):
     """
     Any method annotated with @create will be registered as a factory method.
+
+    Args:
+        eager (bool): If True, the corresponding object will be created eagerly when the environment is created.
+        scope (str): The scope of the factory, e.g. "singleton", "request", "environment".
     """
     def decorator(func):
         Decorators.add(func, create, eager, scope)
@@ -763,7 +776,7 @@ def create(eager=True, scope="singleton"):
 
 def on_init():
     """
-    Methods annotated with @on_init will be called when the instance is created."""
+    Methods annotated with `@on_init` will be called when the instance is created."""
     def decorator(func):
         Decorators.add(func, on_init)
         return func
@@ -772,7 +785,7 @@ def on_init():
 
 def on_running():
     """
-    Methods annotated with @on_running will be called when the container up and running."""
+    Methods annotated with `@on_running` will be called when the container up and running."""
     def decorator(func):
         Decorators.add(func, on_running)
         return func
@@ -781,7 +794,7 @@ def on_running():
 
 def on_destroy():
     """
-    Methods annotated with @on_destroy will be called when the instance is destroyed.
+    Methods annotated with `@on_destroy` will be called when the instance is destroyed.
     """
     def decorator(func):
         Decorators.add(func, on_destroy)
@@ -792,9 +805,10 @@ def on_destroy():
 def environment(imports: Optional[list[Type]] = None):
     """
     This annotation is used to mark classes that control the set of injectables that will be managed based on their location
-    relative to the module of the class. All @injectable s and @factory s that are located in the same or any sub-module will
+    relative to the module of the class. All `@injectable`s and `@factory`s that are located in the same or any sub-module will
     be registered and managed accordingly.
-    Arguments:
+
+    Args:
         imports (Optional[list[Type]]): Optional list of imported environment types
     """
     def decorator(cls):
@@ -873,6 +887,25 @@ def conditional(*conditions: Condition):
 class Environment:
     """
     Central class that manages the lifecycle of instances and their dependencies.
+
+    Usage:
+
+    ```python
+    @injectable()
+    class Foo:
+        def __init__(self):
+        self.inited = False
+
+    @environment()
+    class SimpleEnvironment:
+        def __init__(self):
+            pass    
+    ```
+
+
+    environment = Environment(SimpleEnvironment)
+
+    foo = environment.get(Foo)  # will create an instance of Foo
     """
 
     # static data
@@ -1136,7 +1169,7 @@ class Environment:
         """
         Create or return a cached instance for the given type.
 
-        Arguments:
+        Args:
             type (Type): The desired type
 
         Returns:

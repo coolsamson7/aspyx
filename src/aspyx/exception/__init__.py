@@ -1,5 +1,5 @@
 """
-This module provides utility functions.
+This module provides exception handling functions.
 """
 from .exception_manager import exception_handler, handle, ExceptionManager
 

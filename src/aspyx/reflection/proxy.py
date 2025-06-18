@@ -14,6 +14,7 @@ class DynamicProxy(Generic[T]):
     by intercepting method calls at runtime and handling them as needed.
 
     Usage:
+    ```python
         class MyHandler(DynamicProxy.InvocationHandler):
             def invoke(self, invocation):
                 print(f"Intercepted: {invocation.name}")
@@ -22,10 +23,7 @@ class DynamicProxy(Generic[T]):
 
         proxy = DynamicProxy.create(SomeClass, MyHandler())
         proxy.some_method(args)  # Will be intercepted by MyHandler.invoke
-
-    Attributes:
-        type: The proxied class type.
-        invocation_handler: The handler that processes intercepted method calls.
+    ```
     """
     # inner class
 

@@ -110,7 +110,7 @@ class AspectTarget(ABC):
     def that_are_async(self) -> AspectTarget:
         """
         matches methods that are async
-        
+
         Returns:
             AspectTarget: self
         """
@@ -558,8 +558,8 @@ def sanity_check(clazz: Type, name: str):
 
 def advice(cls):
     """
-    Classes decorated with @advice are treated as advice classes.
-    They can contain methods decorated with @before, @after, @around, or @error to define aspects.
+    Classes decorated with `@advice` are treated as advice classes.
+    They can contain methods decorated with `@before`, `@after`, `@around`, or `@error` to define aspects.
     """
     Providers.register(ClassInstanceProvider(cls, True))
 
@@ -590,7 +590,7 @@ def _register(decorator, targets: list[AspectTarget], func, aspect_type: AspectT
 
 def before(*targets: AspectTarget):
     """
-    Methods decorated with @before will be executed before the target method is invoked.
+    Methods decorated with `@before` will be executed before the target method is invoked.
     """
     def decorator(func):
         _register(before, targets, func, AspectType.BEFORE)
@@ -601,7 +601,7 @@ def before(*targets: AspectTarget):
 
 def error(*targets: AspectTarget):
     """
-    Methods decorated with @error will be executed if the target method raises an exception."""
+    Methods decorated with `@error` will be executed if the target method raises an exception."""
     def decorator(func):
         _register(error, targets, func, AspectType.ERROR)
 
@@ -611,7 +611,7 @@ def error(*targets: AspectTarget):
 
 def after(*targets: AspectTarget):
     """
-    Methods decorated with @after will be executed after the target method is invoked.
+    Methods decorated with `@after` will be executed after the target method is invoked.
     """
     def decorator(func):
         _register(after, targets, func, AspectType.AFTER)
@@ -622,7 +622,7 @@ def after(*targets: AspectTarget):
 
 def around(*targets: AspectTarget):
     """
-    Methods decorated with @around will be executed around the target method.
+    Methods decorated with `@around` will be executed around the target method.
     Every around method must accept a single parameter of type Invocation and needs to call proceed
     on this parameter to proceed to the next around method.
     """

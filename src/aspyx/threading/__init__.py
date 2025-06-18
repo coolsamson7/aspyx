@@ -1,5 +1,5 @@
 """
-threading utilities
+A module with threading related utilities
 """
 from .thread_local import ThreadLocal
 

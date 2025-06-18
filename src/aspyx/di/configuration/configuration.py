@@ -66,10 +66,12 @@ class ConfigurationManager:
     def get(self, path: str, type: Type[T], default : Optional[T]=None) -> T:
         """
         Retrieve a configuration value by path and type, with optional coercion.
-        Arguments:
+
+        Args:
             path (str): The path to the configuration value, e.g. "database.host".
             type (Type[T]): The expected type.
             default (Optional[T]): The default value to return if the path is not found.
+
         Returns:
             T: The configuration value coerced to the specified type, or the default value if not found.
         """
@@ -123,7 +125,7 @@ def value(key: str, default=None):
     """
     Decorator to inject a configuration value into a method.
 
-    Arguments:
+    Args:
         key (str): The configuration key to inject.
         default: The default value to use if the key is not found.
 

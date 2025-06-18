@@ -156,8 +156,9 @@ class ExceptionManager:
     def handle(self, exception: Exception):
         """
         handle an exception by invoking the most applicable handler ( according to mro )
+
         Args:
-            exception: the exception
+            exception (Exception): the exception
         """
         chain = self.get_handlers(type(exception))
         if chain is not None:

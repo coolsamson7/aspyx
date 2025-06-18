@@ -37,6 +37,7 @@ class ThreadLocal(Generic[T]):
     def set(self, value: T) -> None:
         """
         set a value in the current thread
+
         Args:
             value: the value
         """
