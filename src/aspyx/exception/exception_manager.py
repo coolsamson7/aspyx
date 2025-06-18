@@ -1,7 +1,5 @@
 from typing import Any, Callable, Dict, Optional, Type
 
-from sniffio import thread_local
-
 from aspyx.di import injectable, Environment, inject_environment, on_running
 from aspyx.reflection import Decorators, TypeDescriptor
 from aspyx.threading import ThreadLocal
