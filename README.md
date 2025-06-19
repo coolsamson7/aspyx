@@ -40,9 +40,12 @@ While working on AI-related projects in Python, I was looking for a dependency i
 - bring both di and AOP features together in a lightweight library ( still only about 2T loc),
 - be as minimal invasive as possible,
 - offering mechanisms to easily extend and customize features without touching the core,
-- while still offering a _simple_ and _readable_ api that doesnt overwhelm developers
+- while still offering a _simple_ and _readable_ api that doesnt overwhelm developers and only requires a minimum initial learning curve
 
-Especially the AOP integration definitely makes sense, as aspects on their own also usually require a context, which in a DI world is simply injected.
+Especially the AOP integration definitely makes sense, as 
+
+- aspects on their own also usually require a context, which in a DI world is simply injected, 
+- and also should cover only certain objects and not act globally.
 
 # Introduction
 
@@ -55,7 +58,7 @@ The following DI features are supported
 - post processors
 - support for factory classes and methods
 - support for eager and lazy construction
-- support for scopes singleton, request and thread
+- support for scopes "singleton", "request" and "thread"
 - possibility to add custom scopes
 - conditional registration of classes and factories ( aka profiles in spring )
 - lifecycle events methods `on_init`, `on_destroy`, `on_running`

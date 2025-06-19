@@ -36,6 +36,7 @@ class SampleAdvice:
 ```
 
 Different aspects - with the appropriate decorator - are possible:
+
 - `before`  
    methods that will be executed _prior_ to the original method
 - `around`  
@@ -73,6 +74,7 @@ A fluent interface is used describe the mapping.
 The parameters restrict either methods or classes and are constructed by a call to either `methods()` or `classes()`.
 
 Both add the fluent methods:
+
 - `of_type(type: Type)`  
    defines the matching classes
 - `named(name: str)`  

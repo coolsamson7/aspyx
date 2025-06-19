@@ -1,4 +1,8 @@
 
+# Environment 
+
+Environment is the central object that takes care of object lifecycles.
+
 # Registration
 
 Different mechanisms are available that make classes eligible for injection

@@ -150,7 +150,7 @@ class Bar(Base):
         self.baz = baz
         self.bazong = bazong
 
-@factory(scope="request")
+@factory()
 class SampleFactory(Factory[Foo]):
     __slots__ = []
 

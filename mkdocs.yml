@@ -26,7 +26,6 @@ theme:
 
 nav:
   - Home:
-      - Motivation: index/motivation.md
       - Introduction: index/introduction.md
       - Installation: index/installation.md
       - Environment: index/environment.md
