@@ -1490,6 +1490,7 @@ class ThreadScope(Scope):
     def get(self, provider: AbstractInstanceProvider, environment: Environment, arg_provider: Callable[[], list]):
         if not hasattr(self._local, "value"):
             self._local.value = provider.create(environment, *arg_provider())
+
         return self._local.value
 
 # internal class that is required to import technical instance providers

@@ -11,13 +11,13 @@ While working on AI-related projects in Python, I was looking for a dependency i
 Especially the AOP integration definitely makes sense, as 
 
 - aspects on their own also usually require a context, which in a DI world is simply injected, 
-- and also should cover only certain objects and not act globally.
-- 
+- and also should cover only objects of the owning container and _not_ act globally.
+
 # Overview
 
-Aspyx is a lightweight Python library that provides both Dependency Injection (DI) and Aspect-Oriented Programming (AOP) support.
+Aspyx is a lightweight Python library - just about 2t loc - that provides both Dependency Injection (DI) and Aspect-Oriented Programming (AOP) support.
 
-The following DI features are supported:
+The following features are supported:
 
 - constructor and setter injection
 - injection of configuration variables
@@ -63,7 +63,6 @@ class Bar:
     def init(self):
         ...
 
-
 # this class will register all - specifically decorated - classes and factories in the own module
 # In this case Foo and Bar
 
@@ -78,14 +77,15 @@ environment = Environment(SampleEnvironment)
 
 # fetch an instance
 
-bar = env.get(Bar)
+bar = environment.get(Bar)
 
 bar.foo.hello("world")
 ```
 
 The concepts should be pretty familiar as well as the names as they are inspired by both Spring and Angular.
+I really don't think that this is too complex, and only for enterprise applications, isn`t it?
 
-Let's add some aspects...
+Let's have some fun and add some aspects...
 
 ```python
 
@@ -108,11 +108,4 @@ class SampleAdvice:
         return invocation.proceed()
 ```
 
-The invocation parameter stores the complete context of the current execution, which are
-- the method
-- args
-- kwargs
-- the result
-- the possible caught error
-
-Let's look at the details
+Especially the around and error aspects are usefull. Think of transactional support or general exception handling logic.

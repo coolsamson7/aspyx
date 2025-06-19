@@ -121,7 +121,7 @@ class ConfigurationSource(ABC):
 
 # decorator
 
-def value(key: str, default=None):
+def inject_value(key: str, default=None):
     """
     Decorator to inject a configuration value into a method.
 
@@ -131,7 +131,7 @@ def value(key: str, default=None):
 
     """
     def decorator(func):
-        Decorators.add(func, value, key, default)
+        Decorators.add(func, inject_value, key, default)
 
         return func
 
@@ -141,7 +141,7 @@ def value(key: str, default=None):
 @order(9)
 class ConfigurationLifecycleCallable(LifecycleCallable):
     def __init__(self,  manager: ConfigurationManager):
-        super().__init__(value, Lifecycle.ON_INJECT)
+        super().__init__(inject_value, Lifecycle.ON_INJECT)
 
         self.manager = manager
 

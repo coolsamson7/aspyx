@@ -6,7 +6,7 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-from aspyx.di.configuration import ConfigurationSource, ConfigurationManager, value, EnvConfigurationSource, \
+from aspyx.di.configuration import ConfigurationSource, ConfigurationManager, inject_value, EnvConfigurationSource, \
     YamlConfigurationSource
 
 from aspyx.di import injectable, Environment, environment, create
@@ -64,16 +64,16 @@ class Foo:
         self.value1 = None
         self.value2 = None
 
-    @value("b.d", 0)
+    @inject_value("b.d", 0)
     def set_value(self, value: int):
         self.value = value
 
     # will coerce
-    @value("b.e", 0)
+    @inject_value("b.e", 0)
     def set_value1(self, value: str):
         self.value1 = value
 
-    @value("b.z", "unknown")
+    @inject_value("b.z", "unknown")
     def set_value2(self, value: str):
         self.value2 = value
 
