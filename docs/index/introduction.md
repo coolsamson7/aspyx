@@ -1,17 +1,17 @@
 
 # Motivation
 
-While working on AI-related projects in Python, I was looking for a dependency injection (DI) framework. After evaluating existing options, my impression was that the most either lacked key features — such as integrated AOP — or had APIs that felt overly technical and complex, which made me develop a library on my own with the following goals
+While working on AI-related projects in Python, I was looking for a dependency injection (DI) framework. After evaluating existing options, my impression was that the most either lacked key features — such as integrated AOP — or had APIs that felt overly technical and complex, which led me to develop a library on my own with the following goals
 
 - bring both DI and AOP features together in a lightweight library,
 - be as minimal invasive as possible,
 - offering mechanisms to easily extend and customize features without touching the core,
-- while still offering a _simple_ and _readable_ api that doesnt overwhelm developers and only requires a minimum initial learning curve
+- while still offering a _simple_ and _readable_ api that doesnt overwhelm developers and keeps the initial learning curve low.
 
-Especially the AOP integration definitely makes sense, as 
+The AOP integration, in particular, makes a lot of sense because:
 
-- aspects on their own also usually require a context, which in a DI world is simply injected, 
-- and also should cover only objects of the owning container and _not_ act globally.
+- Aspects typically require context, which is naturally provided through DI,
+- And they should only apply to objects managed by the container, rather than acting globally.
 
 # Overview
 
@@ -29,9 +29,9 @@ The following features are supported:
 - possibility to add custom scopes
 - conditional registration of classes and factories ( aka profiles in spring )
 - lifecycle events methods `on_init`, `on_destroy`, `on_running`
-- bundling of injectable objects according to their module location including recursive imports and inheritance
-- instantiation of - possibly multiple - container instances - so called environments - that manage the lifecycle of related objects
-- hierarchical environments
+- Automatic discovery and bundling of injectable objects based on their module location, including support for recursive imports
+- Instantiation of one or possible more isolated container instances — called environments — each managing the lifecycle of a related set of objects,
+ - Support for hierarchical environments, enabling structured scoping and layered object management.
 
 With respect to AOP:
 
@@ -83,7 +83,6 @@ bar.foo.hello("world")
 ```
 
 The concepts should be pretty familiar as well as the names as they are inspired by both Spring and Angular.
-I really don't think that this is too complex, and only for enterprise applications, isn`t it?
 
 Let's have some fun and add some aspects...
 
@@ -109,3 +108,5 @@ class SampleAdvice:
 ```
 
 Especially the around and error aspects are usefull. Think of transactional support or general exception handling logic.
+
+While features like DI and AOP are often associated with enterprise applcations, this example hopefully demonstrates that they work just as well in small- to medium-sized projects—without introducing significant overhead—while still providing powerful tools for achieving clean architecture, resulting in maintainable and easily testable code.

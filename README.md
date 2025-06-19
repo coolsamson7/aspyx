@@ -11,7 +11,7 @@
 ## Table of Contents 
 
 - [Motivation](#motivation)
-- [Introduction](#introduction)
+- [Overview](#overview)
 - [Installation](#installation)
 - [Registration](#registration)
   - [Class](#class)
@@ -42,14 +42,14 @@ While working on AI-related projects in Python, I was looking for a dependency i
 - offering mechanisms to easily extend and customize features without touching the core,
 - while still offering a _simple_ and _readable_ api that doesnt overwhelm developers and only requires a minimum initial learning curve
 
-Especially the AOP integration definitely makes sense, as 
+The AOP integration, in particular, makes a lot of sense because:
 
-- aspects on their own also usually require a context, which in a DI world is simply injected, 
-- and also should cover only certain objects and not act globally.
+- Aspects typically require context, which is naturally provided through DI,
+- And they should only apply to objects managed by the container, rather than acting globally.
 
-# Introduction
+# Overview
 
-Aspyx is a lightweight Python library that provides both Dependency Injection (DI) and Aspect-Oriented Programming (AOP) support.
+Aspyx is a lightweight - still only about 2T LOC- Python library that provides both Dependency Injection (DI) and Aspect-Oriented Programming (AOP) support.
 
 The following DI features are supported 
 - constructor and setter injection
@@ -62,9 +62,9 @@ The following DI features are supported
 - possibility to add custom scopes
 - conditional registration of classes and factories ( aka profiles in spring )
 - lifecycle events methods `on_init`, `on_destroy`, `on_running`
-- bundling of injectable objects according to their module location including recursive imports and inheritance
-- instantiation of - possibly multiple - container instances - so called environments - that manage the lifecycle of related objects
-- hierarchical environments
+- Automatic discovery and bundling of injectable objects based on their module location, including support for recursive imports
+- Instantiation of one or possible more isolated container instances — called environments — each managing the lifecycle of a related set of objects,
+ - Support for hierarchical environments, enabling structured scoping and layered object management.
 
 With respect to AOP:
 - support for before, around, after and error aspects 
@@ -96,8 +96,7 @@ class Bar:
         ...
 
 
-# this class will register all - specifically decorated - classes and factories in the own module
-# In this case Foo and Bar
+# this class will discover and manage all - specifically decorated - classes and factories that are part of the own module
 
 @environment()
 class SampleEnvironment:
@@ -139,6 +138,8 @@ class SampleAdvice:
         ...
         return invocation.proceed()
 ```
+
+While features like DI and AOP are often associated with enterprise applcations, this example hopefully demonstrates that they work just as well in small- to medium-sized projects—without introducing significant overhead—while still providing powerful tools for achieving clean architecture, resulting in maintainable and easily testable code.
 
 Let's look at the details
 
@@ -242,7 +243,7 @@ Valid conditions are created by:
 
 ## Definition
 
-An `Environment` is the container that manages the lifecycle of objects. The set of classes and instances is determined by a constructor argument that controls the class registry.
+An `Environment` is the container that manages the lifecycle of objects. The set of classes and instances is determined by a type constructor argument that controls the discovery process.
 
 **Example**: 
 ```python

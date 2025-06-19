@@ -1,10 +1,9 @@
 
 # Exceptions
 
-The class `ExceptionManager` is used to collect dynamic handlers for specific exceptions and is able to dispatch to the concrete functions
-given a specific exception.
+The class `ExceptionManager` is used to collect dynamic handlers for specific exceptions and is able to dispatch to the concrete functions given a specific exception.
 
-The handlers are declared by annoting a class with `@exception_handler` and decorating specific methods with `@handle`
+The handlers are declared by decorating a class with `@exception_handler` and decorating specific methods with `@handle`
 
 **Example**:
 ```python
@@ -57,7 +56,12 @@ environment.get(ExceptionManager).handle(DerivedException())
 ```
 
 The exception maanger will first call the most appropriate method. 
-Any `ExceptionManager.proceed()` will in turn call the next most applicable method ( if available).
+
+Any 
+
+`ExceptionManager.proceed()` 
+
+will in turn call the next most applicable method ( if available).
 
 Together with a simple around advice we can now add exception handling to any method:
 
@@ -73,10 +77,10 @@ class Service:
 
 @advice
 class ExceptionAdvice:
-    def __init__(self, exceptionManager: ExceptionManager):
-        self.exceptionManager = exceptionManager
+    def __init__(self, exception_manager: ExceptionManager):
+        self.exception_manager = exception_manager
 
     @error(methods().of_type(Service))
     def handle_error(self, invocation: Invocation):
-        self.exceptionManager.handle(invocation.exception)
+        self.exception_manager.handle(invocation.exception)
 ```
