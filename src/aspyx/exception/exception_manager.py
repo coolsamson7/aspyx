@@ -32,9 +32,6 @@ def handle():
 
     return decorator
 
-class ErrorContext():
-    pass
-
 class Handler:
     # constructor
 
@@ -43,8 +40,13 @@ class Handler:
         self.instance = instance
         self.handler = handler
 
-    def handle(self, exception: BaseException):
-        self.handler(self.instance, exception)
+    def handle(self, exception: BaseException) -> BaseException:
+        result = self.handler(self.instance, exception)
+
+        if result is not None:
+            return result
+        else:
+            return exception
 
 class Chain:
     # constructor
@@ -55,11 +57,11 @@ class Chain:
 
     # public
 
-    def handle(self, exception: BaseException):
-        self.handler.handle(exception)
+    def handle(self, exception: BaseException) -> BaseException:
+        return self.handler.handle(exception)
 
 class Invocation:
-    def __init__(self, exception: Exception, chain: Chain):
+    def __init__(self, exception: BaseException, chain: Chain):
         self.exception = exception
         self.chain = chain
         self.current = self.chain
@@ -74,17 +76,26 @@ class ExceptionManager:
 
     exception_handler_classes = []
 
-    invocation = ThreadLocal()
+    invocation = ThreadLocal[Invocation]()
 
     # class methods
 
     @classmethod
-    def proceed(cls):
+    def proceed(cls) -> BaseException:
+        """
+        proceed with the next most applicable handler
+
+        Returns:
+            BaseException: the resulting exception
+
+        """
         invocation = cls.invocation.get()
 
         invocation.current = invocation.current.next
         if invocation.current is not None:
-            invocation.current.handle(invocation.exception)
+            return invocation.current.handle(invocation.exception)
+        else:
+            return invocation.exception
 
     # constructor
 
@@ -93,7 +104,6 @@ class ExceptionManager:
         self.handler : list[Handler] = []
         self.cache: Dict[Type, Chain] = {}
         self.lock = RLock()
-        self.current_context: Optional[ErrorContext] = None
 
     # internal
 
@@ -153,18 +163,22 @@ class ExceptionManager:
         else:
             return None
 
-    def handle(self, exception: Exception):
+    def handle(self, exception: BaseException) -> BaseException:
         """
-        handle an exception by invoking the most applicable handler ( according to mro )
+        handle an exception by invoking the most applicable handler (according to mro)
+        and return a possible modified exception as a result.
 
         Args:
-            exception (Exception): the exception
+            exception (BaseException): the exception
+
+        Returns:
+            BaseException: the resulting exception
         """
         chain = self.get_handlers(type(exception))
         if chain is not None:
 
             self.invocation.set(Invocation(exception, chain))
             try:
-                chain.handle(exception)
+                return chain.handle(exception)
             finally:
                 self.invocation.clear()

@@ -3,6 +3,7 @@ Test cases for the aspyx.di module.
 """
 from __future__ import annotations
 
+import threading
 import time
 import logging
 import unittest
@@ -149,7 +150,7 @@ class Bar(Base):
         self.baz = baz
         self.bazong = bazong
 
-@factory()
+@factory(scope="request")
 class SampleFactory(Factory[Foo]):
     __slots__ = []
 
@@ -181,6 +182,30 @@ class ComplexEnvironment:
 
 class TestDI(unittest.TestCase):
     testEnvironment = Environment(SimpleEnvironment, features=["dev"])
+
+    def test_thread_test(self):
+        n_threads = 1
+        iterations = 10000
+
+        threads = []
+
+        def worker(thread_id: int):
+            env = Environment(SimpleEnvironment, features=["dev"])
+
+            for i in range(iterations):
+                foo = env.get(Foo)
+
+                print(foo)
+
+        for t_id in range(0, n_threads):
+            thread = threading.Thread(target=worker, args=(t_id,))
+            threads.append(thread)
+            thread.start()
+
+        for thread in threads:
+            thread.join()
+
+        print("All threads finished.")
 
     def test_conditional(self):
         env = TestDI.testEnvironment

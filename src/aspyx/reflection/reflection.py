@@ -32,20 +32,44 @@ class Decorators:
     Utility class that caches decorators ( Python does not have a feature for this )
     """
     @classmethod
-    def add(cls, func, decorator: Callable, *args):
-        decorators = getattr(func, '__decorators__', None)
+    def add(cls, func_or_class, decorator: Callable, *args):
+        """
+        Remember the decorator
+        Args:
+            func_or_class: a function or class
+            decorator: the decorator
+            *args: any arguments supplied to the decorator
+        """
+        decorators = getattr(func_or_class, '__decorators__', None)
         if decorators is None:
-            setattr(func, '__decorators__', [DecoratorDescriptor(decorator, *args)])
+            setattr(func_or_class, '__decorators__', [DecoratorDescriptor(decorator, *args)])
         else:
             decorators.append(DecoratorDescriptor(decorator, *args))
 
     @classmethod
-    def has_decorator(cls, func, callable: Callable) -> bool:
-        return any(decorator.decorator is callable for decorator in Decorators.get(func))
+    def has_decorator(cls, func_or_class, callable: Callable) -> bool:
+        """
+        Return True, if the function or class is decorated with the decorator
+        Args:
+            func_or_class: a function or class
+            callable: the decorator
+
+        Returns:
+            bool: the result
+        """
+        return any(decorator.decorator is callable for decorator in Decorators.get(func_or_class))
 
     @classmethod
-    def get(cls, func) -> list[DecoratorDescriptor]:
-        return getattr(func, '__decorators__', [])
+    def get(cls, func_or_class) -> list[DecoratorDescriptor]:
+        """
+        return the list of decorators associated with the given function or class
+        Args:
+            func_or_class: the function or class
+
+        Returns:
+            list[DecoratorDescriptor]: ths list
+        """
+        return getattr(func_or_class, '__decorators__', [])
 
 class TypeDescriptor:
     """
@@ -88,6 +112,7 @@ class TypeDescriptor:
         def get_doc(self, default = "") -> str:
             """
             return the method docstring
+
             Args:
                 default: the default if no docstring is found
 
@@ -108,6 +133,7 @@ class TypeDescriptor:
         def get_decorator(self, decorator: Callable) -> Optional[DecoratorDescriptor]:
             """
             return the DecoratorDescriptor - if any - associated with the passed Callable
+
             Args:
                 decorator: the decorator
 
@@ -123,6 +149,7 @@ class TypeDescriptor:
         def has_decorator(self, decorator: Callable) -> bool:
             """
             return True if the method is decorated with the decorator
+
             Args:
                 decorator: the decorator callable
 

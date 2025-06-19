@@ -32,15 +32,15 @@ class Test:
 
     @handle()
     def handle_derived_exception(self, exception: DerivedException):
-        ExceptionManager.proceed()
+        return ExceptionManager.proceed()
 
     @handle()
     def handle_exception(self, exception: Exception):
-        pass
+        return exception
 
     @handle()
     def handle_base_exception(self, exception: BaseException):
-        pass
+        return exception
 
 @injectable()
 class Service:
@@ -52,12 +52,14 @@ class Service:
 
 @advice
 class ExceptionAdvice:
-    def __init__(self, exceptionManager: ExceptionManager):
-        self.exceptionManager = exceptionManager
+    def __init__(self, exception_manager: ExceptionManager):
+        self.exceptionManager = exception_manager
 
     @error(methods().of_type(Service))
     def handle_error(self, invocation: Invocation):
-        self.exceptionManager.handle(invocation.exception)
+        exception = self.exceptionManager.handle(invocation.exception) # possibly transform
+
+        invocation.exception = exception
 
 class TestExceptionManager(unittest.TestCase):
     def test_exception_manager(self):

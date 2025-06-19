@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 import unittest
 from typing import Dict
 
@@ -52,7 +53,7 @@ class Bar:
     def say(self, message: str):
         return f"hello {message}"
 
-@injectable(eager=False)
+@injectable(eager=False, scope="request")
 class Foo:
     def __init__(self, bar: Bar):
         self.bar = bar
@@ -158,6 +159,31 @@ class SampleAdvice:
 environment = Environment(SampleEnvironment)
 
 class TestAsyncAdvice(unittest.IsolatedAsyncioTestCase):
+
+    def test_thread_test(self):
+        n_threads = 1
+        iterations = 10000
+
+        threads = []
+
+        def worker(thread_id: int):
+            env = Environment(SampleEnvironment)
+
+            for i in range(iterations):
+                foo = env.get(Foo)
+
+                foo.say(f"thread {thread_id}")
+
+        for t_id in range(0, n_threads):
+            thread = threading.Thread(target=worker, args=(t_id,))
+            threads.append(thread)
+            thread.start()
+
+        for thread in threads:
+            thread.join()
+
+        print("All threads finished.")
+
     async def test_async(self):
         bar = environment.get(Bar)
 

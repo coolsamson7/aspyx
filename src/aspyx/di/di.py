@@ -62,32 +62,76 @@ class DIRuntimeException(DIException):
 
 class AbstractInstanceProvider(ABC, Generic[T]):
     """
-    Interface for instance providers.
+    An AbstractInstanceProvider is responsible to create instances.
     """
     @abstractmethod
     def get_module(self) -> str:
+        """
+        return the module name of the provider
+
+        Returns:
+            str: the module name of the provider
+        """
         pass
 
     def get_host(self) -> Type[T]:
+        """
+        return the class which is responsible for creation ( e.g. the injectable class )
+
+        Returns:
+            Type[T]: the class which is responsible for creation
+        """
         return type(self)
 
     @abstractmethod
     def get_type(self) -> Type[T]:
+        """
+        return the type of the created instance
+        Returns:
+            Type[T: the type]
+        """
         pass
 
     @abstractmethod
     def is_eager(self) -> bool:
+        """
+        return True, if the provider will eagerly construct instances
+
+        Returns:
+            bool: eager flag
+        """
         pass
 
     @abstractmethod
     def get_scope(self) -> str:
+        """
+        return the scope name
+        Returns:
+            str: the scope name
+        """
         pass
 
     def get_dependencies(self) -> (list[Type],int):
+        """
+        return the types that i depend on ( for constructor or setter injection  ).
+        The second tuple element is the number of parameters that a construction injection will require
+
+        Returns:
+            (list[Type],int): the type array and the number of parameters
+        """
         return [],1
 
     @abstractmethod
-    def create(self, environment: Environment, *args):
+    def create(self, environment: Environment, *args) -> T:
+        """
+        Create a new instance.
+        Args:
+            environment: the Environment
+            *args: the required arguments
+
+        Returns:
+            T: the instance
+        """
         pass
 
     def report(self) -> str:
@@ -362,7 +406,7 @@ class ClassInstanceProvider(InstanceProvider):
                 for param in method.param_types:
                     types.append(param)
 
-        return (types, self.params)
+        return types, self.params
 
     def create(self, environment: Environment, *args):
         Environment.logger.debug("%s create class %s", self, self.type.__qualname__)
@@ -450,6 +494,7 @@ class Lifecycle(Enum):
     """
     This enum defines the lifecycle phases that can be processed by lifecycle processors.
     Phases are:
+
     - ON_INJECT
     - ON_INIT
     - ON_RUNNING
@@ -894,18 +939,16 @@ class Environment:
     @injectable()
     class Foo:
         def __init__(self):
-        self.inited = False
 
     @environment()
     class SimpleEnvironment:
         def __init__(self):
-            pass    
-    ```
-
+            pass
 
     environment = Environment(SimpleEnvironment)
 
     foo = environment.get(Foo)  # will create an instance of Foo
+    ```
     """
 
     # static data

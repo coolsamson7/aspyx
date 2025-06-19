@@ -37,7 +37,7 @@
 
 While working on AI-related projects in Python, I was looking for a dependency injection (DI) framework. After evaluating existing options, my impression was that the most either lacked key features — such as integrated AOP — or had APIs that felt overly technical and complex, which made me develop a library on my own with the following goals
 
-- bring both di and AOP features together in a lightweight library,
+- bring both di and AOP features together in a lightweight library ( still only about 2T loc),
 - be as minimal invasive as possible,
 - offering mechanisms to easily extend and customize features without touching the core,
 - while still offering a _simple_ and _readable_ api that doesnt overwhelm developers
@@ -136,13 +136,6 @@ class SampleAdvice:
         ...
         return invocation.proceed()
 ```
-
-The invocation parameter stores the complete context of the current execution, which are
-- the method
-- args
-- kwargs
-- the result
-- the possible caught error
 
 Let's look at the details
 
@@ -430,7 +423,9 @@ class SingletonScope(Scope):
 
 It is possible to define different aspects, that will be part of method calling flow. This logic fits nicely in the library, since the DI framework controls the instantiation logic and can handle aspects within a regular post processor. 
 
-Advice classes need to be part of classes that add a `@advice()` decorator and can define methods that add aspects.
+On the other hand, advices are also regular DI objects, as they will usually require some kind of - injected - context.
+
+Advices are regular classes decorated with `@advice` that define aspect methods.
 
 ```python
 @advice
@@ -482,7 +477,7 @@ All methods are expected to have single `Invocation` parameter, that stores
 - `result` the result ( initially `None`)
 - `exception` a possible caught exception ( initially `None`)
 
-⚠️ **Attention:** It is essential for `around` methods to call `proceed()` on the invocation, which will call the next around method in the chain and finally the original method.
+⚠️ **Note:** It is essential for `around` methods to call `proceed()` on the invocation, which will call the next around method in the chain and finally the original method.
 
 If the `proceed` is called with parameters, they will replace the original parameters! 
 
@@ -527,6 +522,12 @@ class TransactionAdvice:
 ```
 
 With respect to async methods, you need to make sure, to replace a `proceed()` with a `await proceed_async()` to have the overall chain async!
+
+## Advice Lifecycle and visibility.
+
+Advices are always part of a specific environment, and only modify methods of objects managed by exactly this environment.
+
+An advice of a parent environment will for example not see classes of inherited environments. What is done instead, is to recreate the advice - more technically speaking, a processor that will collect and apply the advices -  in every child environment, and let it operate on the local objects. With this approach different environments are completely isolated from each other with no side effects whatsoever.   
 
 # Threading
 

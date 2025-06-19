@@ -25,6 +25,7 @@ class AspectType(Enum):
     AspectType defines the types of aspect-oriented advice that can be applied to methods.
 
     The available types are:
+
     - BEFORE: Advice to be executed before the method invocation.
     - AROUND: Advice that intercepts the method invocation.
     - AFTER: Advice to be executed after the method invocation, regardless of its outcome.
@@ -123,6 +124,7 @@ class AspectTarget(ABC):
 
         Args:
             type (Type): the type to match against
+
         Returns:
             AspectTarget: self
         """

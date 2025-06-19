@@ -65,3 +65,5 @@ plugins:
             show_source: false
             docstring_style: google
             follow_imports: true
+            merge_init_into_class: true
+            merge_class_into_init: false
