@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import unittest
 
-from aspyx.di import injectable, environment, Environment
+from aspyx.di import injectable, module, Environment
 from aspyx.di.di import DIException
 
 
@@ -19,8 +19,8 @@ class Bar:
     def __init__(self, foo: Foo):
         pass
 
-@environment()
-class SampleEnvironment:
+@module()
+class SampleModule:
     # constructor
 
     def __init__(self):
@@ -29,7 +29,7 @@ class SampleEnvironment:
 class TestCycle(unittest.TestCase):
     def test_cycle(self):
         with self.assertRaises(DIException):
-            Environment(SampleEnvironment)
+            Environment(SampleModule)
 
 
 if __name__ == '__main__':

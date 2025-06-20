@@ -1,10 +1,10 @@
 """
 Sub module
 """
-from aspyx.di import environment, injectable
+from aspyx.di import module, injectable
 
-@environment()
-class SubImportEnvironment:
+@module()
+class SubImportModule:
     def __init__(self):
         pass
 

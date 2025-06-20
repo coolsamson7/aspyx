@@ -75,8 +75,8 @@ Two specific source are already implemented:
 Typically you create the required configuration sources in an environment class, e.g.
 
 ```python
-@environment()
-class SampleEnvironment:
+@module()
+class SampleModule:
     # constructor
 
     def __init__(self):

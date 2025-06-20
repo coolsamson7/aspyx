@@ -1,10 +1,10 @@
 """
 Import
 """
-from aspyx.di import environment, injectable
+from aspyx.di import module, injectable
 
-@environment()
-class ImportedEnvironment:
+@module()
+class ImportedModule:
     def __init__(self):
         pass
 

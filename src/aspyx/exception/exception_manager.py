@@ -176,9 +176,10 @@ class ExceptionManager:
         """
         chain = self.get_handlers(type(exception))
         if chain is not None:
-
             self.invocation.set(Invocation(exception, chain))
             try:
                 return chain.handle(exception)
             finally:
                 self.invocation.clear()
+        else:
+            return exception # hmmm?

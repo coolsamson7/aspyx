@@ -9,11 +9,11 @@ from pathlib import Path
 from aspyx.di.configuration import ConfigurationSource, ConfigurationManager, inject_value, EnvConfigurationSource, \
     YamlConfigurationSource
 
-from aspyx.di import injectable, Environment, environment, create
+from aspyx.di import injectable, Environment, module, create
 
 
-@environment()
-class SampleEnvironment:
+@module()
+class SampleModule:
     # constructor
 
     def __init__(self):
@@ -78,7 +78,7 @@ class Foo:
         self.value2 = value
 
 class TestConfiguration(unittest.TestCase):
-    testEnvironment = Environment(SampleEnvironment)
+    testEnvironment = Environment(SampleModule)
 
     def test_yaml(self):
         env = TestConfiguration.testEnvironment

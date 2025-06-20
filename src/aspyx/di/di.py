@@ -72,7 +72,6 @@ class AbstractInstanceProvider(ABC, Generic[T]):
         Returns:
             str: the module name of the provider
         """
-        pass
 
     def get_host(self) -> Type[T]:
         """
@@ -87,10 +86,10 @@ class AbstractInstanceProvider(ABC, Generic[T]):
     def get_type(self) -> Type[T]:
         """
         return the type of the created instance
+        
         Returns:
             Type[T: the type]
         """
-        pass
 
     @abstractmethod
     def is_eager(self) -> bool:
@@ -100,16 +99,16 @@ class AbstractInstanceProvider(ABC, Generic[T]):
         Returns:
             bool: eager flag
         """
-        pass
 
     @abstractmethod
     def get_scope(self) -> str:
         """
         return the scope name
+
         Returns:
             str: the scope name
         """
-        pass
+
 
     def get_dependencies(self) -> (list[Type],int):
         """
@@ -125,6 +124,7 @@ class AbstractInstanceProvider(ABC, Generic[T]):
     def create(self, environment: Environment, *args) -> T:
         """
         Create a new instance.
+
         Args:
             environment: the Environment
             *args: the required arguments
@@ -132,7 +132,6 @@ class AbstractInstanceProvider(ABC, Generic[T]):
         Returns:
             T: the instance
         """
-        pass
 
     def report(self) -> str:
         return str(self)
@@ -847,19 +846,19 @@ def on_destroy():
 
     return decorator
 
-def environment(imports: Optional[list[Type]] = None):
+def module(imports: Optional[list[Type]] = None):
     """
-    This annotation is used to mark classes that control the set of injectables that will be managed based on their location
+    This annotation is used to mark classes that control the discovery process of injectables based on their location
     relative to the module of the class. All `@injectable`s and `@factory`s that are located in the same or any sub-module will
     be registered and managed accordingly.
 
     Args:
-        imports (Optional[list[Type]]): Optional list of imported environment types
+        imports (Optional[list[Type]]): Optional list of imported module types
     """
     def decorator(cls):
         Providers.register(ClassInstanceProvider(cls, True))
 
-        Decorators.add(cls, environment, imports)
+        Decorators.add(cls, module, imports)
         Decorators.add(cls, injectable) # do we need that?
 
         return cls
@@ -953,7 +952,7 @@ class Environment:
 
     # static data
 
-    logger = logging.getLogger(__name__)  # __name__ = module name
+    logger = logging.getLogger("aspyx.di")  # __name__ = module name
 
     instance : 'Environment' = None
 
@@ -1063,7 +1062,7 @@ class Environment:
 
                 # sanity check
 
-                decorator = TypeDescriptor.for_type(env).get_decorator(environment)
+                decorator = TypeDescriptor.for_type(env).get_decorator(module)
                 if decorator is None:
                     raise DIRegistrationException(f"{env.__name__} is not an environment class")
 
@@ -1495,7 +1494,7 @@ class ThreadScope(Scope):
 
 # internal class that is required to import technical instance providers
 
-@environment()
+@module()
 class Boot:
     # class
 

@@ -11,7 +11,7 @@ from typing import Dict
 
 from aspyx.di.threading import synchronized
 from aspyx.reflection import Decorators
-from aspyx.di import injectable, Environment, environment, order
+from aspyx.di import injectable, Environment, module, order
 from aspyx.di.aop import advice, before, after, around, methods, Invocation, error, classes
 
 logging.basicConfig(
@@ -32,8 +32,8 @@ def transactional():
 
     return decorator
 
-@environment()
-class SampleEnvironment:
+@module()
+class SampleModule:
     def __init__(self):
         pass
 
@@ -156,7 +156,7 @@ class SampleAdvice:
 
         return invocation.proceed()
 
-environment = Environment(SampleEnvironment)
+environment = Environment(SampleModule)
 
 class TestAsyncAdvice(unittest.IsolatedAsyncioTestCase):
 
@@ -167,7 +167,7 @@ class TestAsyncAdvice(unittest.IsolatedAsyncioTestCase):
         threads = []
 
         def worker(thread_id: int):
-            env = Environment(SampleEnvironment)
+            env =  Environment(SampleModule)
 
             for i in range(iterations):
                 foo = env.get(Foo)

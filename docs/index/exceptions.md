@@ -11,8 +11,8 @@ class DerivedException(Exception):
     def __init__(self):
         pass
 
-@environment()
-class SampleEnvironment:
+@module()
+class SampleModule:
     # constructor
 
     def __init__(self):
@@ -50,7 +50,7 @@ class ExceptionAdvice:
     def handle_error(self, invocation: Invocation):
         self.exceptionManager.handle(invocation.exception)
 
-environment =  Environment(SampleEnvironment)
+environment =  Environment(SampleModule)
 
 environment.get(ExceptionManager).handle(DerivedException())
 ```

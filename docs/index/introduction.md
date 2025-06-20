@@ -44,7 +44,8 @@ The library is thread-safe and heavily performance optimized as most of the runt
 Let's look at a simple example
 
 ```python
-from aspyx.di import injectable, on_init, on_destroy, environment, Environment
+from aspyx.di import injectable, on_init, on_destroy, module, Environment
+
 
 @injectable()
 class Foo:
@@ -54,22 +55,25 @@ class Foo:
     def hello(self, msg: str):
         print(f"hello {msg}")
 
+
 @injectable()  # eager and singleton by default
 class Bar:
-    def __init__(self, foo: Foo): # will inject the Foo dependency
+    def __init__(self, foo: Foo):  # will inject the Foo dependency
         self.foo = foo
 
-    @on_init() # a lifecycle callback called after the constructor and all possible injections
+    @on_init()  # a lifecycle callback called after the constructor and all possible injections
     def init(self):
         ...
+
 
 # this class will register all - specifically decorated - classes and factories in the own module
 # In this case Foo and Bar
 
-@environment()
+@module()
 class SampleEnvironment:
     def __init__(self):
         pass
+
 
 # create environment
 

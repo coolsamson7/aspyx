@@ -76,7 +76,8 @@ The library is thread-safe and heavily performance optimized as most of the runt
 Let's look at a simple example
 
 ```python
-from aspyx.di import injectable, on_init, on_destroy, environment, Environment
+from aspyx.di import injectable, on_init, on_destroy, module, Environment
+
 
 @injectable()
 class Foo:
@@ -86,26 +87,28 @@ class Foo:
     def hello(self, msg: str):
         print(f"hello {msg}")
 
+
 @injectable()  # eager and singleton by default
 class Bar:
-    def __init__(self, foo: Foo): # will inject the Foo dependency
+    def __init__(self, foo: Foo):  # will inject the Foo dependency
         self.foo = foo
 
-    @on_init() # a lifecycle callback called after the constructor and all possible injections
+    @on_init()  # a lifecycle callback called after the constructor and all possible injections
     def init(self):
         ...
 
 
 # this class will discover and manage all - specifically decorated - classes and factories that are part of the own module
 
-@environment()
-class SampleEnvironment:
+@module()
+class SampleModule:
     def __init__(self):
         pass
 
+
 # create environment
 
-environment = Environment(SampleEnvironment)
+environment = Environment(SampleModule)
 
 # fetch an instance
 
@@ -243,21 +246,26 @@ Valid conditions are created by:
 
 ## Definition
 
-An `Environment` is the container that manages the lifecycle of objects. The set of classes and instances is determined by a type constructor argument that controls the discovery process.
+An `Environment` is the container that manages the lifecycle of objects. 
+The set of classes and instances is determined by a 
+constructor type argument called `module`.
 
 **Example**: 
 ```python
-@environment()
-class SampleEnvironment:
+@module()
+class SampleModule:
     def __init__(self):
         pass
-
-environment = Environment(SampleEnvironment)
 ```
 
-The default is that all eligible classes, that are implemented in the containing module or in any submodule will be managed.
-THe container will import the module and its children automatically. No need to add artificial import statements!
+A module is a regular injectable class decorated with `@module` that controls the discovery of injectable classes, by filtering classes according to their module location relative to this class. 
+  All eligible classes, that are implemented in the containing module or in any submodule will be managed.
 
+In a second step the real container - the environment - is created based on a module:
+
+```python
+environment = Environment(SampleModule, features=["dev"])
+```
 
 By adding the parameter `features: list[str]`, it is possible to filter injectables by evaluating the corresponding `@conditional` decorators.
 
@@ -270,21 +278,21 @@ class DevOnly:
      def __init__(self):
         pass
 
-@environment()
-class SampleEnvironmen():
+@module()
+class SampleModule():
     def __init__(self):
         pass
 
-environment = Environment(SampleEnvironment, features=["dev"])
+environment = Environment(SampleModule, features=["dev"])
 ```
 
 
-By adding an `imports: list[Type]` parameter, specifying other environment types, it will register the appropriate classes recursively.
+By adding an `imports: list[Type]` parameter, specifying other module types, it will register the appropriate classes recursively.
 
 **Example**: 
 ```python
-@environment()
-class SampleEnvironmen(imports=[OtherEnvironment]):
+@module()
+class SampleModule(imports=[OtherModule]):
     def __init__(self):
         pass
 ```
@@ -293,8 +301,9 @@ Another possibility is to add a parent environment as an `Environment` construct
 
 **Example**: 
 ```python
-rootEnvironment = Environment(RootEnvironment)
-environment = Environment(SampleEnvironment, parent=rootEnvironment)
+rootEnvironment = Environment(RootModule)
+
+environment = Environment(SampleModule, parent=rootEnvironment)
 ```
 
 The difference is, that in the first case, class instances of imported modules will be created in the scope of the _own_ environment, while in the second case, it will return instances managed by the parent.
@@ -623,8 +632,8 @@ Two specific source are already implemented:
 Typically you create the required configuration sources in an environment class, e.g.
 
 ```python
-@environment()
-class SampleEnvironment:
+@module()
+class SampleModule:
     # constructor
 
     def __init__(self):
@@ -696,8 +705,8 @@ class DerivedException(Exception):
     def __init__(self):
         pass
 
-@environment()
-class SampleEnvironment:
+@module()
+class SampleModule:
     # constructor
 
     def __init__(self):

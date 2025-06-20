@@ -6,13 +6,6 @@ from __future__ import annotations
 import threading
 import time
 import logging
-import unittest
-from typing import Dict
-
-from aspyx.di import DIException, injectable, order, on_init, on_running, on_destroy, inject_environment, inject, \
-    Factory, create, environment, Environment, PostProcessor, factory, requires_feature, conditional, requires_class
-
-from di_import import ImportedEnvironment, ImportedClass
 
 # not here
 
@@ -22,10 +15,27 @@ logging.basicConfig(
 )
 
 def configure_logging(levels: Dict[str, int]) -> None:
-    for name in levels:
-        logging.getLogger(name).setLevel(levels[name])
+    for name, level in levels.items():
+        logger = logging.getLogger(name)
+        logger.setLevel(level)
 
-configure_logging({"aspyx": logging.DEBUG})
+        # If no handler is attached, add one
+        if not logger.handlers and logger.propagate is False:
+            handler = logging.StreamHandler()
+            handler.setFormatter(logging.Formatter(
+                '[%(asctime)s] %(levelname)s in %(filename)s:%(lineno)d - %(message)s'
+            ))
+            logger.addHandler(handler)
+
+configure_logging({"aspyx.di": logging.DEBUG})
+
+import unittest
+from typing import Dict
+
+from aspyx.di import DIException, injectable, order, on_init, on_running, on_destroy, inject_environment, inject, \
+    Factory, create, module, Environment, PostProcessor, factory, requires_feature, conditional, requires_class
+
+from di_import import ImportedModule, ImportedClass
 
 @injectable()
 @order(10)
@@ -160,8 +170,8 @@ class SampleFactory(Factory[Foo]):
     def create(self) -> Foo:
         return Foo()
 
-@environment()
-class SimpleEnvironment:
+@module()
+class SimpleModule:
     # constructor
 
     def __init__(self):
@@ -173,15 +183,15 @@ class SimpleEnvironment:
     def create(self) -> Baz:
         return Baz()
 
-@environment(imports=[SimpleEnvironment, ImportedEnvironment])
-class ComplexEnvironment:
+@module(imports=[SimpleModule, ImportedModule])
+class ComplexModule:
     # constructor
 
     def __init__(self):
         pass
 
 class TestDI(unittest.TestCase):
-    testEnvironment = Environment(SimpleEnvironment, features=["dev"])
+    testEnvironment = Environment(SimpleModule, features=["dev"])
 
     def test_thread_test(self):
         n_threads = 1
@@ -190,12 +200,10 @@ class TestDI(unittest.TestCase):
         threads = []
 
         def worker(thread_id: int):
-            env = Environment(SimpleEnvironment, features=["dev"])
+            env = Environment(SimpleModule, features=["dev"])
 
             for i in range(iterations):
                 foo = env.get(Foo)
-
-                print(foo)
 
         for t_id in range(0, n_threads):
             thread = threading.Thread(target=worker, args=(t_id,))
@@ -226,7 +234,7 @@ class TestDI(unittest.TestCase):
 
         # prod
 
-        prod_environment = Environment(SimpleEnvironment, features=["prod"])
+        prod_environment = Environment(SimpleModule, features=["prod"])
 
         base = prod_environment.get(ConditionalBase)
         prod = prod_environment.get(ProdClass)
@@ -239,7 +247,7 @@ class TestDI(unittest.TestCase):
         # none
 
         try:
-            no_feature_environment = Environment(SimpleEnvironment)
+            no_feature_environment = Environment(SimpleModule)
             no_feature_environment = prod_environment.get(RequiresBase)
             self.fail("should not return conditional class")
         except Exception as e:
@@ -328,7 +336,7 @@ class TestDI(unittest.TestCase):
         self.assertIsNot(ns, ns1)
 
     def test_import_configurations(self):
-        env = Environment(ImportedEnvironment)
+        env = Environment(ImportedModule)
 
         imported = env.get(ImportedClass)
         self.assertIsNotNone(imported)

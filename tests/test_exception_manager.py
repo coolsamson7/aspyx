@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import unittest
 
-from aspyx.di import injectable, Environment, environment, create
+from aspyx.di import injectable, Environment, module, create
 from aspyx.di.aop import Invocation, advice, error, methods
 from aspyx.exception import ExceptionManager, exception_handler, handle
 
@@ -13,8 +13,8 @@ class DerivedException(Exception):
     def __init__(self):
         pass
 
-@environment()
-class SampleEnvironment:
+@module()
+class SampleModule:
     # constructor
 
     def __init__(self):
@@ -63,7 +63,7 @@ class ExceptionAdvice:
 
 class TestExceptionManager(unittest.TestCase):
     def test_exception_manager(self):
-        environment =  Environment(SampleEnvironment)
+        environment =  Environment(SampleModule)
 
         service = environment.get(Service)
 
