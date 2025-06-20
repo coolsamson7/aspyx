@@ -800,6 +800,10 @@ class ExceptionAdvice:
 - bugfixes
 - added `@ExceptionManager`
 
+**1.4.1**
+
+- mkdocs
+
 
       
 
