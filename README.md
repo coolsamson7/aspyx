@@ -39,7 +39,7 @@
 
 While working on AI-related projects in Python, I was looking for a dependency injection (DI) framework. After evaluating existing options, my impression was that the most either lacked key features — such as integrated AOP — or had APIs that felt overly technical and complex, which made me develop a library on my own with the following goals
 
-- bring both di and AOP features together in a lightweight library ( still only about 2T loc),
+- bring both di and AOP features together in a lightweight library,
 - be as minimal invasive as possible,
 - offering mechanisms to easily extend and customize features without touching the core,
 - while still offering a _simple_ and _readable_ api that doesnt overwhelm developers and only requires a minimum initial learning curve
@@ -51,7 +51,7 @@ The AOP integration, in particular, makes a lot of sense because:
 
 # Overview
 
-Aspyx is a lightweight - still only about 2T LOC- Python library that provides both Dependency Injection (DI) and Aspect-Oriented Programming (AOP) support.
+Aspyx is a lightweight - still only about 2K LOC - Python library that provides both Dependency Injection (DI) and Aspect-Oriented Programming (AOP) support.
 
 The following DI features are supported 
 - constructor and setter injection
@@ -66,7 +66,7 @@ The following DI features are supported
 - lifecycle events methods `on_init`, `on_destroy`, `on_running`
 - Automatic discovery and bundling of injectable objects based on their module location, including support for recursive imports
 - Instantiation of one or possible more isolated container instances — called environments — each managing the lifecycle of a related set of objects,
- - Support for hierarchical environments, enabling structured scoping and layered object management.
+- Support for hierarchical environments, enabling structured scoping and layered object management.
 
 With respect to AOP:
 - support for before, around, after and error aspects 
