@@ -69,7 +69,8 @@ class Decorators:
         Returns:
             list[DecoratorDescriptor]: ths list
         """
-        return getattr(func_or_class, '__decorators__', [])
+        return func_or_class.__dict__.get('__decorators__', [])
+
 
 class TypeDescriptor:
     """

@@ -1,7 +1,7 @@
 """
 This module provides dependency injection and aop capabilities for Python applications.
 """
-from .di import conditional, requires_class, requires_feature, DIException, AbstractCallableProcessor, LifecycleCallable, Lifecycle, Providers, Environment, ClassInstanceProvider, injectable, factory, module, inject, order, create, on_init, on_running, on_destroy, inject_environment, Factory, PostProcessor
+from .di import InstanceProvider, conditional, requires_class, requires_feature, DIException, AbstractCallableProcessor, LifecycleCallable, Lifecycle, Providers, Environment, ClassInstanceProvider, injectable, factory, module, inject, order, create, on_init, on_running, on_destroy, inject_environment, Factory, PostProcessor
 
 # import something from the subpackages, so that the decorators are executed
 
@@ -21,7 +21,7 @@ __all__ = [
     "inject",
     "create",
     "order",
-
+    "InstanceProvider",
     "on_init",
     "on_running",
     "on_destroy",

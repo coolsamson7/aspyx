@@ -708,10 +708,13 @@ class Providers:
                 if type is provider.get_type():
                     raise ProviderCollisionException(f"type {type.__name__} already registered", existing_provider, provider)
 
-                if isinstance(existing_provider, AmbiguousProvider):
-                    cast(AmbiguousProvider, existing_provider).add_provider(provider)
-                else:
-                    cache[type] = AmbiguousProvider(type, existing_provider, provider)
+                if existing_provider.get_type() is not type:
+                    # only overwrite if the existing provider is not specific
+
+                    if isinstance(existing_provider, AmbiguousProvider):
+                        cast(AmbiguousProvider, existing_provider).add_provider(provider)
+                    else:
+                        cache[type] = AmbiguousProvider(type, existing_provider, provider)
 
             # recursion
 
@@ -939,12 +942,12 @@ class Environment:
     class Foo:
         def __init__(self):
 
-    @environment()
-    class SimpleEnvironment:
+    @module()
+    class Module:
         def __init__(self):
             pass
 
-    environment = Environment(SimpleEnvironment)
+    environment = Environment(Module)
 
     foo = environment.get(Foo)  # will create an instance of Foo
     ```
