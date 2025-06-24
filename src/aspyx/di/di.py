@@ -431,28 +431,28 @@ class FunctionInstanceProvider(InstanceProvider):
 
     # constructor
 
-    def __init__(self, clazz : Type, method, return_type : Type[T], eager = True, scope = "singleton"):
-        super().__init__(clazz, return_type, eager, scope)
+    def __init__(self, clazz : Type, method: TypeDescriptor.MethodDescriptor, eager = True, scope = "singleton"):
+        super().__init__(clazz, method.return_type, eager, scope)
 
-        self.method = method
+        self.method : TypeDescriptor.MethodDescriptor = method
 
     # implement
 
     def get_dependencies(self) -> (list[Type],int):
-        return [self.host], 1
+        return [self.host, *self.method.param_types], 1 + len(self.method.param_types)
 
     def create(self, environment: Environment, *args):
         Environment.logger.debug("%s create class %s", self, self.type.__qualname__)
 
-        instance = self.method(*args) # args[0]=self
+        instance = self.method.method(*args) # args[0]=self
 
         return environment.created(instance)
 
     def report(self) -> str:
-        return f"{self.host.__name__}.{self.method.__name__}"
+        return f"{self.host.__name__}.{self.method.get_name()}"
 
     def __str__(self):
-        return f"FunctionInstanceProvider({self.host.__name__}.{self.method.__name__} -> {self.type.__name__})"
+        return f"FunctionInstanceProvider({self.host.__name__}.{self.method.get_name()} -> {self.type.__name__})"
 
 class FactoryInstanceProvider(InstanceProvider):
     """
@@ -766,8 +766,7 @@ def register_factories(cls: Type):
             if return_type is None:
                 raise DIRegistrationException(f"{cls.__name__}.{method.method.__name__} expected to have a return type")
 
-            Providers.register(FunctionInstanceProvider(cls, method.method, return_type, create_decorator.args[0],
-                                                        create_decorator.args[1]))
+            Providers.register(FunctionInstanceProvider(cls, method, create_decorator.args[0], create_decorator.args[1]))
 def order(prio = 0):
     def decorator(cls):
         Decorators.add(cls, order, prio)
@@ -1029,9 +1028,33 @@ class Environment:
 
         def get_type_package(type: Type):
             module_name = type.__module__
-            module = sys.modules[module_name]
+            module = sys.modules.get(module_name)
 
-            return module.__package__
+            if not module:
+                raise ImportError(f"Module {module_name} not found")
+
+            # Try to get the package
+
+            package = getattr(module, '__package__', None)
+
+            # Fallback: if module is __main__, try to infer from the module name if possible
+
+            if not package:
+                if module_name == '__main__':
+                    # Try to resolve real name via __file__
+                    path = getattr(module, '__file__', None)
+                    if path:
+                        Environment.logger.warning(
+                            "Module is __main__; consider running via -m to preserve package context")
+                    return ''
+
+                # Try to infer package name from module name
+
+                parts = module_name.split('.')
+                if len(parts) > 1:
+                    return '.'.join(parts[:-1])
+
+            return package or ''
 
         def import_package(name: str):
             """Import a package and all its submodules recursively."""

@@ -28,9 +28,15 @@ class DynamicProxy(Generic[T]):
     # inner class
 
     class Invocation:
-        def __init__(self, type: Type[T], name: str, *args, **kwargs):
+        __slots__ = [
+            "type",
+            "method",
+            "args",
+            "kwargs",
+        ]
+        def __init__(self, type: Type[T], method: str, *args, **kwargs):
             self.type = type
-            self.name = name
+            self.method = method
             self.args = args
             self.kwargs = kwargs
 
