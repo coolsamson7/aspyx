@@ -1,24 +1,43 @@
-[build-system]
-requires = ["setuptools>=61"]
-build-backend = "setuptools.build_meta"
-
 [project]
-name = "aspyx"
-version = "1.4.1"
-description = "A DI and AOP library for Python"
-authors = [{ name = "Andreas Ernst", email = "andreas.ernst7@gmail.com" }]
-readme = "README.md"
-license = { file = "LICENSE" }
-requires-python = ">=3.9"
+name = "aspyx-monorepo"
+version = "0.0.0"
+description = "Development workspace for Aspyx libraries"
 dependencies = []
 
-[tool.setuptools]
-package-dir = { "" = "src" }
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-[tool.setuptools.packages.find]
-where = ["src"]
-
-[project.optional-dependencies]
-dev = [
-    "mkdocstrings-python"
+[tool.hatch]
+# Register all subpackages
+projects = [
+    "packages/aspyx",
+    "packages/aspyx_service",
 ]
+
+[tool.hatch.envs.default]
+
+# Shared dev dependencies for the whole monorepo
+dependencies = [
+    "pytest"
+]
+
+#    "aspyx @ packages/aspyx",
+#    "aspyx_service @ packages/aspyx_service"
+
+[tool.hatch.envs.default.scripts]
+test = "pytest"
+
+[tool.hatch.envs.test.scripts]
+aspyx = "pytest packages/aspyx/tests"
+service = "pytest packages/aspyx_service/tests"
+all = "pytest packages"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.envs.default.pip-compile]
+all-extras = true
+
+[tool.hatch.envs.default.env-vars]
+PYTHONPATH = "packages/aspyx/src:packages/aspyx_service/src"
