@@ -19,7 +19,7 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Install dependencies via Hatch
+      - name: Install dependencies via Hatch1
         run: |
             pip install hatch
             hatch run pip install mkdocs-material mkdocstrings[python]
