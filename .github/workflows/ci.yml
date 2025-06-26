@@ -44,6 +44,4 @@ jobs:
           pip install packages/aspyx_service/dist/*.whl
 
       - name: Run all tests
-        run: |
-          pytest packages/aspyx/tests
-          pytest packages/aspyx_service/tests
+        run: hatch run test
