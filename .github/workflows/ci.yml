@@ -20,22 +20,30 @@ jobs:
         run: |
           python -m pip install --upgrade pip hatch
 
-      - name: Install packages in editable mode
+      - name: Debug source files
         run: |
-          pip install -e packages/aspyx
-          pip install -e packages/aspyx_service
+            pwd
+            ls -R packages/aspyx/src
+            ls -R packages/aspyx_service/src
+            find packages/aspyx/src/aspyx -name '__init__.py' -exec ls -l {} +
+            find packages/aspyx_service/src/aspyx_service -name '__init__.py' -exec ls -l {} +
 
-      - name: Print current working directory
-        run: ls -la
-
-      - name: List files for debug
+      - name: Build aspyx package
         run: |
-          pwd
-          ls -R packages/aspyx/src
-          ls -R packages/aspyx_service/src
+          cd packages/aspyx
+          hatch build
 
-      - name: Build all packages
-        run: hatch run build-all
+      - name: Build aspyx_service package
+        run: |
+          cd packages/aspyx_service
+          hatch build
+
+      - name: Install built wheels
+        run: |
+          pip install packages/aspyx/dist/*.whl
+          pip install packages/aspyx_service/dist/*.whl
 
       - name: Run all tests
-        run: hatch run test
+        run: |
+          pytest packages/aspyx/tests
+          pytest packages/aspyx_service/tests
