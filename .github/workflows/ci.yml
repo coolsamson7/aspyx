@@ -43,8 +43,9 @@ jobs:
           pip install packages/aspyx/dist/*.whl
           pip install packages/aspyx_service/dist/*.whl
 
+      - name: Setup environment
+        run: echo "PYTHONPATH=packages/aspyx/src:packages/aspyx_service/src" >> $GITHUB_ENV
+
       - name: Run all tests
         run: |
-          pip install pytest
-          pytest packages/aspyx/tests
-          pytest packages/aspyx_service/tests
+          hatch run test
