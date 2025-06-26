@@ -26,7 +26,13 @@ jobs:
           pip install -e packages/aspyx_service
 
       - name: Print current working directory
-        run: pwd
+        run: ls -la
+
+      - name: List files for debug
+        run: |
+          pwd
+          ls -R packages/aspyx/src
+          ls -R packages/aspyx_service/src
 
       - name: Build all packages
         run: hatch run build-all
