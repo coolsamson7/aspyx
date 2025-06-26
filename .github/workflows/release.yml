@@ -1,45 +1,50 @@
-name: Publish Python Package
+name: Release
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - 'aspyx-v*'           # e.g., aspyx-v1.4.2
+      - 'aspyx_service-v*'   # e.g., aspyx_service-v0.9.1
+
+permissions:
+  contents: read
 
 jobs:
-  build-and-publish:
-    name: Test, Build, and Publish to PyPI
+  release:
     runs-on: ubuntu-latest
 
+    environment:
+      name: pypi
+      url: https://pypi.org/p/aspyx
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'  # latest stable
+          python-version: '3.11'
 
-      - name: Set PYTHONPATH
-        run: echo "PYTHONPATH=$PWD/src:$PWD/tests" >> $GITHUB_ENV
-
-      - name: Install dependencies
+      - name: Install Hatch and Twine
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install --upgrade --force-reinstall  pytest pytest-xdist
-          pip show pytest-xdist
-          pip install -e .[dev]  # assuming tests are defined in extras_require
-          pip install build twine
+          pip install hatch twine
 
-      - name: Run tests
+      - name: Build & Publish aspyx
+        if: startsWith(github.ref, 'refs/tags/aspyx-v')
+        working-directory: packages/aspyx
         run: |
-          pytest
-
-      - name: Build the package
-        run: |
-          python -m build
-
-      - name: Publish to PyPI
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-        run: |
+          hatch build
           twine upload dist/*
+
+      - name: Build & Publish aspyx_service
+        if: startsWith(github.ref, 'refs/tags/aspyx_service-v')
+        working-directory: packages/aspyx_service
+        run: |
+          hatch build
+          twine upload dist/*
+
+    env:
+      TWINE_USERNAME: __token__
+      TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
