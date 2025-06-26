@@ -15,5 +15,8 @@ dependencies = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.hatch.build]
+source = "src"
+
 [tool.hatch.build.targets.wheel]
 packages = ["aspyx"]

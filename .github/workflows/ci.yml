@@ -25,5 +25,11 @@ jobs:
           pip install -e packages/aspyx
           pip install -e packages/aspyx_service
 
-      - name: Run tests with Hatch
-        run: hatch run dev test
+      - name: Print current working directory
+        run: pwd
+
+      - name: Build all packages
+        run: hatch run build-all
+
+      - name: Run all tests
+        run: hatch run test
