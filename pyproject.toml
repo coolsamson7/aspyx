@@ -26,10 +26,7 @@ dependencies = [
 
 [tool.hatch.envs.default.scripts]
 test = "pytest"
-build-all = [
-  "sh -c 'cd packages/aspyx && hatch build'",
-  "sh -c 'cd packages/aspyx_service && pwd && hatch build'"
-]
+build-all = "bash scripts/build-all.sh"
 
 [tool.hatch.envs.test.scripts]
 aspyx = "pytest packages/aspyx/tests"
