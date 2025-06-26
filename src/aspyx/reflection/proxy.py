@@ -1,7 +1,8 @@
 """
 Dynamic proxies for method interception and delegation.
 """
-from typing import Generic, TypeVar, Type
+import inspect
+from typing import Generic, TypeVar, Type, Callable
 
 T = TypeVar("T")
 
@@ -34,7 +35,10 @@ class DynamicProxy(Generic[T]):
             "args",
             "kwargs",
         ]
-        def __init__(self, type: Type[T], method: str, *args, **kwargs):
+
+        # constructor
+
+        def __init__(self, type: Type[T], method: Callable, *args, **kwargs):
             self.type = type
             self.method = method
             self.args = args
@@ -44,11 +48,19 @@ class DynamicProxy(Generic[T]):
         def invoke(self, invocation: 'DynamicProxy.Invocation'):
             pass
 
+        async def invoke_async(self, invocation: 'DynamicProxy.Invocation'):
+            return self.invoke(invocation)
+
     # class methods
 
     @classmethod
     def create(cls, type: Type[T], invocation_handler: 'DynamicProxy.InvocationHandler') -> T:
         return DynamicProxy(type, invocation_handler)
+
+    __slots__ = [
+        "type",
+        "invocation_handler"
+    ]
 
     # constructor
 
@@ -59,7 +71,16 @@ class DynamicProxy(Generic[T]):
     # public
 
     def __getattr__(self, name):
-        def wrapper(*args, **kwargs):
-            return self.invocation_handler.invoke(DynamicProxy.Invocation(self.type, name, *args, **kwargs))
+        method = getattr(self.type, name)
 
-        return wrapper
+        if  inspect.iscoroutinefunction(method):
+            async def async_wrapper(*args, **kwargs):
+                return  await self.invocation_handler.invoke_async(DynamicProxy.Invocation(self.type, method, *args, **kwargs))
+
+            return async_wrapper
+
+        else:
+            def sync_wrapper(*args, **kwargs):
+                return self.invocation_handler.invoke(DynamicProxy.Invocation(self.type, method, *args, **kwargs))
+
+            return sync_wrapper

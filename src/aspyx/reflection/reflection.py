@@ -7,6 +7,8 @@ from __future__ import annotations
 import inspect
 from inspect import signature, getmembers
 import threading
+from types import FunctionType
+
 from typing import Callable, get_type_hints, Type, Dict, Optional
 from weakref import WeakKeyDictionary
 
@@ -25,7 +27,7 @@ class DecoratorDescriptor:
         self.args = args
 
     def __str__(self):
-        return f"@{self.decorator.__name__}({','.join(self.args)})"
+        return f"@{self.decorator.__name__}({', '.join(map(str, self.args))})"
 
 class Decorators:
     """
@@ -60,6 +62,14 @@ class Decorators:
         return any(decorator.decorator is callable for decorator in Decorators.get(func_or_class))
 
     @classmethod
+    def get_decorator(cls, func_or_class, callable: Callable) -> DecoratorDescriptor:
+        return next((decorator for decorator in Decorators.get_all(func_or_class) if decorator.decorator is callable), None)
+
+    @classmethod
+    def get_all(cls, func_or_class) -> list[DecoratorDescriptor]:
+        return getattr(func_or_class, '__decorators__', [])
+
+    @classmethod
     def get(cls, func_or_class) -> list[DecoratorDescriptor]:
         """
         return the list of decorators associated with the given function or class
@@ -67,8 +77,12 @@ class Decorators:
             func_or_class: the function or class
 
         Returns:
-            list[DecoratorDescriptor]: ths list
+            list[DecoratorDescriptor]: the list
         """
+        if inspect.ismethod(func_or_class):
+            func_or_class = func_or_class.__func__  # unwrap bound method
+
+        #return getattr(func_or_class, '__decorators__', []) will return inherited as well
         return func_or_class.__dict__.get('__decorators__', [])
 
 
@@ -213,10 +227,16 @@ class TypeDescriptor:
     # internal
 
     def _get_local_members(self, cls):
+        #return [
+        #    (name, value)
+        #    for name, value in getmembers(cls, predicate=inspect.isfunction)
+        #    if name in cls.__dict__
+        #]
+
         return [
-            (name, value)
-            for name, value in getmembers(cls, predicate=inspect.isfunction)
-            if name in cls.__dict__
+            (name, attr)
+            for name, attr in cls.__dict__.items()
+            if isinstance(attr, FunctionType)
         ]
 
     # public

@@ -85,8 +85,8 @@ class TestConfiguration(unittest.TestCase):
 
         config = env.get(ConfigurationManager)
 
-        server = config.get("server.name", str)
-        self.assertEqual(server, "bla")
+        port = config.get("server.port", int)
+        self.assertEqual(port, 8000)
 
     def test_env(self):
         env = TestConfiguration.testEnvironment

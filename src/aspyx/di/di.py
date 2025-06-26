@@ -316,13 +316,14 @@ class EnvironmentInstanceProvider(AbstractInstanceProvider):
 
         self.environment = environment
         self.provider = provider
-        self.dependencies = []
+        self.dependencies : list[AbstractInstanceProvider] = []
         self.scope_instance = Scopes.get(provider.get_scope(), environment)
 
     # implement
 
     def resolve(self, context: Providers.ResolveContext):
         context.add(self)
+        context.push(self)
 
         if not context.is_resolved(self):
             context.provider_dependencies[self] = [] #?
@@ -332,7 +333,7 @@ class EnvironmentInstanceProvider(AbstractInstanceProvider):
             for type in type_and_params[0]:
                 if params > 0:
                     params -= 1
-                    self.dependencies.append(context.get_provider(type))
+                    self.dependencies.append(context.get_provider(type)) # try/catch TODO
 
                 provider = context.add_provider_dependency(self, type)
                 if provider is not None:
@@ -340,6 +341,8 @@ class EnvironmentInstanceProvider(AbstractInstanceProvider):
 
         else:
             context.add(*context.get_provider_dependencies(self))
+
+        context.pop()
 
     def get_module(self) -> str:
         return self.provider.get_module()
@@ -398,12 +401,13 @@ class ClassInstanceProvider(InstanceProvider):
         for param in init.param_types:
             types.append(param)
 
-        # check @inject
+        # check @inject & create
 
         for method in TypeDescriptor.for_type(self.type).get_methods():
-            if method.has_decorator(inject):
+            if method.has_decorator(inject) or method.has_decorator(create):
                 for param in method.param_types:
                     types.append(param)
+        # done
 
         return types, self.params
 
@@ -553,7 +557,8 @@ class Providers:
         __slots__ = [
             "dependencies",
             "providers",
-            "provider_dependencies"
+            "provider_dependencies",
+            "path"
         ]
 
         # constructor
@@ -561,6 +566,7 @@ class Providers:
         def __init__(self, providers: Dict[Type, EnvironmentInstanceProvider]):
             self.dependencies : list[EnvironmentInstanceProvider] = []
             self.providers = providers
+            self.path = []
             self.provider_dependencies : dict[EnvironmentInstanceProvider, list[EnvironmentInstanceProvider]] = {}
 
         # public
@@ -586,7 +592,14 @@ class Providers:
 
             return provider
 
+        def push(self, provider):
+            self.path.append(provider)
+
+        def pop(self):
+            self.path.pop()
+
         def next(self):
+            self.path.clear()
             self.dependencies.clear()
 
         def get_provider(self, type: Type) -> EnvironmentInstanceProvider:
@@ -607,7 +620,7 @@ class Providers:
             cycle = ""
 
             first = True
-            for p in self.dependencies:
+            for p in self.path:
                 if not first:
                     cycle += " -> "
 
