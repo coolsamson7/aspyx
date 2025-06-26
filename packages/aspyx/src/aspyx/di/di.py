@@ -316,13 +316,14 @@ class EnvironmentInstanceProvider(AbstractInstanceProvider):
 
         self.environment = environment
         self.provider = provider
-        self.dependencies = []
+        self.dependencies : list[AbstractInstanceProvider] = []
         self.scope_instance = Scopes.get(provider.get_scope(), environment)
 
     # implement
 
     def resolve(self, context: Providers.ResolveContext):
         context.add(self)
+        context.push(self)
 
         if not context.is_resolved(self):
             context.provider_dependencies[self] = [] #?
@@ -332,7 +333,7 @@ class EnvironmentInstanceProvider(AbstractInstanceProvider):
             for type in type_and_params[0]:
                 if params > 0:
                     params -= 1
-                    self.dependencies.append(context.get_provider(type))
+                    self.dependencies.append(context.get_provider(type)) # try/catch TODO
 
                 provider = context.add_provider_dependency(self, type)
                 if provider is not None:
@@ -340,6 +341,8 @@ class EnvironmentInstanceProvider(AbstractInstanceProvider):
 
         else:
             context.add(*context.get_provider_dependencies(self))
+
+        context.pop()
 
     def get_module(self) -> str:
         return self.provider.get_module()
@@ -398,12 +401,13 @@ class ClassInstanceProvider(InstanceProvider):
         for param in init.param_types:
             types.append(param)
 
-        # check @inject
+        # check @inject & create
 
         for method in TypeDescriptor.for_type(self.type).get_methods():
-            if method.has_decorator(inject):
+            if method.has_decorator(inject) or method.has_decorator(create):
                 for param in method.param_types:
                     types.append(param)
+        # done
 
         return types, self.params
 
@@ -431,28 +435,28 @@ class FunctionInstanceProvider(InstanceProvider):
 
     # constructor
 
-    def __init__(self, clazz : Type, method, return_type : Type[T], eager = True, scope = "singleton"):
-        super().__init__(clazz, return_type, eager, scope)
+    def __init__(self, clazz : Type, method: TypeDescriptor.MethodDescriptor, eager = True, scope = "singleton"):
+        super().__init__(clazz, method.return_type, eager, scope)
 
-        self.method = method
+        self.method : TypeDescriptor.MethodDescriptor = method
 
     # implement
 
     def get_dependencies(self) -> (list[Type],int):
-        return [self.host], 1
+        return [self.host, *self.method.param_types], 1 + len(self.method.param_types)
 
     def create(self, environment: Environment, *args):
         Environment.logger.debug("%s create class %s", self, self.type.__qualname__)
 
-        instance = self.method(*args) # args[0]=self
+        instance = self.method.method(*args) # args[0]=self
 
         return environment.created(instance)
 
     def report(self) -> str:
-        return f"{self.host.__name__}.{self.method.__name__}"
+        return f"{self.host.__name__}.{self.method.get_name()}"
 
     def __str__(self):
-        return f"FunctionInstanceProvider({self.host.__name__}.{self.method.__name__} -> {self.type.__name__})"
+        return f"FunctionInstanceProvider({self.host.__name__}.{self.method.get_name()} -> {self.type.__name__})"
 
 class FactoryInstanceProvider(InstanceProvider):
     """
@@ -553,7 +557,8 @@ class Providers:
         __slots__ = [
             "dependencies",
             "providers",
-            "provider_dependencies"
+            "provider_dependencies",
+            "path"
         ]
 
         # constructor
@@ -561,6 +566,7 @@ class Providers:
         def __init__(self, providers: Dict[Type, EnvironmentInstanceProvider]):
             self.dependencies : list[EnvironmentInstanceProvider] = []
             self.providers = providers
+            self.path = []
             self.provider_dependencies : dict[EnvironmentInstanceProvider, list[EnvironmentInstanceProvider]] = {}
 
         # public
@@ -586,7 +592,14 @@ class Providers:
 
             return provider
 
+        def push(self, provider):
+            self.path.append(provider)
+
+        def pop(self):
+            self.path.pop()
+
         def next(self):
+            self.path.clear()
             self.dependencies.clear()
 
         def get_provider(self, type: Type) -> EnvironmentInstanceProvider:
@@ -607,7 +620,7 @@ class Providers:
             cycle = ""
 
             first = True
-            for p in self.dependencies:
+            for p in self.path:
                 if not first:
                     cycle += " -> "
 
@@ -708,10 +721,13 @@ class Providers:
                 if type is provider.get_type():
                     raise ProviderCollisionException(f"type {type.__name__} already registered", existing_provider, provider)
 
-                if isinstance(existing_provider, AmbiguousProvider):
-                    cast(AmbiguousProvider, existing_provider).add_provider(provider)
-                else:
-                    cache[type] = AmbiguousProvider(type, existing_provider, provider)
+                if existing_provider.get_type() is not type:
+                    # only overwrite if the existing provider is not specific
+
+                    if isinstance(existing_provider, AmbiguousProvider):
+                        cast(AmbiguousProvider, existing_provider).add_provider(provider)
+                    else:
+                        cache[type] = AmbiguousProvider(type, existing_provider, provider)
 
             # recursion
 
@@ -763,8 +779,7 @@ def register_factories(cls: Type):
             if return_type is None:
                 raise DIRegistrationException(f"{cls.__name__}.{method.method.__name__} expected to have a return type")
 
-            Providers.register(FunctionInstanceProvider(cls, method.method, return_type, create_decorator.args[0],
-                                                        create_decorator.args[1]))
+            Providers.register(FunctionInstanceProvider(cls, method, create_decorator.args[0], create_decorator.args[1]))
 def order(prio = 0):
     def decorator(cls):
         Decorators.add(cls, order, prio)
@@ -939,12 +954,12 @@ class Environment:
     class Foo:
         def __init__(self):
 
-    @environment()
-    class SimpleEnvironment:
+    @module()
+    class Module:
         def __init__(self):
             pass
 
-    environment = Environment(SimpleEnvironment)
+    environment = Environment(Module)
 
     foo = environment.get(Foo)  # will create an instance of Foo
     ```
@@ -1026,9 +1041,33 @@ class Environment:
 
         def get_type_package(type: Type):
             module_name = type.__module__
-            module = sys.modules[module_name]
+            module = sys.modules.get(module_name)
 
-            return module.__package__
+            if not module:
+                raise ImportError(f"Module {module_name} not found")
+
+            # Try to get the package
+
+            package = getattr(module, '__package__', None)
+
+            # Fallback: if module is __main__, try to infer from the module name if possible
+
+            if not package:
+                if module_name == '__main__':
+                    # Try to resolve real name via __file__
+                    path = getattr(module, '__file__', None)
+                    if path:
+                        Environment.logger.warning(
+                            "Module is __main__; consider running via -m to preserve package context")
+                    return ''
+
+                # Try to infer package name from module name
+
+                parts = module_name.split('.')
+                if len(parts) > 1:
+                    return '.'.join(parts[:-1])
+
+            return package or ''
 
         def import_package(name: str):
             """Import a package and all its submodules recursively."""

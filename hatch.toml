@@ -1,0 +1,7 @@
+[workspace]
+# Declare all included packages
+root = "."
+members = [
+  "packages/aspyx",
+  "packages/aspyx_service"
+]
