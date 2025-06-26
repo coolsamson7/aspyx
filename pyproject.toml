@@ -9,21 +9,24 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch]
-# Register all subpackages
 projects = [
     "packages/aspyx",
     "packages/aspyx_service",
 ]
 
 [tool.hatch.envs.default]
-
-# Shared dev dependencies for the whole monorepo
 dependencies = [
     "pytest"
 ]
 
 #    "aspyx @ packages/aspyx",
 #    "aspyx_service @ packages/aspyx_service"
+
+[tool.hatch.envs.default.path]
+extend = [
+  "packages/aspyx/src",
+  "packages/aspyx_service/src",
+]
 
 [tool.hatch.envs.default.scripts]
 test = "pytest"
