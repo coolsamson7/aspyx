@@ -1,0 +1,4 @@
+server:
+  port: 8000
+consul:
+  url: http://localhost:8500
