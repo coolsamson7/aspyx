@@ -22,8 +22,6 @@ dependencies = [
     "pytest"
 ]
 
-env-vars = { PYTHONPATH = "packages/aspyx/src:packages/aspyx_service/src" }
-
 #    "aspyx @ packages/aspyx",
 #    "aspyx_service @ packages/aspyx_service"
 
