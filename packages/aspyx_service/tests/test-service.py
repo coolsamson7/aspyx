@@ -11,13 +11,14 @@ import atexit
 import consul
 import httpx
 
-from aspyx.di import module, create, injectable
+from aspyx.di import module, create, injectable, inject_environment, Environment
 from aspyx.di.aop import Invocation, advice, around, methods
 from aspyx.di.configuration import YamlConfigurationSource
 
 from aspyx_service import ConsulComponentRegistry, service, Service, component, Component, \
-    implementation, health, AbstractComponent, ComponentHealth, ChannelAddress, inject_service, \
-    FastAPIServer, Server, ServiceModule, DispatchJSONChannel, ServiceManager, ComponentDescriptor
+    implementation, health, AbstractComponent, ChannelAddress, inject_service, \
+    FastAPIServer, Server, ServiceModule, DispatchJSONChannel, ServiceManager, ComponentDescriptor, health_checks, \
+    check, HealthCheckManager, HealthStatus
 
 # configure logging
 
@@ -33,8 +34,8 @@ def configure_logging(levels: Dict[str, int]) -> None:
         logging.getLogger(name).setLevel(levels[name])
 
 configure_logging({
-    "aspyx.di": logging.INFO,
-    "aspyx.service": logging.INFO
+    "aspyx.di": logging.DEBUG,
+    "aspyx.service": logging.DEBUG
 })
 
 # just a test
@@ -164,10 +165,18 @@ class TestComponentImpl(AbstractComponent, TestComponent):
     def __init__(self):
         super().__init__()
 
+        self.health_check_manager : Optional[HealthCheckManager] = None
+
+    # lifecycle hooks
+
+    @inject_environment()
+    def set_environment(self, environment: Environment):
+        self.health_check_manager = environment.get(HealthCheckManager)
+
     # implement
 
     def get_health(self):
-        return ComponentHealth.UP
+        return self.health_check_manager.check()
 
     def get_addresses(self, port: int) -> list[ChannelAddress]:
         return [
@@ -195,6 +204,21 @@ class Test:
     #def set_service(self, service: TestService):
     #    self.service = service
     #    print(service)
+
+@health_checks()
+class Checks:
+    def __init__(self):
+        pass
+
+    @check(fail_if_slower_than=1)
+    def check_1(self, result: HealthCheckManager.Result):
+        #result.set_status(HealthStatus.OK)
+        #time.sleep(2)
+        pass
+
+    @check(name="check-2", cache=10)
+    def check_2(self, result: HealthCheckManager.Result):
+        pass # result.set_status(HealthStatus.OK)
 
 
 @module(imports=[ServiceModule])

@@ -16,22 +16,33 @@ from aspyx.di import injectable, Environment, Providers, ClassInstanceProvider, 
     Lifecycle, LifecycleCallable, InstanceProvider
 from aspyx.reflection import Decorators, DynamicProxy, DecoratorDescriptor, TypeDescriptor
 from aspyx.util import StringBuilder
+from .healthcheck import HealthCheckManager
 
 T = TypeVar("T")
 
 class Service:
+    """
+    This is something like a 'tagging interface' for services.
+    """
     pass
 
 class ComponentStatus(Enum):
+    """
+    A component is ij one of the following status:
+
+    - VIRGIN: just constructed
+    - RUNNING: registered and up and running
+    - STOPPED: after shutdown
+    """
     VIRGIN = auto()
     RUNNING = auto()
     STOPPED = auto()
 
-class ComponentHealth(Enum):
-    UP   = auto()
-    DOWN = auto()
-
 class Server(ABC):
+    """
+    A server is a central entity that boots a main module and initializes the ServiceManager.
+    It also is the place where http servers get initialized,
+    """
     port = 0
 
     # constructor
@@ -45,6 +56,10 @@ class Server(ABC):
 
     @abstractmethod
     def route(self, url : str, callable: Callable):
+        pass
+
+    @abstractmethod
+    def route_health(self, url: str, callable: Callable):
         pass
 
     @classmethod
@@ -66,6 +81,12 @@ class Server(ABC):
 
 @dataclass
 class ChannelAddress:
+    """
+    A channel address is a combination of:
+
+    - channel: the channel name
+    - uri: uri of the appropriate endpoint
+    """
     channel : str
     uri : str
 
@@ -73,6 +94,9 @@ class ChannelAddress:
         return f"{self.channel}({self.uri})"
 
 class Component(Service):
+    """
+    This is teh base class for components.
+    """
     @abstractmethod
     def startup(self):
         pass
@@ -90,10 +114,13 @@ class Component(Service):
         pass
 
     @abstractmethod
-    def get_health(self) -> ComponentHealth:
+    def get_health(self) -> HealthCheckManager.Health:
         pass
 
 class AbstractComponent(Component, ABC):
+    """
+    abstract base class for components
+    """
     # constructor
 
     def __init__(self):
@@ -152,6 +179,9 @@ def implementation():
     return decorator
 
 class BaseDescriptor(Generic[T]):
+    """
+    the base class for the meta data of both services and components.
+    """
     __slots__ = [
         "name",
         "description",
@@ -202,6 +232,9 @@ class BaseDescriptor(Generic[T]):
         return self.implementation is not None
 
 class ServiceDescriptor(BaseDescriptor[T]):
+    """
+    meta data for services
+    """
     __slots__ = [
         "component_descriptor"
     ]
@@ -222,6 +255,10 @@ class ServiceDescriptor(BaseDescriptor[T]):
         return self.component_descriptor
 
 class ComponentDescriptor(BaseDescriptor[T]):
+    """
+    meta data for components
+    """
+
     __slots__ = [
         "services",
         "health",
@@ -513,7 +550,7 @@ class ServiceManager:
 
                     # add health route
 
-                    server.route(health_name, instance.get_health)
+                    server.route_health(health_name, instance.get_health)
 
                     # register addresses
 

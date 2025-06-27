@@ -4,10 +4,11 @@ This module provides the core Aspyx service management framework allowing for se
 
 from aspyx.di import module
 
-from .service import ServiceException, Server, Channel, ComponentDescriptor, inject_service, ChannelAddress, ServiceAddress, ServiceManager, Component, Service, AbstractComponent, ComponentStatus, ComponentHealth, ComponentRegistry, implementation, health, component, service
+from .service import ServiceException, Server, Channel, ComponentDescriptor, inject_service, ChannelAddress, ServiceAddress, ServiceManager, Component, Service, AbstractComponent, ComponentStatus, ComponentRegistry, implementation, health, component, service
 from .channels import HTTPXChannel, DispatchJSONChannel
 from .registries import ConsulComponentRegistry
 from .server import FastAPIServer
+from .healthcheck import health_checks, check, HealthCheckManager, HealthStatus
 
 
 @module()
@@ -28,7 +29,6 @@ __all__ = [
     "AbstractComponent",
     "ComponentStatus",
     "ComponentDescriptor",
-    "ComponentHealth",
     "ComponentRegistry",
     "ChannelAddress",
     "ServiceAddress",
@@ -37,6 +37,8 @@ __all__ = [
     "service",
     "implementation",
     "inject_service",
+
+    # healthcheck
 
     # serialization
 
