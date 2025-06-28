@@ -16,7 +16,7 @@ from aspyx.di import Environment
 from aspyx.reflection import TypeDescriptor
 from .healthcheck import HealthCheckManager, HealthStatus
 
-from .serialization import deserialize
+from .serialization import deserialize, get_deserializer
 
 from .service import Server, ServiceManager
 from .channels import Request, Response
@@ -40,6 +40,7 @@ class FastAPIServer(Server):
         # cache
 
         self.param_types: dict[str, list[Type]] = {}
+        self.deserializers: dict[str, list[Callable]] = {}
 
         # that's the overall dispatcher
 
@@ -56,11 +57,23 @@ class FastAPIServer(Server):
 
         print(f"server started on {self.host}:{self.port}")
 
-    def deserialize_args(self, request: Request, param_types: list[Type]) -> list:
+    def get_deserializers(self, service: Type, method):
+        deserializers = self.deserializers.get(method, None)
+        if deserializers is None:
+            descriptor = TypeDescriptor.for_type(service).get_method(method.__name__)
+
+            deserializers = [get_deserializer(type) for type in descriptor.param_types]
+            self.deserializers[method] = deserializers
+
+        return deserializers
+
+    def deserialize_args(self, request: Request, type: Type, method: Callable) -> list:
         args = list(request.args)
 
-        for i in range(0, len(param_types)):
-            args[i] = deserialize(args[i], param_types[i])
+        deserializers = self.get_deserializers(type, method)
+
+        for i in range(0, len(args)):
+            args[i] = deserializers[i](args[i])
 
         return args
 
@@ -114,7 +127,8 @@ class FastAPIServer(Server):
         service = self.service_manager.get_service(service_descriptor.type, preferred_channel="local")
 
         method = getattr(service, method_name)
-        args = self.deserialize_args(request, self.get_param_types(request.method, lambda: TypeDescriptor.for_type(service_descriptor.type).get_method(method_name).param_types))
+
+        args = self.deserialize_args(request, service_descriptor.type, method)
         try:
             if inspect.iscoroutinefunction(method):
                 result = await method(*args)
@@ -152,15 +166,6 @@ class FastAPIServer(Server):
             )
 
         self.router.get(url)(get_health_response)
-        #self.router.get(url)(lambda:
-        #                     get_health_response()
-        #                     )
-
-       # self.router.add_api_route(
-       #     path=url,
-       #     endpoint=get_health_response,
-       #     methods=["GET"]
-       # )
 
     def boot(self, module_type: Type) -> Environment:
         # setup environment

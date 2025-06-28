@@ -18,7 +18,7 @@ def health_checks():
     def decorator(cls):
         Decorators.add(cls, health_checks)
 
-        Providers.register(ClassInstanceProvider(cls, True, "singleton"))
+        Providers.register(ClassInstanceProvider(cls, True, "singleton")) # TODO what if it is alread registered?
 
         HealthCheckManager.types.append(cls)
 

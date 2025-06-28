@@ -113,7 +113,8 @@ class DispatchJSONChannel(HTTPXChannel):
                 if result.exception is not None:
                     raise RemoteServiceException(f"server side exception {result.exception}")
 
-                return deserialize(result.result, return_type)
+                #return deserialize(result.result, return_type)
+                return get_deserializer(return_type)(result.result)
             else:
                 raise ServiceException(f"no url for channel {self.name} for component {self.component_descriptor.name} registered")
         except Exception as e:

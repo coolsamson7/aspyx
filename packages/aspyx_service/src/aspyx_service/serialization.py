@@ -69,12 +69,16 @@ def from_dict(cls, data: dict):
     return cls(**kwargs)
 
 class TypeDeserializer:
+    # constructor
+
     def __init__(self, typ):
         self.typ = typ
         self.deserializer = self._build_deserializer(typ)
 
     def __call__(self, value):
         return self.deserializer(value)
+
+    # internal
 
     def _build_deserializer(self, typ):
         origin = get_origin(typ)
