@@ -20,7 +20,7 @@ class HTTPXChannel(Channel):
         "client",
         "async_client",
         "service_names",
-        "return_types"
+        "deserializers"
     ]
 
     # constructor
@@ -31,17 +31,20 @@ class HTTPXChannel(Channel):
         self.client: Optional[Client] = None
         self.async_client: Optional[AsyncClient] = None
         self.service_names: dict[Type, str] = {}
-        self.return_types: dict[Callable, Type] = {}
+        self.deserializers: dict[Callable, Callable] = {}
 
     # protected
 
-    def get_return_type(self, type: Type, method: Callable) -> Type:
-        return_type = self.return_types.get(method, None)
-        if return_type is None:
+    def get_deserializer(self, type: Type, method: Callable) -> Type:
+        deserializer = self.deserializers.get(method, None)
+        if deserializer is None:
             return_type = TypeDescriptor.for_type(type).get_method(method.__name__).return_type
-            self.return_types[method] = return_type
 
-        return return_type
+            deserializer = get_deserializer(return_type)
+
+            self.deserializers[method] = deserializer
+
+        return deserializer
 
     # override
 
@@ -90,7 +93,7 @@ class DispatchJSONChannel(HTTPXChannel):
         should_reset = (
                 address is None or
                 not address.urls or
-                (self.address and self.address.urls[0] not in address.urls)
+                (self.address and self.address.urls[0] not in address.urls) # TODO
         )
 
         self.client = self.make_client() if not should_reset else None
@@ -105,16 +108,13 @@ class DispatchJSONChannel(HTTPXChannel):
         service_name = self.service_names[invocation.type]  # map type to registered service name
         request = Request(method=f"{self.component_descriptor.name}:{service_name}:{invocation.method.__name__}", args=invocation.args)
 
-        return_type = self.get_return_type(invocation.type, invocation.method)
-
         try:
             if self.client is not None:
                 result = Response(**self.client.post(f"{self.get_url()}/invoke", json=request.dict(), timeout=30000.0).json())
                 if result.exception is not None:
                     raise RemoteServiceException(f"server side exception {result.exception}")
 
-                #return deserialize(result.result, return_type)
-                return get_deserializer(return_type)(result.result)
+                return self.get_deserializer(invocation.type, invocation.method)(result.result)
             else:
                 raise ServiceException(f"no url for channel {self.name} for component {self.component_descriptor.name} registered")
         except Exception as e:
@@ -125,8 +125,6 @@ class DispatchJSONChannel(HTTPXChannel):
         request = Request(method=f"{self.component_descriptor.name}:{service_name}:{invocation.method.__name__}",
                           args=invocation.args)
 
-        return_type = self.get_return_type(invocation.type, invocation.method)
-
         try:
             if self.async_client is not None:
                 data =  await self.async_client.post(f"{self.get_url()}/invoke", json=request.dict(), timeout=30000.0)
@@ -134,8 +132,7 @@ class DispatchJSONChannel(HTTPXChannel):
                 if result.exception is not None:
                     raise RemoteServiceException(f"server side exception {result.exception}")
 
-                #return deserialize(result.result, return_type)
-                return get_deserializer(return_type)(result.result)
+                return self.get_deserializer(invocation.type, invocation.method)(result.result)
             else:
                 raise ServiceException(
                     f"no url for channel {self.name} for component {self.component_descriptor.name} registered")
@@ -151,7 +148,7 @@ class DispatchMSPackChannel(HTTPXChannel):
 
     # override
 
-    def set_address(self, address):
+    def set_address(self, address: Optional[ServiceAddress]):
         self.client = self.make_client() if address else None
         self.async_client = self.make_async_client() if address else None
 
@@ -161,8 +158,6 @@ class DispatchMSPackChannel(HTTPXChannel):
         service_name = self.service_names[invocation.type]  # map type to registered service name
         request = Request(method=f"{self.component_descriptor.name}:{service_name}:{invocation.method.__name__}",
                           args=invocation.args)
-
-        return_type = self.get_return_type(invocation.type, invocation.method)
 
         try:
             packed = msgpack.packb(request.dict(), use_bin_type=True)
@@ -180,11 +175,10 @@ class DispatchMSPackChannel(HTTPXChannel):
                 if result.get("exception", None):
                     raise RemoteServiceException(f"server-side: {result['exception']}")
 
-                #return deserialize(result["result"], return_type)
-                return get_deserializer(return_type)(result["result"])
+                return self.get_deserializer(invocation.type, invocation.method)(result["result"])
 
             else:
-                raise ServiceException("No client available for MSPackChannel.")
+                raise ServiceException("No client available for msgpack.")
 
         except Exception as e:
             raise ServiceException(f"MSPackChannel exception: {e}") from e
@@ -193,8 +187,6 @@ class DispatchMSPackChannel(HTTPXChannel):
         service_name = self.service_names[invocation.type]  # map type to registered service name
         request = Request(method=f"{self.component_descriptor.name}:{service_name}:{invocation.method.__name__}",
                           args=invocation.args)
-
-        return_type = self.get_return_type(invocation.type, invocation.method)
 
         try:
             packed = msgpack.packb(request.dict(), use_bin_type=True)
@@ -212,12 +204,11 @@ class DispatchMSPackChannel(HTTPXChannel):
                 if result.get("exception", None):
                     raise RemoteServiceException(f"server-side: {result['exception']}")
 
-                #return deserialize(result["result"], return_type)
-                return get_deserializer(return_type)(result["result"])
+                return self.get_deserializer(invocation.type, invocation.method)(result["result"])
 
             else:
-                raise ServiceException("No client available for MSPackChannel.")
+                raise ServiceException("No client available for msgpack.")
 
         except Exception as e:
-            raise ServiceException(f"MSPackChannel exception: {e}") from e
+            raise ServiceException(f"msgpack exception: {e}") from e
     

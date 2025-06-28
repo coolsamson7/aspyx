@@ -4,6 +4,7 @@ health checks
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from enum import Enum
 from typing import Any, Callable, Type, Optional
@@ -48,6 +49,8 @@ class HealthStatus(Enum):
 
 @injectable()
 class HealthCheckManager:
+    logger = logging.getLogger("aspyx.service.health")
+
     # local classes
 
     class Check:
@@ -132,6 +135,8 @@ class HealthCheckManager:
     # check
 
     async def check(self) -> HealthCheckManager.Health:
+        self.logger.info("Checking health...")
+
         health = HealthCheckManager.Health()
 
         tasks = []

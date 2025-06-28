@@ -327,16 +327,16 @@ class Channel(DynamicProxy.InvocationHandler, ABC):
         "address"
     ]
 
-    class URLProvider:
+    class URLSelector:
         @abstractmethod
-        def get(self, urls: list[str]) -> str:
+        def get(self, urls: list[str]) -> str: # TODO no url...
             pass
 
-    class FirstURLProvider(URLProvider):
+    class FirstURLSelector(URLSelector):
         def get(self, urls: list[str]) -> str:
             return urls[0]
 
-    class RoundRobinURLProvider(URLProvider):
+    class RoundRobinURLSelector(URLSelector):
         def __init__(self):
             self.index = 0
 
@@ -353,18 +353,18 @@ class Channel(DynamicProxy.InvocationHandler, ABC):
         self.name = name
         self.component_descriptor : Optional[ComponentDescriptor] = None
         self.address: Optional[ServiceAddress] = None
-        self.url_provider : Channel.URLProvider = Channel.FirstURLProvider()
+        self.url_provider : Channel.URLSelector = Channel.FirstURLSelector()
 
     # public
 
     def customize(self):
         pass
 
-    def round_robin(self):
-        self.url_provider = Channel.RoundRobinURLProvider()
+    def select_round_robin(self):
+        self.url_provider = Channel.RoundRobinURLSelector()
 
-    def puck_first_url(self):
-        self.url_provider = Channel.FirstURLProvider()
+    def select_first_url(self):
+        self.url_provider = Channel.FirstURLSelector()
 
     def get_url(self) -> str:
         return self.url_provider.get(self.address.urls)
