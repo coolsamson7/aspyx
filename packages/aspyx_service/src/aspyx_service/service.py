@@ -114,7 +114,7 @@ class Component(Service):
         pass
 
     @abstractmethod
-    def get_health(self) -> HealthCheckManager.Health:
+    async def get_health(self) -> HealthCheckManager.Health:
         pass
 
 class AbstractComponent(Component, ABC):

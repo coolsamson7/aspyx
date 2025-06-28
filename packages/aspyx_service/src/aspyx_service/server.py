@@ -138,8 +138,8 @@ class FastAPIServer(Server):
         self.router.get(url)(callable)
 
     def route_health(self, url: str, callable: Callable):
-        def get_health_response():
-            health : HealthCheckManager.Health = callable()
+        async def get_health_response():
+            health : HealthCheckManager.Health = await callable()
 
             return JSONResponse(
                 status_code= self.component_registry.map_health(health),

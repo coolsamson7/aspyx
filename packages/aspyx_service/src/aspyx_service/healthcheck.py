@@ -3,6 +3,7 @@ health checks
 """
 from __future__ import annotations
 
+import asyncio
 import time
 from enum import Enum
 from typing import Any, Callable, Type, Optional
@@ -60,22 +61,26 @@ class HealthCheckManager:
 
             self.last_value : Optional[HealthCheckManager.Result] = None
 
-        def run(self, result: HealthCheckManager.Result):
+        async def run(self, result: HealthCheckManager.Result):
             now = time.time()
 
             if self.cache > 0 and self.last_check is not None and now - self.last_check < self.cache:
                 result.copy_from(self.last_value)
+                return
+
+            self.last_check = now
+            self.last_value = result
+
+            if asyncio.iscoroutinefunction(self.callable):
+                await self.callable(self.instance, result)
             else:
-                self.last_check = now
-                self.last_value = result
-                self.callable(self.instance, result)
+                await asyncio.to_thread(self.callable, self.instance, result)
 
-                spent = time.time() - now
+            spent = time.time() - now
 
-                if result.status == HealthStatus.OK:
-                    if 0 < self.fail_if_slower_than < spent:
-                        result.status = HealthStatus.ERROR
-                        result.details = f"spent {spent}s"
+            if result.status == HealthStatus.OK and 0 < self.fail_if_slower_than < spent:
+                result.status = HealthStatus.ERROR
+                result.details = f"spent {spent:.3f}s"
 
 
     class Result:
@@ -126,18 +131,18 @@ class HealthCheckManager:
 
     # check
 
-    def check(self) -> HealthCheckManager.Health:
+    async def check(self) -> HealthCheckManager.Health:
         health = HealthCheckManager.Health()
 
+        tasks = []
         for check in self.checks:
             result = HealthCheckManager.Result(check.name)
-
             health.results.append(result)
+            tasks.append(check.run(result))
 
-            check.run(result)
+        await asyncio.gather(*tasks)
 
-            # update overall status
-
+        for result in health.results:
             if result.status.value > health.status.value:
                 health.status = result.status
 
