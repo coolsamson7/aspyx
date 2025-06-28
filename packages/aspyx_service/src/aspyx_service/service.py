@@ -394,6 +394,10 @@ class ComponentRegistry:
     def get_addresses(self, descriptor: ComponentDescriptor) -> list[ServiceAddress]:
         pass
 
+    @abstractmethod
+    def map_health(self, health:  HealthCheckManager.Health) -> int:
+        return 200
+
     def shutdown(self):
         pass
 

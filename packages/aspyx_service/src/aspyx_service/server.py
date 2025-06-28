@@ -14,6 +14,7 @@ from fastapi import Request as HttpRequest, Response as HttpResponse
 
 from aspyx.di import Environment
 from aspyx.reflection import TypeDescriptor
+from . import ComponentRegistry
 from .healthcheck import HealthCheckManager, HealthStatus
 
 from .serialization import deserialize, get_deserializer
@@ -33,13 +34,13 @@ class FastAPIServer(Server):
         Server.port = port
         self.server_thread = None
         self.service_manager : Optional[ServiceManager] = None
+        self.component_registry: Optional[ComponentRegistry] = None
 
         self.router = APIRouter()
         self.fast_api = FastAPI(host=self.host, port=Server.port, debug=True)
 
         # cache
 
-        self.param_types: dict[str, list[Type]] = {}
         self.deserializers: dict[str, list[Callable]] = {}
 
         # that's the overall dispatcher
@@ -104,14 +105,6 @@ class FastAPIServer(Server):
                 media_type="application/msgpack"
             )
 
-    def get_param_types(self, method: str, compute: Callable) -> list[Type]:
-        param_types = self.param_types.get(method, None)
-        if param_types is None:
-            param_types = compute()
-            self.param_types[method] = param_types
-
-        return param_types
-
     async def dispatch(self, request: Request) :
         ServiceManager.logger.debug("dispatch request %s", request.method)
 
@@ -145,24 +138,12 @@ class FastAPIServer(Server):
         self.router.get(url)(callable)
 
     def route_health(self, url: str, callable: Callable):
-        def remove_empty_strings(obj):
-            if isinstance(obj, dict):
-                return {k: remove_empty_strings(v) for k, v in obj.items() if v != ""}
-            elif isinstance(obj, list):
-                return [remove_empty_strings(item) for item in obj]
-            else:
-                return obj
-
         def get_health_response():
-            result : HealthCheckManager.Health = callable()
-            health = callable().to_dict()
+            health : HealthCheckManager.Health = callable()
 
-            health = remove_empty_strings(health)
-
-            status_code = 200 if result.status is HealthStatus.OK else 503
             return JSONResponse(
-                status_code=status_code,
-                content = health
+                status_code= self.component_registry.map_health(health),
+                content = health.to_dict()
             )
 
         self.router.get(url)(get_health_response)
@@ -173,6 +154,7 @@ class FastAPIServer(Server):
         environment = Environment(module_type)
 
         self.service_manager = environment.get(ServiceManager)
+        self.component_registry = environment.get(ComponentRegistry)
 
         self.service_manager.startup(self)
 
@@ -180,8 +162,8 @@ class FastAPIServer(Server):
 
         self.fast_api.include_router(self.router)
 
-        for route in self.fast_api.routes:
-            print(f"{route.name}: {route.path} [{route.methods}]")
+        #for route in self.fast_api.routes:
+        #    print(f"{route.name}: {route.path} [{route.methods}]")
 
         # start server thread
 

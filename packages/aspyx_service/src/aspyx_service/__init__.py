@@ -8,7 +8,7 @@ from .service import ServiceException, Server, Channel, ComponentDescriptor, inj
 from .channels import HTTPXChannel, DispatchJSONChannel
 from .registries import ConsulComponentRegistry
 from .server import FastAPIServer
-from .healthcheck import health_checks, check, HealthCheckManager, HealthStatus
+from .healthcheck import health_checks, health_check, HealthCheckManager, HealthStatus
 
 
 @module()

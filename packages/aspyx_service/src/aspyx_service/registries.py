@@ -12,6 +12,7 @@ import consul
 
 from aspyx.util import StringBuilder
 from aspyx.di import on_init
+from .healthcheck import HealthCheckManager, HealthStatus
 
 from .server import Server
 from .service import ComponentRegistry, Channel, ServiceAddress, ServiceManager, ComponentDescriptor, Component, ChannelAddress
@@ -210,3 +211,17 @@ class ConsulComponentRegistry(ComponentRegistry):
                 self.component_addresses[descriptor.name] = component_addresses
 
         return list(component_addresses.values())
+
+    #200–299	passing	Service is healthy (OK, Created, No Content…)
+    #429	warning	Rate limited or degraded
+    #300–399	warning	Redirects interpreted as potential issues
+    #400–499	critical	Client errors (Bad Request, Unauthorized…)
+    #500–599	critical	Server errors (Internal Error, Timeout…)
+    #Other / No response	critical	Timeout, connection refused, etc.
+    def map_health(self, health: HealthCheckManager.Health) -> int:
+        if health.status is HealthStatus.OK:
+            return 200
+        elif health.status is HealthStatus.WARNING:
+            return 429
+        else:
+            return 500

@@ -18,7 +18,8 @@ def health_checks():
     def decorator(cls):
         Decorators.add(cls, health_checks)
 
-        Providers.register(ClassInstanceProvider(cls, True, "singleton")) # TODO what if it is alread registered?
+        #if not Providers.is_registered(cls):
+        #    Providers.register(ClassInstanceProvider(cls, True, "singleton"))
 
         HealthCheckManager.types.append(cls)
 
@@ -26,11 +27,11 @@ def health_checks():
 
     return decorator
 
-def check(name="", cache = 0, fail_if_slower_than = 0):
+def health_check(name="", cache = 0, fail_if_slower_than = 0):
     """
     Methods annotated with `@on_init` will be called when the instance is created."""
     def decorator(func):
-        Decorators.add(func, check, name, cache, fail_if_slower_than)
+        Decorators.add(func, health_check, name, cache, fail_if_slower_than)
         return func
 
     return decorator
@@ -74,29 +75,33 @@ class HealthCheckManager:
                 if result.status == HealthStatus.OK:
                     if 0 < self.fail_if_slower_than < spent:
                         result.status = HealthStatus.ERROR
-                        result.message = f"spent {spent}s"
+                        result.details = f"spent {spent}s"
 
 
     class Result:
         def __init__(self, name: str):
             self.status = HealthStatus.OK
             self.name = name
-            self.message = ""
+            self.details = ""
 
         def copy_from(self, value: HealthCheckManager.Result):
             self.status  = value.status
-            self.message = value.message
+            self.details = value.details
 
-        def set_status(self, status: HealthStatus, message =""):
+        def set_status(self, status: HealthStatus, details =""):
             self.status = status
-            self.message = message
+            self.details = details
 
         def to_dict(self):
-            return {
+            result = {
                 "name": self.name,
                 "status": str(self.status),
-                "message": self.message # TODO
             }
+
+            if len(self.details) > 0:
+                result["details"] = self.details
+
+            return result
 
     class Health:
         def __init__(self):
@@ -106,7 +111,7 @@ class HealthCheckManager:
         def to_dict(self):
             return {
                 "status": str(self.status),
-                "checks": [r.to_dict() for r in self.results]
+                "checks": [result.to_dict() for result in self.results]
             }
 
     # class data
@@ -151,8 +156,8 @@ class HealthCheckManager:
             instance = self.environment.get(type)
 
             for method in descriptor.get_methods():
-                if method.has_decorator(check):
-                    decorator = method.get_decorator(check)
+                if method.has_decorator(health_check):
+                    decorator = method.get_decorator(health_check)
 
                     name = decorator.args[0]
                     cache = decorator.args[1]
