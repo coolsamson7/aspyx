@@ -7,15 +7,20 @@ that lets you deploy, discover and call services with different remoting protoco
 
 The basic design consists of four different concepts:
 
-- **Service**
+!!! info "Service"
+  defines a group of methods that can be called either locally or remotely. 
+  These methods represent the functional interface exposed to clients — similar to an interface in traditional programming
 
-  a service defines a set of methods that can be called
-- **Component**
-  a component bundles a list of services and determines the protocols that are available to call the services.
-- **Component Registry**
-  the registry is a central service that is used to register and discover components
-- **Channel**
-  channels implement any transport protocol that is used to execute remote calls.
+!!! info "Component"
+  a component bundles one or more services and declares the channels (protocols) used to expose them.
+  Think of a component as a deployment unit or module.
+
+!!! info "Component Registry "
+  acts as the central directory for managing available components.
+  It allows the framework to register, discover, and resolve components and their services.
+
+!!! info "Channel"
+  is a pluggable transport layer that defines how service method invocations are transmitted and handled.
 
 Let's look at the "interface" layer first.
 
