@@ -345,6 +345,17 @@ class ChannelAdvice:
         return invocation.proceed()
 ```
 
+### Performance
+
+I benchmarked the different implementations with a recursive dataclass as an argument and return value.
+The avg response times - on a local server - where all below 1ms per call.
+
+- rest calls are the slowest ( about 0.7ms )
+- dispatching-json 20% faster
+- dispatching-msgpack 30% faster
+
+The big advantage of the dispatching flavors is also, that you don't have to worry about the additional decorators!
+
 ### Rest Calls
 
 Invoking rest calls requires decorators and some marker annotations.
@@ -412,6 +423,7 @@ class ChannelAdvice:
 
 In order to expose components via HTTP, the corresponding infrastructure in form of a FastAPI server needs to be setup. 
 
+
 ```python
 @module()
 class Module():
@@ -428,7 +440,7 @@ No need to add any FastAPI decorators, sicen the mapping is already done interna
 
 ## Implementing Channels
 
-In order to implement a new channel, you only need to derive from one of the possible base classes ( `Channel` or `HTTPXChannel`)
+In order to implement a new channel, you only need to derive from one of the possible base classes ( `Channel` or `HTTPXChannel` that already has a `httpx` client)
 and decorate it with `@channel(<name>)`
 
 The main methods to implement are `ìnvoke` and `ìnvoke_async`
@@ -441,7 +453,7 @@ class FancyChannel(Channel):
     # constructor
 
     def __init__(self):
-        super().__init__("fancy")
+        super().__init__()
 
     # override
 
