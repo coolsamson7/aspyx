@@ -112,8 +112,8 @@ class HealthCheckManager:
             return result
 
     class Health:
-        def __init__(self):
-            self.status = HealthStatus.OK
+        def __init__(self, status: HealthStatus = HealthStatus.OK):
+            self.status = status
             self.results : list[HealthCheckManager.Result] = []
 
         def to_dict(self):
