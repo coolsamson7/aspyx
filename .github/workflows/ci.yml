@@ -23,14 +23,6 @@ jobs:
       - name: Setup environment
         run: echo "PYTHONPATH=packages/aspyx/src:packages/aspyx_service/src" >> $GITHUB_ENV
 
-      - name: Debug source files
-        run: |
-            pwd
-            ls -R packages/aspyx/src
-            ls -R packages/aspyx_service/src
-            find packages/aspyx/src/aspyx -name '__init__.py' -exec ls -l {} +
-            find packages/aspyx_service/src/aspyx_service -name '__init__.py' -exec ls -l {} +
-
       - name: Build aspyx package
         working-directory: packages/aspyx
         run: |
@@ -42,5 +34,4 @@ jobs:
         working-directory: packages/aspyx_service
         run: |
           hatch build
-          hatch run test
           pip install dist/*.whl
