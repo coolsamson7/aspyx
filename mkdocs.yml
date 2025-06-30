@@ -34,6 +34,7 @@ nav:
       - Reflection: index/reflection.md
       - Exceptions: index/exceptions.md
       - Threading: index/threading.md
+      - Service: index/service.md
       - Version History: index/versions.md
 
   - API Reference:
