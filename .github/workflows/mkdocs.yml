@@ -19,13 +19,12 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Install dependencies via Hatch1
+      - name: Install MkDocs and plugins
         run: |
-            pip install hatch
-            hatch run pip install mkdocs-material mkdocstrings[python]
+          pip install mkdocs-material mkdocstrings[python]
 
       - name: Build docs
-        run: hatch run mkdocs build
+        run: mkdocs build
 
       - name: Deploy to GitHub Pages
-        run: hatch run mkdocs gh-deploy --force
+        run: mkdocs gh-deploy --force
