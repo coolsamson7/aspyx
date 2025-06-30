@@ -19,4 +19,4 @@ build-backend = "hatchling.build"
 source = "src"
 
 [tool.hatch.build.targets.wheel]
-packages = ["aspyx"]
+packages = ["src/aspyx"]
