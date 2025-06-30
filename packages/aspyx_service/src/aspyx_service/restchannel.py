@@ -25,6 +25,13 @@ QueryParam = lambda t: Annotated[t, QueryParamMarker]
 
 # decorators
 
+def rest(url):
+    def decorator(cls):
+        Decorators.add(cls, rest, url)
+
+        return cls
+    return decorator
+
 def get(url):
     def decorator(cls):
         Decorators.add(cls, get, url)
@@ -40,6 +47,32 @@ def post(url):
         return cls
 
     return decorator
+
+def put(url):
+    def decorator(cls):
+        Decorators.add(cls, put, url)
+
+        return cls
+
+    return decorator
+
+def delete(url):
+    def decorator(cls):
+        Decorators.add(cls, delete, url)
+
+        return cls
+
+    return decorator
+
+def patch(url):
+    def decorator(cls):
+        Decorators.add(cls, patch, url)
+
+        return cls
+
+    return decorator
+
+
 
 
 @channel("rest")
@@ -59,6 +92,10 @@ class RestChannel(HTTPXChannel):
         def __init__(self, type: Type, method : Callable):
             self.signature = inspect.signature(method)
 
+            prefix = ""
+            if Decorators.has_decorator(type, rest):
+                prefix = Decorators.get_decorator(type, rest).args[0]
+
             # find decorator
 
             self.type = "get"
@@ -66,16 +103,11 @@ class RestChannel(HTTPXChannel):
 
             decorators = Decorators.get_all(method)
 
-            for decorator in [get, post]:
+            for decorator in [get, post, put, delete, patch]:
                 descriptor = next((descriptor for descriptor in decorators if descriptor.decorator is decorator), None)
                 if descriptor is not None:
-                    if decorator is get:
-                        self.type = "get"
-
-                    elif decorator is post:
-                        self.type = "post"
-
-                    self.url_template = descriptor.args[0]
+                    self.type = decorator.__name__
+                    self.url_template = prefix + descriptor.args[0]
 
             # parameters
 
@@ -152,6 +184,10 @@ class RestChannel(HTTPXChannel):
                 result = None
                 if call.type == "get":
                     result = self.client.get(self.get_url() + url, params=query_params, timeout=30000.0).json()
+                elif call.type == "put":
+                    result = self.client.put(self.get_url() + url, params=query_params, timeout=30000.0).json()
+                elif call.type == "delete":
+                    result = self.client.delete(self.get_url() + url, params=query_params, timeout=30000.0).json()
                 elif call.type == "post":
                     result = self.client.post(self.get_url() + url, params=query_params, json=body, timeout=30000.0).json()
 

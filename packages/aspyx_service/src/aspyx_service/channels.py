@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from aspyx.reflection import DynamicProxy, TypeDescriptor
 
 from .service import ComponentDescriptor, ServiceAddress, ServiceException, channel, Channel, RemoteServiceException
-from .serialization import deserialize, get_deserializer
+from .serialization import get_deserializer
 
 
 class HTTPXChannel(Channel):
@@ -211,4 +211,4 @@ class DispatchMSPackChannel(HTTPXChannel):
 
         except Exception as e:
             raise ServiceException(f"msgpack exception: {e}") from e
-    
+

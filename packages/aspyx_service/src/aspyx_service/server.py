@@ -3,28 +3,27 @@ FastAPI server implementation for the aspyx service framework.
 """
 import functools
 import inspect
-import json
 import threading
 from typing import Type, Optional, Callable
 
 from fastapi.responses import JSONResponse
 import msgpack
 import uvicorn
-from fastapi import FastAPI, APIRouter
-from fastapi import Request as HttpRequest, Response as HttpResponse
+
+from fastapi import FastAPI, APIRouter, Request as HttpRequest, Response as HttpResponse
 
 from aspyx.di import Environment
-from aspyx.reflection import TypeDescriptor
-from . import ComponentRegistry
-from .healthcheck import HealthCheckManager, HealthStatus
+from aspyx.reflection import TypeDescriptor, Decorators
 
-from .serialization import deserialize, get_deserializer
+from .service import ComponentRegistry
+from .healthcheck import HealthCheckManager
+
+from .serialization import get_deserializer
 
 from .service import Server, ServiceManager
 from .channels import Request, Response
 
-from .restchannel import get, post
-
+from .restchannel import get, post, put, delete, rest
 
 
 class FastAPIServer(Server):
@@ -58,57 +57,26 @@ class FastAPIServer(Server):
         add everything that looks like a http endpoint
         """
 
-        # local functions
-
-        def wrap_method(bound_method):
-            return bound_method
-
-
-            sig = inspect.signature(bound_method)
-            params = list(sig.parameters.values())[1:]  # Skip `self`
-            new_sig = sig # sig.replace(parameters=params)
-
-            if inspect.iscoroutinefunction(bound_method):
-                @functools.wraps(bound_method)
-                async def async_wrapper(*args, **kwargs):
-                    return await bound_method(*args, **kwargs)
-
-                async_wrapper.__signature__ = new_sig
-
-                return async_wrapper
-            else:
-                @functools.wraps(bound_method)
-                def sync_wrapper(*args, **kwargs):
-                    return bound_method(*args, **kwargs)
-
-                sync_wrapper.__signature__ = new_sig
-
-                return sync_wrapper
-
         # go
 
         for descriptor in self.service_manager.descriptors.values():
             if not descriptor.is_component() and descriptor.is_local():
+                prefix = ""
+
                 type_descriptor = TypeDescriptor.for_type(descriptor.type)
                 instance = self.environment.get(descriptor.implementation)
 
+                if type_descriptor.has_decorator(rest):
+                    prefix = type_descriptor.get_decorator(rest).args[0]
+
                 for method in type_descriptor.get_methods():
-                    if method.has_decorator(get):
-                        decorator = method.get_decorator(get)
+                    decorator = next((decorator for decorator in Decorators.get(method.method) if decorator.decorator in [get, put, post, delete]), None)
+                    if decorator is not None:
                         self.router.add_api_route(
-                            path=decorator.args[0],
-                            endpoint=wrap_method(getattr(instance, method.get_name())),
-                            methods=["GET"],
+                            path=prefix + decorator.args[0],
+                            endpoint=getattr(instance, method.get_name()),
+                            methods=[decorator.decorator.__name__],
                             name=f"{descriptor.get_component_descriptor().name}.{descriptor.name}.{method.get_name()}",
-                            response_model=method.return_type,
-                        )
-                    elif method.has_decorator(post):
-                        decorator = method.get_decorator(post)
-                        self.router.add_api_route(
-                            path=decorator.args[0],
-                            endpoint=wrap_method(getattr(instance, method.get_name())),
-                            methods=["POST"],
-                            name=descriptor.get_component_descriptor().name + "." + descriptor.name,
                             response_model=method.return_type,
                         )
 
