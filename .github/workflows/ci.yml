@@ -32,11 +32,13 @@ jobs:
         run: |
           cd packages/aspyx
           hatch build
+          hatch run test
 
       - name: Build aspyx_service package
         run: |
           cd packages/aspyx_service
           hatch build
+          hatch run test
 
       - name: Install built wheels
         run: |
