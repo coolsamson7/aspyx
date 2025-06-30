@@ -10,6 +10,7 @@ from httpx import Client, AsyncClient
 from pydantic import BaseModel
 
 from aspyx.reflection import DynamicProxy, TypeDescriptor
+from .service import ServiceManager
 
 from .service import ComponentDescriptor, ServiceAddress, ServiceException, channel, Channel, RemoteServiceException
 from .serialization import get_deserializer
@@ -63,6 +64,18 @@ class HTTPXChannel(Channel):
 
     # public
 
+    def get_client(self) -> Client:
+        if self.client is None:
+            self.client = self.make_client()
+
+        return self.client
+
+    def get_async_client(self) -> Client:
+        if self.async_client is None:
+            self.async_client = self.make_async_client()
+
+        return self.async_client
+
     def make_client(self):
         return Client()  # base_url=url
 
@@ -88,16 +101,8 @@ class DispatchJSONChannel(HTTPXChannel):
 
     # implement Channel
 
-    # address has changed, lets check what to do
     def set_address(self, address: Optional[ServiceAddress]):
-        should_reset = (
-                address is None or
-                not address.urls or
-                (self.address and self.address.urls[0] not in address.urls) # TODO
-        )
-
-        self.client = self.make_client() if not should_reset else None
-        self.async_client = self.make_async_client() if not should_reset else None
+        ServiceManager.logger.info("channel %s got an address %s", self.name, address)
 
         super().set_address(address)
 
@@ -110,7 +115,7 @@ class DispatchJSONChannel(HTTPXChannel):
 
         try:
             if self.client is not None:
-                result = Response(**self.client.post(f"{self.get_url()}/invoke", json=request.dict(), timeout=30000.0).json())
+                result = Response(**self.get_client().post(f"{self.get_url()}/invoke", json=request.dict(), timeout=30000.0).json())
                 if result.exception is not None:
                     raise RemoteServiceException(f"server side exception {result.exception}")
 
@@ -149,8 +154,7 @@ class DispatchMSPackChannel(HTTPXChannel):
     # override
 
     def set_address(self, address: Optional[ServiceAddress]):
-        self.client = self.make_client() if address else None
-        self.async_client = self.make_async_client() if address else None
+        ServiceManager.logger.info("channel %s got an address %s", self.name, address)
 
         super().set_address(address)
 
@@ -162,23 +166,19 @@ class DispatchMSPackChannel(HTTPXChannel):
         try:
             packed = msgpack.packb(request.dict(), use_bin_type=True)
 
-            if self.client is not None:
-                response = self.client.post(
-                    f"{self.get_url()}/invoke",
-                    content=packed,
-                    headers={"Content-Type": "application/msgpack"},
-                    timeout=30.0
-                )
+            response = self.get_client().post(
+                f"{self.get_url()}/invoke",
+                content=packed,
+                headers={"Content-Type": "application/msgpack"},
+                timeout=30.0
+            )
 
-                result = msgpack.unpackb(response.content, raw=False)
+            result = msgpack.unpackb(response.content, raw=False)
 
-                if result.get("exception", None):
-                    raise RemoteServiceException(f"server-side: {result['exception']}")
+            if result.get("exception", None):
+                raise RemoteServiceException(f"server-side: {result['exception']}")
 
-                return self.get_deserializer(invocation.type, invocation.method)(result["result"])
-
-            else:
-                raise ServiceException("No client available for msgpack.")
+            return self.get_deserializer(invocation.type, invocation.method)(result["result"])
 
         except Exception as e:
             raise ServiceException(f"msgpack exception: {e}") from e
@@ -191,23 +191,19 @@ class DispatchMSPackChannel(HTTPXChannel):
         try:
             packed = msgpack.packb(request.dict(), use_bin_type=True)
 
-            if self.async_client is not None:
-                response = await self.async_client.post(
-                    f"{self.get_url()}/invoke",
-                    content=packed,
-                    headers={"Content-Type": "application/msgpack"},
-                    timeout=30.0
-                )
+            response = await self.get_async_client().post(
+                f"{self.get_url()}/invoke",
+                content=packed,
+                headers={"Content-Type": "application/msgpack"},
+                timeout=30.0
+            )
 
-                result = msgpack.unpackb(response.content, raw=False)
+            result = msgpack.unpackb(response.content, raw=False)
 
-                if result.get("exception", None):
-                    raise RemoteServiceException(f"server-side: {result['exception']}")
+            if result.get("exception", None):
+                raise RemoteServiceException(f"server-side: {result['exception']}")
 
-                return self.get_deserializer(invocation.type, invocation.method)(result["result"])
-
-            else:
-                raise ServiceException("No client available for msgpack.")
+            return self.get_deserializer(invocation.type, invocation.method)(result["result"])
 
         except Exception as e:
             raise ServiceException(f"msgpack exception: {e}") from e

@@ -95,7 +95,7 @@ class ChannelAddress:
 
 class Component(Service):
     """
-    This is teh base class for components.
+    This is the base class for components.
     """
     @abstractmethod
     def startup(self):
@@ -317,6 +317,9 @@ class ServiceException(Exception):
 class LocalServiceException(ServiceException):
     pass
 
+class ServiceCommunicationException(ServiceException):
+    pass
+
 class RemoteServiceException(ServiceException):
     pass
 
@@ -329,11 +332,14 @@ class Channel(DynamicProxy.InvocationHandler, ABC):
 
     class URLSelector:
         @abstractmethod
-        def get(self, urls: list[str]) -> str: # TODO no url...
+        def get(self, urls: list[str]) -> str:
             pass
 
     class FirstURLSelector(URLSelector):
         def get(self, urls: list[str]) -> str:
+            if len(urls) == 0:
+                raise ServiceCommunicationException("no known url")
+
             return urls[0]
 
     class RoundRobinURLSelector(URLSelector):
@@ -341,10 +347,13 @@ class Channel(DynamicProxy.InvocationHandler, ABC):
             self.index = 0
 
         def get(self, urls: list[str]) -> str:
-            try:
-                return urls[self.index]
-            finally:
-                self.index = (self.index + 1) % len(urls)
+            if len(urls) > 0:
+                try:
+                    return urls[self.index]
+                finally:
+                    self.index = (self.index + 1) % len(urls)
+            else:
+                raise ServiceCommunicationException("no known url")
 
 
     # constructor
@@ -720,9 +729,9 @@ class LocalComponentRegistry(ComponentRegistry):
     def get_addresses(self, descriptor: ComponentDescriptor) -> list[ServiceAddress]:
         return self.component_channels.get(descriptor, [])
 
-def inject_service():
+def inject_service(preferred_channel=""):
     def decorator(func):
-        Decorators.add(func, inject_service)
+        Decorators.add(func, inject_service, preferred_channel)
 
         return func
 
@@ -737,4 +746,4 @@ class ServiceLifecycleCallable(LifecycleCallable):
         self.manager = manager
 
     def args(self, decorator: DecoratorDescriptor, method: TypeDescriptor.MethodDescriptor, environment: Environment):
-        return [self.manager.get_service(method.param_types[0])]
+        return [self.manager.get_service(method.param_types[0], preferred_channel=decorator.args[0])]

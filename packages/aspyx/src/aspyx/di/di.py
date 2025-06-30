@@ -319,6 +319,24 @@ class EnvironmentInstanceProvider(AbstractInstanceProvider):
         self.dependencies : list[AbstractInstanceProvider] = []
         self.scope_instance = Scopes.get(provider.get_scope(), environment)
 
+    # public
+
+    def print_tree(self, prefix=""):
+        children = self.dependencies
+        last_index = len(children) - 1
+        print(prefix + "+- " + self.report())
+
+        for i, child in enumerate(children):
+            if i == last_index:
+                # Last child
+                child_prefix = prefix + "   "
+            else:
+                # Not last child
+                child_prefix = prefix + "|  "
+
+
+            cast(EnvironmentInstanceProvider, child).print_tree(child_prefix)
+
     # implement
 
     def resolve(self, context: Providers.ResolveContext):
@@ -401,11 +419,14 @@ class ClassInstanceProvider(InstanceProvider):
         for param in init.param_types:
             types.append(param)
 
-        # check @inject & create
+        # check @inject
 
         for method in TypeDescriptor.for_type(self.type).get_methods():
-            if method.has_decorator(inject) or method.has_decorator(create):
+            if method.has_decorator(inject):
                 for param in method.param_types:
+                    if not Providers.is_registered(param):
+                        raise DIRegistrationException(f"{self.type.__name__}.{method.method.__name__} declares an unknown parameter type {param.__name__}")
+
                     types.append(param)
         # done
 
@@ -453,10 +474,10 @@ class FunctionInstanceProvider(InstanceProvider):
         return environment.created(instance)
 
     def report(self) -> str:
-        return f"{self.host.__name__}.{self.method.get_name()}"
+        return f"{self.host.__name__}.{self.method.get_name()}({', '.join(t.__name__ for t in self.method.param_types)}) -> {self.type.__qualname__}"
 
     def __str__(self):
-        return f"FunctionInstanceProvider({self.host.__name__}.{self.method.get_name()} -> {self.type.__name__})"
+        return f"FunctionInstanceProvider({self.host.__name__}.{self.method.get_name()}({', '.join(t.__name__ for t in self.method.param_types)}) -> {self.type.__name__})"
 
 class FactoryInstanceProvider(InstanceProvider):
     """
@@ -487,7 +508,7 @@ class FactoryInstanceProvider(InstanceProvider):
         return environment.created(args[0].create())
 
     def report(self) -> str:
-        return f"{self.host.__name__}.create"
+        return f"{self.host.__name__}.create() -> {self.type.__name__} "
 
     def __str__(self):
         return f"FactoryInstanceProvider({self.host.__name__} -> {self.type.__name__})"
@@ -650,6 +671,10 @@ class Providers:
             Providers.providers[provider.get_type()] = [provider]
         else:
             candidates.append(provider)
+
+    @classmethod
+    def is_registered(cls,type: Type) -> bool:
+        return Providers.providers.get(type, None) is not None
 
     # add factories lazily
 
@@ -1145,6 +1170,9 @@ class Environment:
         # construct eager objects for local providers
 
         for provider in set(self.providers.values()):
+            if isinstance(provider, EnvironmentInstanceProvider):
+                provider.print_tree()
+
             if provider.is_eager():
                 provider.create(self)
 

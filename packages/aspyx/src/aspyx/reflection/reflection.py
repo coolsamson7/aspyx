@@ -145,6 +145,9 @@ class TypeDescriptor:
             """
             return inspect.iscoroutinefunction(self.method)
 
+        def get_decorators(self) -> list[DecoratorDescriptor]:
+            return self.decorators
+
         def get_decorator(self, decorator: Callable) -> Optional[DecoratorDescriptor]:
             """
             return the DecoratorDescriptor - if any - associated with the passed Callable

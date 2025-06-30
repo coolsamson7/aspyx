@@ -1,6 +1,7 @@
 """
 FastAPI server implementation for the aspyx service framework.
 """
+import atexit
 import functools
 import inspect
 import threading
@@ -199,5 +200,14 @@ class FastAPIServer(Server):
         # start server thread
 
         self.start()
+
+        # shutdown
+
+        def cleanup():
+            self.service_manager.shutdown()
+
+        atexit.register(cleanup)
+
+        # done
 
         return self.environment
