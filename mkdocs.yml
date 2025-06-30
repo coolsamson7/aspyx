@@ -1,6 +1,9 @@
 site_name: Aspyx
 site_url: https://coolsamson7.github.io/aspyx/
 repo_url: https://github.com/coolsamson7/aspyx
+site_description: "Aspyx is a lightweight DI and AOP framework for Python."
+site_author: "Andreas Ernst"
+
 theme:
   name: material
   features:
@@ -8,6 +11,31 @@ theme:
     - navigation.indexes
     - content.code.copy
     - palette.toggle
+    - search.suggest
+    - search.highlight
+  markdown_extensions:
+    - pymdownx.superfences
+    - pymdownx.tabbed
+    - pymdownx.snippets
+    - toc:
+        permalink: true
+    - admonition
+    - codehilite
+    - footnotes
+    - pymdownx.arithmatex
+    - pymdownx.magiclink
+    - pymdownx.betterem
+    - pymdownx.tasklist:
+        custom_checkbox: true
+    - pymdownx.tilde
+    - pymdownx.critic
+    - pymdownx.details
+    - pymdownx.inlinehilite
+    - pymdownx.keys
+    - pymdownx.mark
+    - pymdownx.highlight
+    - pymdownx.striphtml
+    - pymdownx.autorefs
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
@@ -38,14 +66,21 @@ nav:
       - Version History: index/versions.md
 
   - API Reference:
-      - Util: api/util.md
-      - Reflection: api/reflection.md
-      - Configuration: api/configuration.md
-      - Threading: api/threading.md
-      - Exception: api/exception.md
-      - DI: api/di.md
-      - AOP: api/aop.md
-      - Service: api/service.md
+      - Core:
+        - Util: api/util.md
+        - Reflection: api/reflection.md
+        - Configuration: api/configuration.md
+        - Threading: api/threading.md
+        - Exception: api/exception.md
+        - DI: api/di.md
+        - AOP: api/aop.md
+      - Service:
+        - Service: api/service.md
+        - Server: api/server.md
+        - Registries: api/registries.md
+        - Channels: api/channels.md
+        - Health Checks: api/healthcheck.md
+
 
 markdown_extensions:
   - toc:
