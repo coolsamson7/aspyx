@@ -272,7 +272,33 @@ Constructor arguments are
 - `port: int` the port
 - `consul_url: str` the url
 
-TODO: make_consul
+ def make_consul(self, host: str, port: int) -> consul.Consul:
+        return consul.Consul(host=host, port=port)
+
+As i didn't want to hassle too much about consul instances ( authentication, etc. ), a method
+
+```
+def make_consul(self, host: str, port: int) -> consul.Consul:
+```
+
+is called from within the class `ConsulComponentRegistry` that can easily be altered by implementing an `around` aspect.
+
+**Example**:
+
+```python
+@around(methods().of_type(ConsulComponentRegistry).named("make_consul"))
+def make_consul(self, invocation: Invocation):
+    port = invocation.kwargs["port"]
+    url = invocation.kwargs["url"]
+    consul = ...
+    return consul
+```
+
+The component registry is also responsible to execute regular health-checks in order to track component healths.
+As soon as - in our case consul - decides that a component is not alive anymore, it will notify the clients via regular heartbeats about address changes
+which will be propagated to channels talking to the appropriate component.
+
+Currently this only affects the list of possible URLs which are required by the channels!
 
 ## Channels
 
@@ -287,6 +313,37 @@ Several channels are implemented:
 - `rest`
   channel that executes regular rest-calls as defined by a couple of decorators.
 
+All channels have the ability to react on changed URLs as provided by the component registry.
+
+A so called `URLSelector` is used internally to provide URLs for every single call. Two subclasses exist that offer a different logic
+
+- `FirstURLSelector` returns the first URL of the list of possible URLs
+- `RoundRobinURLSelector` switches between all URLs.
+
+In order to customize the behaviour, an around advice can be implemented easily:
+
+**Example**:
+ 
+```python
+@advice
+class ChannelAdvice:
+    def __init__(self):
+        pass
+
+   
+@advice
+class ChannelAdvice:
+    def __init__(self):
+        pass
+
+    @around(methods().named("customize").of_type(Channel))
+    def customize_channel(self, invocation: Invocation):
+        channel = cast(Channel, invocation.args[0])
+
+        channel.select_round_robin() # or select_first_url()
+
+        return invocation.proceed()
+```
 
 ### Rest Calls
 
@@ -317,14 +374,46 @@ Additional markers are
 
 ### Intercepting calls
 
-TODO
+The client side HTTP calling is done with `httpx` instances of type `Httpx.Client` or `Httpx.AsyncClient`.
+
+In order to add the possibility to add interceptors - for token handling, etc. - the channel base class `HTTPXChannel` defines
+the methods `make_client()` and `make_async_client` that can be modified with an around advice.
+
+**Example**:
+
+```python
+
+class InterceptingClient(httpx.Client):
+    # constructor
+
+    def __init__(self, *args, **kwargs):
+        self.token_provider = ...
+        super().__init__(*args, **kwargs)
+
+    # override
+
+    def request(self, method, url, *args, **kwargs):
+        headers = kwargs.pop("headers", {})
+        headers["Authorization"] = f"Bearer {self.token_provider()}"
+        kwargs["headers"] = headers
+
+        return super().request(method, url, *args, **kwargs)
+    
+@advice
+class ChannelAdvice:
+    def __init__(self):
+        pass
+
+    @around(methods().named("make_client").of_type(HTTPXChannel))
+    def make_client(self, invocation: Invocation):
+        return InterceptingClient()
+```
 
 ## FastAPI server
 
 In order to expose components via HTTP, the corresponding infrastructure in form of a FastAPI server needs to be setup. 
 
 ```python
-
 @module()
 class Module():
     def __init__(self):
