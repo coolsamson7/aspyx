@@ -1,6 +1,7 @@
 """
 FastAPI server implementation for the aspyx service framework.
 """
+import functools
 import inspect
 import json
 import threading
@@ -22,6 +23,8 @@ from .serialization import deserialize, get_deserializer
 from .service import Server, ServiceManager
 from .channels import Request, Response
 
+from .restchannel import get, post
+
 
 
 class FastAPIServer(Server):
@@ -33,6 +36,7 @@ class FastAPIServer(Server):
         self.host = host
         Server.port = port
         self.server_thread = None
+        self.environment : Optional[Environment] = None
         self.service_manager : Optional[ServiceManager] = None
         self.component_registry: Optional[ComponentRegistry] = None
 
@@ -48,6 +52,65 @@ class FastAPIServer(Server):
         self.router.post("/invoke")(self.invoke)
 
     # private
+
+    def add_routes(self):
+        """
+        add everything that looks like a http endpoint
+        """
+
+        # local functions
+
+        def wrap_method(bound_method):
+            return bound_method
+
+
+            sig = inspect.signature(bound_method)
+            params = list(sig.parameters.values())[1:]  # Skip `self`
+            new_sig = sig # sig.replace(parameters=params)
+
+            if inspect.iscoroutinefunction(bound_method):
+                @functools.wraps(bound_method)
+                async def async_wrapper(*args, **kwargs):
+                    return await bound_method(*args, **kwargs)
+
+                async_wrapper.__signature__ = new_sig
+
+                return async_wrapper
+            else:
+                @functools.wraps(bound_method)
+                def sync_wrapper(*args, **kwargs):
+                    return bound_method(*args, **kwargs)
+
+                sync_wrapper.__signature__ = new_sig
+
+                return sync_wrapper
+
+        # go
+
+        for descriptor in self.service_manager.descriptors.values():
+            if not descriptor.is_component() and descriptor.is_local():
+                type_descriptor = TypeDescriptor.for_type(descriptor.type)
+                instance = self.environment.get(descriptor.implementation)
+
+                for method in type_descriptor.get_methods():
+                    if method.has_decorator(get):
+                        decorator = method.get_decorator(get)
+                        self.router.add_api_route(
+                            path=decorator.args[0],
+                            endpoint=wrap_method(getattr(instance, method.get_name())),
+                            methods=["GET"],
+                            name=f"{descriptor.get_component_descriptor().name}.{descriptor.name}.{method.get_name()}",
+                            response_model=method.return_type,
+                        )
+                    elif method.has_decorator(post):
+                        decorator = method.get_decorator(post)
+                        self.router.add_api_route(
+                            path=decorator.args[0],
+                            endpoint=wrap_method(getattr(instance, method.get_name())),
+                            methods=["POST"],
+                            name=descriptor.get_component_descriptor().name + "." + descriptor.name,
+                            response_model=method.return_type,
+                        )
 
     def start(self):
         def run():
@@ -151,15 +214,15 @@ class FastAPIServer(Server):
     def boot(self, module_type: Type) -> Environment:
         # setup environment
 
-        environment = Environment(module_type)
-
-        self.service_manager = environment.get(ServiceManager)
-        self.component_registry = environment.get(ComponentRegistry)
+        self.environment = Environment(module_type)
+        self.service_manager = self.environment.get(ServiceManager)
+        self.component_registry = self.environment.get(ComponentRegistry)
 
         self.service_manager.startup(self)
 
         # add routes
 
+        self.add_routes()
         self.fast_api.include_router(self.router)
 
         #for route in self.fast_api.routes:
@@ -169,4 +232,4 @@ class FastAPIServer(Server):
 
         self.start()
 
-        return environment
+        return self.environment

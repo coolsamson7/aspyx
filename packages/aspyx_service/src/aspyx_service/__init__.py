@@ -9,6 +9,7 @@ from .channels import HTTPXChannel, DispatchJSONChannel
 from .registries import ConsulComponentRegistry
 from .server import FastAPIServer
 from .healthcheck import health_checks, health_check, HealthCheckManager, HealthStatus
+from .restchannel import RestChannel, post, get, QueryParam, Body
 
 
 @module()
@@ -48,6 +49,14 @@ __all__ = [
 
     "HTTPXChannel",
     "DispatchJSONChannel",
+
+    # rest
+
+    "RestChannel",
+    "post",
+    "get",
+    "QueryParam",
+    "Body",
 
     # registries
 

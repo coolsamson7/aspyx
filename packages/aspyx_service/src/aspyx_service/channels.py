@@ -181,7 +181,7 @@ class DispatchMSPackChannel(HTTPXChannel):
                 raise ServiceException("No client available for msgpack.")
 
         except Exception as e:
-            raise ServiceException(f"MSPackChannel exception: {e}") from e
+            raise ServiceException(f"msgpack exception: {e}") from e
 
     async def invoke_async(self, invocation: DynamicProxy.Invocation):
         service_name = self.service_names[invocation.type]  # map type to registered service name
