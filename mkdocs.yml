@@ -45,6 +45,7 @@ nav:
       - Exception: api/exception.md
       - DI: api/di.md
       - AOP: api/aop.md
+      - Service: api/service.md
 
 markdown_extensions:
   - toc:
