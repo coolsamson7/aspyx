@@ -382,7 +382,6 @@ the methods `make_client()` and `make_async_client` that can be modified with an
 **Example**:
 
 ```python
-
 class InterceptingClient(httpx.Client):
     # constructor
 
@@ -422,14 +421,37 @@ class Module():
  server = FastAPIServer(host="0.0.0.0", port=8000)
 
  environment = server.boot(Module) # will start the http server
- ```
+```
 
 This setup will also expose all service interfaces decorated with the corresponding http decorators!
 No need to add any FastAPI decorators, sicen the mapping is already done internally! 
 
 ## Implementing Channels
 
-TODO
+In order to implement a new channel, you only need to derive from one of the possible base classes ( `Channel` or `HTTPXChannel`)
+and decorate it with `@channel(<name>)`
+
+The main methods to implement are `ìnvoke` and `ìnvoke_async`
+
+**Example**:
+
+```python
+@channel("fancy")
+class FancyChannel(Channel):
+    # constructor
+
+    def __init__(self):
+        super().__init__("fancy")
+
+    # override
+
+    def invoke(self, invocation: DynamicProxy.Invocation):
+        return ...
+    
+     async def invoke_async(self, invocation: DynamicProxy.Invocation):
+        return await ...
+        
+```
 
 
 
