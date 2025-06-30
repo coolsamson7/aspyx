@@ -11,13 +11,10 @@ The basic design consists of four different concepts:
 
   a service defines a set of methods that can be called
 - **Component**
-
   a component bundles a list of services and determines the protocols that are available to call the services.
 - **Component Registry**
-
   the registry is a central service that is used to register and discover components
 - **Channel**
-
   channels implement any transport protocol that is used to execute remote calls.
 
 Let's look at the "interface" layer first.
