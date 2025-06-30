@@ -27,10 +27,10 @@ jobs:
         working-directory: packages/aspyx
         run: |
           hatch build
+          pip install dist/*.whl
           echo "-> tests"
           pytest
           echo "<- tests"
-          pip install dist/*.whl
 
       - name: Build aspyx_service package
         working-directory: packages/aspyx_service
