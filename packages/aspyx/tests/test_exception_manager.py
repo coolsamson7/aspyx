@@ -53,11 +53,11 @@ class Service:
 @advice
 class ExceptionAdvice:
     def __init__(self, exception_manager: ExceptionManager):
-        self.exceptionManager = exception_manager
+        self.exception_manager = exception_manager
 
     @error(methods().of_type(Service))
     def handle_error(self, invocation: Invocation):
-        exception = self.exceptionManager.handle(invocation.exception) # possibly transform
+        exception = self.exception_manager.handle(invocation.exception) # possibly transform
 
         invocation.exception = exception
 

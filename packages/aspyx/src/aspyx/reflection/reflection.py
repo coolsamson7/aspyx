@@ -5,7 +5,7 @@ including their methods, decorators, and type hints. It supports caching for per
 from __future__ import annotations
 
 import inspect
-from inspect import signature, getmembers
+from inspect import signature
 import threading
 from types import FunctionType
 

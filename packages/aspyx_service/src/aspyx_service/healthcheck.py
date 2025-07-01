@@ -9,7 +9,7 @@ import time
 from enum import Enum
 from typing import Any, Callable, Type, Optional
 
-from aspyx.di import Providers, ClassInstanceProvider, injectable, Environment, inject_environment, on_init
+from aspyx.di import injectable, Environment, inject_environment, on_init
 from aspyx.reflection import Decorators, TypeDescriptor
 
 

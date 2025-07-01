@@ -214,4 +214,3 @@ class DispatchMSPackChannel(HTTPXChannel):
 
         except Exception as e:
             raise ServiceException(f"msgpack exception: {e}") from e
-

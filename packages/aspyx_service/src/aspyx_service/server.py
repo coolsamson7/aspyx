@@ -2,7 +2,6 @@
 FastAPI server implementation for the aspyx service framework.
 """
 import atexit
-import functools
 import inspect
 import threading
 from typing import Type, Optional, Callable

@@ -25,7 +25,6 @@ class Service:
     """
     This is something like a 'tagging interface' for services.
     """
-    pass
 
 class ComponentStatus(Enum):
     """
@@ -107,14 +106,12 @@ class Component(Service):
         """
         startup callback
         """
-        pass
 
     @abstractmethod
     def shutdown(self)-> None:
         """
         shutdown callback
         """
-        pass
 
     @abstractmethod
     def get_addresses(self, port: int) -> list[ChannelAddress]:
@@ -127,7 +124,6 @@ class Component(Service):
         Returns:
             list of channel addresses
         """
-        pass
 
     @abstractmethod
     def get_status(self) -> ComponentStatus:
@@ -136,7 +132,6 @@ class Component(Service):
 
         Returns: the component status
         """
-        pass
 
     @abstractmethod
     async def get_health(self) -> HealthCheckManager.Health:
@@ -145,7 +140,6 @@ class Component(Service):
 
         Returns: the component health
         """
-        pass
 
 class AbstractComponent(Component, ABC):
     """
@@ -386,25 +380,21 @@ class ServiceException(Exception):
     """
     base class for service exceptions
     """
-    pass
 
 class LocalServiceException(ServiceException):
     """
     base class for service exceptions occurring locally
     """
-    pass
 
 class ServiceCommunicationException(ServiceException):
     """
     base class for service exceptions thrown by remoting errors
     """
-    pass
 
 class RemoteServiceException(ServiceException):
     """
     base class for service exceptions occurring on the server side
     """
-    pass
 
 class Channel(DynamicProxy.InvocationHandler, ABC):
     """
@@ -431,7 +421,6 @@ class Channel(DynamicProxy.InvocationHandler, ABC):
             Returns:
                 a URL
             """
-            pass
 
     class FirstURLSelector(URLSelector):
         """
@@ -508,7 +497,6 @@ class ComponentRegistry:
             descriptor: the descriptor
             addresses: list of addresses
         """
-        pass
 
     @abstractmethod
     def deregister(self, descriptor: ComponentDescriptor[Component]) -> None:
@@ -517,7 +505,6 @@ class ComponentRegistry:
         Args:
             descriptor: the component descriptor
         """
-        pass
 
     @abstractmethod
     def watch(self, channel: Channel) -> None:
@@ -526,7 +513,6 @@ class ComponentRegistry:
         Args:
             channel: a channel
         """
-        pass
 
     @abstractmethod
     def get_addresses(self, descriptor: ComponentDescriptor) -> list[ChannelInstances]:
@@ -539,7 +525,6 @@ class ComponentRegistry:
         Returns:
             list of channel instances
         """
-        pass
 
     def map_health(self, health:  HealthCheckManager.Health) -> int:
         return 200

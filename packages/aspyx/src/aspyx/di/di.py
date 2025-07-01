@@ -690,7 +690,7 @@ class Providers:
         cache: Dict[Type,AbstractInstanceProvider] = {}
 
         context: ConditionContext = {
-            "requires_feature": lambda feature : environment.has_feature(feature),
+            "requires_feature": environment.has_feature,
             "requires_class": lambda clazz : cache.get(clazz, None) is not None # ? only works if the class is in the cache already?
         }
 

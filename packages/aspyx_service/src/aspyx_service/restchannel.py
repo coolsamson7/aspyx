@@ -1,3 +1,6 @@
+"""
+rest channel implementation
+"""
 import inspect
 import re
 from dataclasses import is_dataclass, asdict
@@ -7,7 +10,7 @@ from typing import get_type_hints, TypeVar, Annotated, Callable, get_origin, get
 from pydantic import BaseModel
 
 from aspyx.reflection import DynamicProxy, Decorators
-from .service import RemoteServiceException, ServiceException, channel
+from .service import ServiceException, channel
 
 T = TypeVar("T")
 
@@ -118,6 +121,7 @@ class RestChannel(HTTPXChannel):
         "signature",
         "url_template",
         "type",
+        "calls",
         "return_type",
         "path_param_names",
         "query_param_names",

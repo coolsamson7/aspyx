@@ -98,7 +98,7 @@ class TypeDeserializer:
             return deser_union
 
         if isinstance(typ, type) and issubclass(typ, BaseModel):
-            return lambda v: typ.parse_obj(v)
+            return typ.parse_obj
 
         if is_dataclass(typ):
             field_deserializers = {f.name: TypeDeserializer(f.type) for f in fields(typ)}
