@@ -28,7 +28,7 @@ class Service:
 
 class ComponentStatus(Enum):
     """
-    A component is ij one of the following status:
+    A component is in one of the following statuses:
 
     - VIRGIN: just constructed
     - RUNNING: registered and up and running
@@ -41,7 +41,7 @@ class ComponentStatus(Enum):
 class Server(ABC):
     """
     A server is a central entity that boots a main module and initializes the ServiceManager.
-    It also is the place where http servers get initialized,
+    It also is the place where http servers get initialized.
     """
     port = 0
 
@@ -66,6 +66,7 @@ class Server(ABC):
     def get_local_ip(cls):
         """
         return the local ip address
+
         Returns: the local ip address
         """
         try:
@@ -76,8 +77,7 @@ class Server(ABC):
             ip = s.getsockname()[0]
             s.close()
 
-            raise Exception("TODO")
-            #return ip
+            return ip
         except Exception:
             return "127.0.0.1"  # Fallback
 

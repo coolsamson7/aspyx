@@ -19,7 +19,7 @@ from .service import ComponentRegistry, Channel, ChannelInstances, ServiceManage
 
 class ConsulComponentRegistry(ComponentRegistry):
     """
-    A specialized registry utilizing consul.
+    A specialized registry using consul.
     A polling mechanism is used to identify changes in the component health.
     """
     # constructor
@@ -133,8 +133,6 @@ class ConsulComponentRegistry(ComponentRegistry):
    # public
 
     def register_service(self, name, service_id, health: str, tags=None, meta=None) -> None:
-        ip = "host.docker.internal" # TODO
-
         self.consul.agent.service.register(
             name=name,
             service_id=service_id,
@@ -143,7 +141,7 @@ class ConsulComponentRegistry(ComponentRegistry):
             tags=tags or [],
             meta=meta or {},
             check=consul.Check().http(
-                url=f"http://{ip}:{self.port}{health}",
+                url=f"http://{self.ip}:{self.port}{health}",
                 interval="10s",
                 timeout="3s",
                 deregister="5m")

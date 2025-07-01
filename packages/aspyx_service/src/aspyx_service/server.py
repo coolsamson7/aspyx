@@ -43,7 +43,7 @@ class FastAPIServer(Server):
         self.component_registry: Optional[ComponentRegistry] = None
 
         self.router = APIRouter()
-        self.fast_api = FastAPI(host=self.host, port=Server.port, debug=True)
+        self.fast_api = FastAPI()
 
         # cache
 
@@ -87,13 +87,17 @@ class FastAPIServer(Server):
         """
         start the fastapi server in a thread
         """
-        def run():
-            uvicorn.run(self.fast_api, host=self.host, port=self.port, access_log=False)
 
-        self.server_thread = threading.Thread(target=run, daemon=True)
-        self.server_thread.start()
+        config = uvicorn.Config(self.fast_api, host=self.host, port=self.port, log_level="info")
+        server = uvicorn.Server(config)
+
+        thread = threading.Thread(target=server.run, daemon=True)
+        thread.start()
 
         print(f"server started on {self.host}:{self.port}")
+
+        return thread
+
 
     def get_deserializers(self, service: Type, method):
         deserializers = self.deserializers.get(method, None)
@@ -110,8 +114,8 @@ class FastAPIServer(Server):
 
         deserializers = self.get_deserializers(type, method)
 
-        for i in range(0, len(args)):
-            args[i] = deserializers[i](args[i])
+        for i, arg in enumerate(args):
+            args[i] = deserializers[i](arg)
 
         return args
 
@@ -208,8 +212,8 @@ class FastAPIServer(Server):
         self.add_routes()
         self.fast_api.include_router(self.router)
 
-        #for route in self.fast_api.routes:
-        #    print(f"{route.name}: {route.path} [{route.methods}]")
+        for route in self.fast_api.routes:
+            print(f"{route.name}: {route.path} [{route.methods}]")
 
         # start server thread
 
