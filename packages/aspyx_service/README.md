@@ -1,5 +1,20 @@
 # Service
 
+- [Introduction](#introduction)
+- [Features](#features)
+- [Service and Component declaration](#service-and-component-declaration)
+- [Service and Component implementation](#service-and-component-implementation)
+- [Health Checks](#health-checks)
+- [Service Manager](#service-manager)
+- [Component Registry](#component-registry)
+- [Channels](#channels)
+  - [Performance](#performance)
+  - [Rest Calls](#rest-calls)
+  - [Intercepting calls](#intercepting-calls)
+- [FastAPI server](#fastapi-server)
+- [Implementing Channels](#implementing-channels)
+- [Version History](#version-history)
+
 ## Introduction
 
 The Aspyx service library is built on top of the DI core framework and adds a microservice based architecture,
