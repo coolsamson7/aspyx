@@ -122,7 +122,7 @@ class Response(BaseModel):
 @channel("dispatch-json")
 class DispatchJSONChannel(HTTPXChannel):
     """
-    A channel that calls a POST on th endpoint `ìnvoke` sending a request body containing information on the
+    A channel that calls a POST on the endpoint `ìnvoke` sending a request body containing information on the
     called component, service and method and the arguments.
     """
     # constructor

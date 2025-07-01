@@ -354,7 +354,7 @@ class EnvironmentInstanceProvider(AbstractInstanceProvider):
                     self.dependencies.append(context.get_provider(type)) # try/catch TODO
 
                 provider = context.add_provider_dependency(self, type)
-                if provider is not None:
+                if provider is not None and not context.is_resolved(provider):
                     provider.resolve(context)
 
         else:

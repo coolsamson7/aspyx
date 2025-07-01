@@ -48,7 +48,12 @@ class Server(ABC):
     # constructor
 
     def __init__(self):
-        pass
+        self.environment : Optional[Environment] = None
+
+    # public
+
+    def get(self, type: Type[T]) -> T:
+        return self.environment.get(type)
 
     @abstractmethod
     def boot(self, module_type: Type):
@@ -479,6 +484,7 @@ class Channel(DynamicProxy.InvocationHandler, ABC):
 
     def set_address(self, address: Optional[ChannelInstances]):
         self.address = address
+        print(self.name + " got new address: " + str(address))
 
     def setup(self, component_descriptor: ComponentDescriptor, address: ChannelInstances):
         self.component_descriptor = component_descriptor

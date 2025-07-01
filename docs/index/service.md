@@ -48,7 +48,7 @@ class Module:
     
     @create()
     def create_registry(self) -> ConsulComponentRegistry:
-        return ConsulComponentRegistry(Server.port, "http://localhost:8500") # a consul based registry!
+        return ConsulComponentRegistry(Server.port, Consul(host="localhost", port=8500)) # a consul based registry!
 
 environment = Environment(Module)
 service_manager = environment.get(ServiceManager)
@@ -359,6 +359,11 @@ If the class is decorated with `@rest(<prefix>)`, the corresponding prefix will 
 Additional annotations are
 - `Body` the post body
 - `QueryParam`marked for query params
+
+You can skip the annotations, assuming the following heuristic:
+
+- if no body is marked it will pick the first parameter which is a dataclass or a pydantic model
+- all parameters which are not in the path or equal to the body are assumed to be query params.
 
 ### Intercepting calls
 

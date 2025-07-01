@@ -134,6 +134,9 @@ class RestChannel(HTTPXChannel):
         def __init__(self, type: Type, method : Callable):
             self.signature = inspect.signature(method)
 
+            param_names = list(self.signature.parameters.keys())
+            param_names.remove("self")
+
             prefix = ""
             if Decorators.has_decorator(type, rest):
                 prefix = Decorators.get_decorator(type, rest).args[0]
@@ -155,6 +158,9 @@ class RestChannel(HTTPXChannel):
 
             self.path_param_names = set(re.findall(r"{(.*?)}", self.url_template))
 
+            for param_name in self.path_param_names:
+                param_names.remove(param_name)
+
             hints = get_type_hints(method, include_extras=True)
 
             self.body_param_name = None
@@ -163,10 +169,42 @@ class RestChannel(HTTPXChannel):
             for param_name, hint in hints.items():
                 if get_origin(hint) is Annotated:
                     metadata = get_args(hint)[1:]
+                    
                     if BodyMarker in metadata:
                         self.body_param_name = param_name
+                        param_names.remove(param_name)
                     elif QueryParamMarker in metadata:
                         self.query_param_names.add(param_name)
+                        param_names.remove(param_name)
+
+            # check if something is missing
+
+            if len(param_names) > 0:
+                # check body params
+                if self.type in ("post", "put", "patch"):
+                    if self.body_param_name is None:
+                        candidates = [
+                            (name, hint)
+                            for name, hint in hints.items()
+                            if name not in self.path_param_names
+                        ]
+                        # find first dataclass or pydantic argument
+                        for name, hint in candidates:
+                            typ = hint
+                            if get_origin(typ) is Annotated:
+                                typ = get_args(typ)[0]
+                            if (
+                                    (isinstance(typ, type) and issubclass(typ, BaseModel))
+                                    or is_dataclass(typ)
+                            ):
+                                self.body_param_name = name
+                                param_names.remove(name)
+                                break
+
+            # the rest are query params
+
+            for param in param_names:
+                self.query_param_names.add(param)
 
             # return type
 

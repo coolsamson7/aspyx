@@ -38,7 +38,6 @@ class FastAPIServer(Server):
         self.host = host
         Server.port = port
         self.server_thread = None
-        self.environment : Optional[Environment] = None
         self.service_manager : Optional[ServiceManager] = None
         self.component_registry: Optional[ComponentRegistry] = None
 
@@ -83,18 +82,16 @@ class FastAPIServer(Server):
                             response_model=method.return_type,
                         )
 
-    def start(self):
+    def start_fastapi_thread(self):
         """
         start the fastapi server in a thread
         """
 
-        config = uvicorn.Config(self.fast_api, host=self.host, port=self.port, log_level="debug")
+        config = uvicorn.Config(self.fast_api, host=self.host, port=self.port, access_log=False) #log_level="debug"
         server = uvicorn.Server(config)
 
         thread = threading.Thread(target=server.run, daemon=True)
         thread.start()
-
-        print(f"server started on {self.host}:{self.port}")
 
         return thread
 
@@ -212,12 +209,12 @@ class FastAPIServer(Server):
         self.add_routes()
         self.fast_api.include_router(self.router)
 
-        for route in self.fast_api.routes:
-            print(f"{route.name}: {route.path} [{route.methods}]")
+        #for route in self.fast_api.routes:
+        #    print(f"{route.name}: {route.path} [{route.methods}]")
 
         # start server thread
 
-        self.start()
+        self.start_fastapi_thread()
 
         # shutdown
 
