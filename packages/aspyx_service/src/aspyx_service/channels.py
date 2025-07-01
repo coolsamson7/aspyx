@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from aspyx.reflection import DynamicProxy, TypeDescriptor
 from .service import ServiceManager
 
-from .service import ComponentDescriptor, ServiceAddress, ServiceException, channel, Channel, RemoteServiceException
+from .service import ComponentDescriptor, ChannelInstances, ServiceException, channel, Channel, RemoteServiceException
 from .serialization import get_deserializer
 
 
@@ -49,7 +49,7 @@ class HTTPXChannel(Channel):
 
     # override
 
-    def setup(self, component_descriptor: ComponentDescriptor, address: ServiceAddress):
+    def setup(self, component_descriptor: ComponentDescriptor, address: ChannelInstances):
         super().setup(component_descriptor, address)
 
         # remember service names
@@ -94,7 +94,7 @@ class Response(BaseModel):
 class DispatchJSONChannel(HTTPXChannel):
     """
     A channel that calls a POST on th endpoint `ìnvoke` sending a request body containing information on the
-    called component, service and method and the arrguments.
+    called component, service and method and the arguments.
     """
     # constructor
 
@@ -105,12 +105,12 @@ class DispatchJSONChannel(HTTPXChannel):
 
     # implement Channel
 
-    def set_address(self, address: Optional[ServiceAddress]):
+    def set_address(self, address: Optional[ChannelInstances]):
         ServiceManager.logger.info("channel %s got an address %s", self.name, address)
 
         super().set_address(address)
 
-    def setup(self, component_descriptor: ComponentDescriptor, address: ServiceAddress):
+    def setup(self, component_descriptor: ComponentDescriptor, address: ChannelInstances):
         super().setup(component_descriptor, address)
 
     def invoke(self, invocation: DynamicProxy.Invocation):
@@ -160,7 +160,7 @@ class DispatchMSPackChannel(HTTPXChannel):
 
     # override
 
-    def set_address(self, address: Optional[ServiceAddress]):
+    def set_address(self, address: Optional[ChannelInstances]):
         ServiceManager.logger.info("channel %s got an address %s", self.name, address)
 
         super().set_address(address)

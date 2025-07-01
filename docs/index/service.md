@@ -88,7 +88,7 @@ The interesting part if the `get_addresses` method that return a list of channel
 In this case a channel is used that exposes a single http endpoint, that will dispatch to the correct service method.
 This information is registered with the appropriate component registry and is used by other processes. 
 
-The required - `FastAPI` - infrastructure in order to expose those services is provided by the call:
+The required - `FastAPI` - infrastructure to expose those services is started with the call:
 
 ```python
 server = FastAPIServer(host="0.0.0.0", port=8000)
@@ -108,7 +108,7 @@ determine a specific channel. As a local channel has the name "local", the appro
 The library offers:
 
 - sync and async support
-- multiple - extensible - channel implementations
+- multiple - extensible - channel implementations supporting dataclasses and pydantic data models.
 - ability to customize http calls with interceptors ( via the AOP abilities )
 - `fastapi` based channels covering simple rest endpoints including `msgpack` support.
 - `httpx` based clients for dispatching channels and simple rest endpoint with the help of low-level decorators.
@@ -132,12 +132,12 @@ class TestService(Service):
         pass
 ```
 
-The decorator can add a name and a description. If `name` is not set, the class name is used.
+The decorator can add a name and a description. If `name` is not set, the class name converted to snake case is used.
 
 A component needs to derive from `Component`:
 
 ```python
-@component(name="test-component", services =[TestService])
+@component(services =[TestService])
 class TestComponent(Component):
     pass
 ```
@@ -248,7 +248,7 @@ The decorator accepts a couple of parameters:
 
 ## Service Manager
 
-`ServiceManager` is the central class that is used to retrieve service proxies.
+`ServiceManager` is the central class used to retrieve service proxies.
 
 ```python
 def get_service(self, service_type: Type[T], preferred_channel="") -> T
@@ -261,7 +261,7 @@ If not specified, the first registered channel is used, which btw. is a local ch
 
 ## Component Registry
 
-The component registry is the place where component implementations are regisstered and retrieved.
+The component registry is the place where component implementations are registered and retrieved.
 
 In addition to a `LocalCompoenetRegistry` ( which is used for testing purposes ) the only implementation is
 
@@ -271,9 +271,6 @@ Constructor arguments are
 
 - `port: int` the port
 - `consul_url: str` the url
-
- def make_consul(self, host: str, port: int) -> consul.Consul:
-        return consul.Consul(host=host, port=port)
 
 As i didn't want to hassle too much about consul instances ( authentication, etc. ), a method
 
@@ -313,14 +310,14 @@ Several channels are implemented:
 - `rest`
   channel that executes regular rest-calls as defined by a couple of decorators.
 
-All channels have the ability to react on changed URLs as provided by the component registry.
+All channels react on changed URLs as provided by the component registry.
 
 A so called `URLSelector` is used internally to provide URLs for every single call. Two subclasses exist that offer a different logic
 
-- `FirstURLSelector` returns the first URL of the list of possible URLs
-- `RoundRobinURLSelector` switches between all URLs.
+- `FirstURLSelector` always returns the first URL of the list of possible URLs
+- `RoundRobinURLSelector` switches sequentially between all URLs.
 
-In order to customize the behaviour, an around advice can be implemented easily:
+To customize the behavior, an around advice can be implemented easily:
 
 **Example**:
  
@@ -330,7 +327,6 @@ class ChannelAdvice:
     def __init__(self):
         pass
 
-   
 @advice
 class ChannelAdvice:
     def __init__(self):
@@ -354,7 +350,7 @@ The avg response times - on a local server - where all below 1ms per call.
 - dispatching-json 20% faster
 - dispatching-msgpack 30% faster
 
-The big advantage of the dispatching flavors is also, that you don't have to worry about the additional decorators!
+The biggest advantage of the dispatching flavors is, that you don't have to worry about the additional decorators!
 
 ### Rest Calls
 
@@ -379,7 +375,7 @@ The decorators `get`,  `put`,  `post` and  `delete` specify the methods.
 
 If the class is decorated with `@rest(<prefix>)`, the corresponding prefix will be appended at the beginning.
 
-Additional markers are
+Additional annotations are
 - `Body` the post body
 - `QueryParam`marked for query params
 
@@ -387,7 +383,7 @@ Additional markers are
 
 The client side HTTP calling is done with `httpx` instances of type `Httpx.Client` or `Httpx.AsyncClient`.
 
-In order to add the possibility to add interceptors - for token handling, etc. - the channel base class `HTTPXChannel` defines
+To add the possibility to add interceptors - for token handling, etc. - the channel base class `HTTPXChannel` defines
 the methods `make_client()` and `make_async_client` that can be modified with an around advice.
 
 **Example**:
@@ -440,7 +436,7 @@ No need to add any FastAPI decorators, since the mapping is already done interna
 
 ## Implementing Channels
 
-In order to implement a new channel, you only need to derive from one of the possible base classes ( `Channel` or `HTTPXChannel` that already has a `httpx` client)
+To implement a new channel, you only need to derive from one of the possible base classes ( `Channel` or `HTTPXChannel` that already has a `httpx` client)
 and decorate it with `@channel(<name>)`
 
 The main methods to implement are `ìnvoke` and `ìnvoke_async`

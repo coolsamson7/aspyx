@@ -25,9 +25,10 @@ QueryParam = lambda t: Annotated[t, QueryParamMarker]
 
 # decorators
 
-def rest(url):
+def rest(url=""):
     """
-    mark service interfaces in order to add a url prefix
+    mark service interfaces to add a url prefix
+
     Args:
         url: prefix that will be added to all urls
     """
@@ -37,9 +38,10 @@ def rest(url):
         return cls
     return decorator
 
-def get(url):
+def get(url: str):
     """
     methods marked with `get` will be executed by calling a http get request.
+
     Args:
         url: the url
     """
@@ -50,10 +52,11 @@ def get(url):
     return decorator
 
 
-def post(url):
+def post(url: str):
     """
     methods marked with `post` will be executed by calling a http get request.
     The body parameter should be marked with `Body(<param>)`
+
     Args:
         url: the url
     """
@@ -64,9 +67,10 @@ def post(url):
 
     return decorator
 
-def put(url):
+def put(url: str):
     """
     methods marked with `put` will be executed by calling a http put request.
+
     Args:
         url: the url
     """
@@ -77,9 +81,10 @@ def put(url):
 
     return decorator
 
-def delete(url):
+def delete(url: str):
     """
     methods marked with `delete` will be executed by calling a http delete request.
+
     Args:
         url: the url
     """
@@ -90,9 +95,10 @@ def delete(url):
 
     return decorator
 
-def patch(url):
+def patch(url: str):
     """
-    methods marked with `patch` will be executed by calling a http pathc request.
+    methods marked with `patch` will be executed by calling a http patch request.
+
     Args:
         url: the url
     """

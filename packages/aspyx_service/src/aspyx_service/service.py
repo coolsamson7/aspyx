@@ -3,6 +3,7 @@ service management framework allowing for service discovery and transparent remo
 """
 from __future__ import annotations
 
+import re
 import socket
 import logging
 import threading
@@ -119,6 +120,7 @@ class Component(Service):
     def get_addresses(self, port: int) -> list[ChannelAddress]:
         """
         returns a list of channel addresses that expose this components services.
+
         Args:
             port: the port of a server hosting this component
 
@@ -163,16 +165,24 @@ class AbstractComponent(Component, ABC):
     def get_status(self) -> ComponentStatus:
         return self.status
 
+def to_snake_case(name: str) -> str:
+    return re.sub(r'(?<!^)(?=[A-Z])', '-', name).lower()
+
 def component(name = "", description="", services: list[Type] = []):
     """
     decorates component interfaces
+
     Args:
-        name: the component name. If empty the class name is used
+        name: the component name. If empty the class name converted to snake-case is used
         description: optional description
         services: the list of hosted services
     """
     def decorator(cls):
-        Decorators.add(cls, component, name, description, services)
+        component_name = name
+        if component_name == "":
+            component_name = to_snake_case(cls.__name__)
+
+        Decorators.add(cls, component, component_name, description, services)
 
         ServiceManager.register_component(cls, services)
 
@@ -185,12 +195,17 @@ def component(name = "", description="", services: list[Type] = []):
 def service(name = "", description = ""):
     """
     decorates service interfaces
+
     Args:
-        name: the service name. If empty the class name is used
+        name: the service name. If empty the class name converted to snake case is used
         description: optional description
     """
     def decorator(cls):
-        Decorators.add(cls, service, name, description)
+        service_name = name
+        if service_name == "":
+            service_name = to_snake_case(cls.__name__)
+
+        Decorators.add(cls, service, service_name, description)
 
         Providers.register(ServiceInstanceProvider(cls))
 
@@ -201,6 +216,7 @@ def service(name = "", description = ""):
 def health(endpoint = ""):
     """
     specifies the health endpoint that will return the component health
+
     Args:
         endpoint: the  health endpoint
     """
@@ -347,7 +363,7 @@ class ComponentDescriptor(BaseDescriptor[T]):
 # a resolved channel address
 
 @dataclass()
-class ServiceAddress:
+class ChannelInstances:
     """
     a resolved channel address containing:
 
@@ -408,10 +424,12 @@ class Channel(DynamicProxy.InvocationHandler, ABC):
         def get(self, urls: list[str]) -> str:
             """
             return the next URL given a list of possible URLS
+
             Args:
                 urls: list of possible URLS
 
-            Returns: a URL
+            Returns:
+                a URL
             """
             pass
 
@@ -447,7 +465,7 @@ class Channel(DynamicProxy.InvocationHandler, ABC):
     def __init__(self):
         self.name =  Decorators.get_decorator(type(self), channel).args[0]
         self.component_descriptor : Optional[ComponentDescriptor] = None
-        self.address: Optional[ServiceAddress] = None
+        self.address: Optional[ChannelInstances] = None
         self.url_selector : Channel.URLSelector = Channel.FirstURLSelector()
 
     # public
@@ -470,10 +488,10 @@ class Channel(DynamicProxy.InvocationHandler, ABC):
     def get_url(self) -> str:
         return self.url_selector.get(self.address.urls)
 
-    def set_address(self, address: Optional[ServiceAddress]):
+    def set_address(self, address: Optional[ChannelInstances]):
         self.address = address
 
-    def setup(self, component_descriptor: ComponentDescriptor, address: ServiceAddress):
+    def setup(self, component_descriptor: ComponentDescriptor, address: ChannelInstances):
         self.component_descriptor = component_descriptor
         self.address = address
 
@@ -511,14 +529,15 @@ class ComponentRegistry:
         pass
 
     @abstractmethod
-    def get_addresses(self, descriptor: ComponentDescriptor) -> list[ServiceAddress]:
+    def get_addresses(self, descriptor: ComponentDescriptor) -> list[ChannelInstances]:
         """
         return a list of addresses that can be used to call services belonging to this component
+
         Args:
-            descriptor: teh component descriptor
+            descriptor: the component descriptor
 
         Returns:
-            list of service addresses
+            list of channel instances
         """
         pass
 
@@ -552,7 +571,7 @@ class ChannelManager:
 
     # public
 
-    def make(self, name: str, descriptor: ComponentDescriptor, address: ServiceAddress) -> Channel:
+    def make(self, name: str, descriptor: ComponentDescriptor, address: ChannelInstances) -> Channel:
         ServiceManager.logger.info("create channel %s: %s", name, self.factories.get(name).__name__)
 
         result =  self.environment.get(self.factories.get(name))
@@ -561,9 +580,10 @@ class ChannelManager:
 
         return result
 
-def channel(name):
+def channel(name: str):
     """
     this decorator is used to mark channel implementations.
+
     Args:
         name: the channel name
     """
@@ -715,7 +735,7 @@ class ServiceManager:
 
     # public
 
-    def find_service_address(self, component_descriptor: ComponentDescriptor, preferred_channel="") -> ServiceAddress:
+    def find_service_address(self, component_descriptor: ComponentDescriptor, preferred_channel="") -> ChannelInstances:
         addresses = self.component_registry.get_addresses(component_descriptor)  # component, channel + urls
         address = next((address for address in addresses if address.channel == preferred_channel), None)
         if address is None:
@@ -730,6 +750,7 @@ class ServiceManager:
     def get_service(self, service_type: Type[T], preferred_channel="") -> T:
         """
         return a service proxy given a service type and preferred channel name
+
         Args:
             service_type:  the service type
             preferred_channel:  the preferred channel name
@@ -863,7 +884,7 @@ class LocalComponentRegistry(ComponentRegistry):
     def watch(self, channel: Channel) -> None:
         pass
 
-    def get_addresses(self, descriptor: ComponentDescriptor) -> list[ServiceAddress]:
+    def get_addresses(self, descriptor: ComponentDescriptor) -> list[ChannelInstances]:
         return self.component_channels.get(descriptor, [])
 
 def inject_service(preferred_channel=""):

@@ -189,6 +189,7 @@ class FastAPIServer(Server):
     def boot(self, module_type: Type) -> Environment:
         """
         startup the service manager, DI framework and the fastapi server based on the supplied module
+
         Args:
             module_type: the module
 

@@ -15,7 +15,7 @@ from aspyx.di import on_init
 from .healthcheck import HealthCheckManager, HealthStatus
 
 from .server import Server
-from .service import ComponentRegistry, Channel, ServiceAddress, ServiceManager, ComponentDescriptor, Component, ChannelAddress
+from .service import ComponentRegistry, Channel, ChannelInstances, ServiceManager, ComponentDescriptor, Component, ChannelAddress
 
 class ConsulComponentRegistry(ComponentRegistry):
     """
@@ -32,7 +32,7 @@ class ConsulComponentRegistry(ComponentRegistry):
         self.watchdog = None
         self.interval = 5
         self.last_index = {}
-        self.component_addresses : dict[str, dict[str, ServiceAddress]] = {} # comp -> channel -> address
+        self.component_addresses : dict[str, dict[str, ChannelInstances]] = {} # comp -> channel -> address
         self.watch_channels : list[Channel] = []
 
         parsed = urlparse(consul_url)
@@ -42,12 +42,14 @@ class ConsulComponentRegistry(ComponentRegistry):
 
     def make_consul(self, host="", port="") -> consul.Consul:
         """
-        return a consul instance
+        create and return a consul instance
+
         Args:
             host: the host
             port: the port
 
-        Returns: a consul instance
+        Returns:
+            a consul instance
 
         """
         return consul.Consul(host=host, port=port)
@@ -66,7 +68,7 @@ class ConsulComponentRegistry(ComponentRegistry):
         self.watchdog = threading.Thread(target=self.watch_consul, daemon=True)
         self.watchdog.start()
 
-    def inform_channels(self, old_address: ServiceAddress, new_address: Optional[ServiceAddress]):
+    def inform_channels(self, old_address: ChannelInstances, new_address: Optional[ChannelInstances]):
         for channel in self.watch_channels:
             if channel.address is old_address:
                 channel.set_address(new_address)
@@ -162,8 +164,8 @@ class ConsulComponentRegistry(ComponentRegistry):
 
     # private
 
-    def fetch_addresses(self, component: str, wait=None) -> dict[str, ServiceAddress]:
-        addresses : dict[str, ServiceAddress] = {} # channel name -> ServiceAddress
+    def fetch_addresses(self, component: str, wait=None) -> dict[str, ChannelInstances]:
+        addresses : dict[str, ChannelInstances] = {} # channel name -> ServiceAddress
 
         index, nodes = self.consul.health.service(component, passing=True, index=self.last_index.get(component, None), wait=wait)
         self.last_index[component] = index
@@ -183,7 +185,7 @@ class ConsulComponentRegistry(ComponentRegistry):
 
                 address = addresses.get(channel, None)
                 if address is None:
-                    address = ServiceAddress(component=component, channel=channel_name)
+                    address = ChannelInstances(component=component, channel=channel_name)
                     addresses[channel] = address
 
                 address.urls.append(url)
@@ -213,7 +215,7 @@ class ConsulComponentRegistry(ComponentRegistry):
 
         self.register_service(name, id, descriptor.health, tags =["component"], meta={"channels": addresses})
 
-    def get_addresses(self, descriptor: ComponentDescriptor) -> list[ServiceAddress]:
+    def get_addresses(self, descriptor: ComponentDescriptor) -> list[ChannelInstances]:
         component_addresses = self.component_addresses.get(descriptor.name, None)
         if component_addresses is None:
             component_addresses = self.fetch_addresses(descriptor.name)
