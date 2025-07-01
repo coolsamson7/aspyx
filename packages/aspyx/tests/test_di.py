@@ -6,6 +6,10 @@ from __future__ import annotations
 import threading
 import time
 import logging
+import unittest
+from typing import Dict
+
+from aspyx.di.configuration import EnvConfigurationSource
 
 # not here
 
@@ -29,13 +33,12 @@ def configure_logging(levels: Dict[str, int]) -> None:
 
 configure_logging({"aspyx.di": logging.DEBUG})
 
-import unittest
-from typing import Dict
-
 from aspyx.di import DIException, injectable, order, on_init, on_running, on_destroy, inject_environment, inject, \
     Factory, create, module, Environment, PostProcessor, factory, requires_feature, conditional, requires_class
 
 from di_import import ImportedModule, ImportedClass
+
+### TEST
 
 @injectable()
 @order(10)
@@ -177,10 +180,17 @@ class SimpleModule:
     def __init__(self):
         pass
 
+    #TEST
+    @create()
+    def create_config(self) -> EnvConfigurationSource:
+        return EnvConfigurationSource()
+
+    # TES
+
     # create some beans
 
     @create()
-    def create(self) -> Baz:
+    def create(self) -> Baz: #source: EnvConfigurationSource
         return Baz()
 
 @module(imports=[SimpleModule, ImportedModule])
