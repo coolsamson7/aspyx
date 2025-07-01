@@ -28,6 +28,9 @@ from .restchannel import get, post, put, delete, rest
 
 
 class FastAPIServer(Server):
+    """
+    A server utilizing fastapi framework.
+    """
     # constructor
 
     def __init__(self, host="0.0.0.0", port=8000, **kwargs):
@@ -82,6 +85,9 @@ class FastAPIServer(Server):
                         )
 
     def start(self):
+        """
+        start the fastapi server in a thread
+        """
         def run():
             uvicorn.run(self.fast_api, host=self.host, port=self.port, access_log=False)
 
@@ -181,6 +187,14 @@ class FastAPIServer(Server):
         self.router.get(url)(get_health_response)
 
     def boot(self, module_type: Type) -> Environment:
+        """
+        startup the service manager, DI framework and the fastapi server based on the supplied module
+        Args:
+            module_type: the module
+
+        Returns:
+
+        """
         # setup environment
 
         self.environment = Environment(module_type)

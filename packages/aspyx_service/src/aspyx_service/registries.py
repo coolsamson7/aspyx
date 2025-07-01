@@ -18,6 +18,10 @@ from .server import Server
 from .service import ComponentRegistry, Channel, ServiceAddress, ServiceManager, ComponentDescriptor, Component, ChannelAddress
 
 class ConsulComponentRegistry(ComponentRegistry):
+    """
+    A specialized registry utilizing consul.
+    A polling mechanism is used to identify changes in the component health.
+    """
     # constructor
 
     def __init__(self, port: int, consul_url: str):
@@ -36,7 +40,16 @@ class ConsulComponentRegistry(ComponentRegistry):
         self.consul_host = parsed.hostname
         self.consul_port = parsed.port
 
-    def make_consul(self, host: str, port: int) -> consul.Consul:
+    def make_consul(self, host="", port="") -> consul.Consul:
+        """
+        return a consul instance
+        Args:
+            host: the host
+            port: the port
+
+        Returns: a consul instance
+
+        """
         return consul.Consul(host=host, port=port)
 
     # lifecycle hooks
@@ -110,14 +123,14 @@ class ConsulComponentRegistry(ComponentRegistry):
             time.sleep(5)
 
     @abstractmethod
-    def watch(self, channel: Channel):
+    def watch(self, channel: Channel) -> None:
         self.watch_channels.append(channel)
 
         #self.component_addresses[channel.component_descriptor.name] = {}
 
    # public
 
-    def register_service(self, name, service_id, health: str, tags=None, meta=None):
+    def register_service(self, name, service_id, health: str, tags=None, meta=None) -> None:
         ip = "host.docker.internal" # TODO
 
         self.consul.agent.service.register(
@@ -134,7 +147,7 @@ class ConsulComponentRegistry(ComponentRegistry):
                 deregister="5m")
             )
 
-    def deregister(self, descriptor: ComponentDescriptor[Component]):
+    def deregister(self, descriptor: ComponentDescriptor[Component]) -> None:
         name = descriptor.name
 
         service_id = f"{self.ip}:{self.port}:{name}"

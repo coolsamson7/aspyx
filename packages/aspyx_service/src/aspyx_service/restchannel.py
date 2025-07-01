@@ -26,6 +26,11 @@ QueryParam = lambda t: Annotated[t, QueryParamMarker]
 # decorators
 
 def rest(url):
+    """
+    mark service interfaces in order to add a url prefix
+    Args:
+        url: prefix that will be added to all urls
+    """
     def decorator(cls):
         Decorators.add(cls, rest, url)
 
@@ -33,6 +38,11 @@ def rest(url):
     return decorator
 
 def get(url):
+    """
+    methods marked with `get` will be executed by calling a http get request.
+    Args:
+        url: the url
+    """
     def decorator(cls):
         Decorators.add(cls, get, url)
 
@@ -41,6 +51,12 @@ def get(url):
 
 
 def post(url):
+    """
+    methods marked with `post` will be executed by calling a http get request.
+    The body parameter should be marked with `Body(<param>)`
+    Args:
+        url: the url
+    """
     def decorator(cls):
         Decorators.add(cls, post, url)
 
@@ -49,6 +65,11 @@ def post(url):
     return decorator
 
 def put(url):
+    """
+    methods marked with `put` will be executed by calling a http put request.
+    Args:
+        url: the url
+    """
     def decorator(cls):
         Decorators.add(cls, put, url)
 
@@ -57,6 +78,11 @@ def put(url):
     return decorator
 
 def delete(url):
+    """
+    methods marked with `delete` will be executed by calling a http delete request.
+    Args:
+        url: the url
+    """
     def decorator(cls):
         Decorators.add(cls, delete, url)
 
@@ -65,6 +91,11 @@ def delete(url):
     return decorator
 
 def patch(url):
+    """
+    methods marked with `patch` will be executed by calling a http pathc request.
+    Args:
+        url: the url
+    """
     def decorator(cls):
         Decorators.add(cls, patch, url)
 
@@ -72,11 +103,11 @@ def patch(url):
 
     return decorator
 
-
-
-
 @channel("rest")
 class RestChannel(HTTPXChannel):
+    """
+    A rest channel executes http requests as specified by the corresponding decorators and annotations,
+    """
     __slots__ = [
         "signature",
         "url_template",
@@ -86,6 +117,7 @@ class RestChannel(HTTPXChannel):
         "query_param_names",
         "body_param_name"
     ]
+
     # local class
 
     class Call:
@@ -133,7 +165,7 @@ class RestChannel(HTTPXChannel):
     # constructor
 
     def __init__(self):
-        super().__init__("rest")
+        super().__init__()
 
         self.calls : dict[Callable, RestChannel.Call] = {}
 

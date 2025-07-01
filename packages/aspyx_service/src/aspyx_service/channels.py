@@ -26,8 +26,8 @@ class HTTPXChannel(Channel):
 
     # constructor
 
-    def __init__(self, name):
-        super().__init__(name)
+    def __init__(self):
+        super().__init__()
 
         self.client: Optional[Client] = None
         self.async_client: Optional[AsyncClient] = None
@@ -92,10 +92,14 @@ class Response(BaseModel):
 
 @channel("dispatch-json")
 class DispatchJSONChannel(HTTPXChannel):
+    """
+    A channel that calls a POST on th endpoint `ìnvoke` sending a request body containing information on the
+    called component, service and method and the arrguments.
+    """
     # constructor
 
     def __init__(self):
-        super().__init__("dispatch-json")
+        super().__init__()
 
     # internal
 
@@ -146,10 +150,13 @@ class DispatchJSONChannel(HTTPXChannel):
 
 @channel("dispatch-msgpack")
 class DispatchMSPackChannel(HTTPXChannel):
+    """
+    A channel that sends a POST on the ìnvoke `endpoint`with an msgpack encoded request body.
+    """
     # constructor
 
     def __init__(self):
-        super().__init__("dispatch-msgpack")
+        super().__init__()
 
     # override
 

@@ -436,7 +436,7 @@ class Module():
 ```
 
 This setup will also expose all service interfaces decorated with the corresponding http decorators!
-No need to add any FastAPI decorators, sicen the mapping is already done internally! 
+No need to add any FastAPI decorators, since the mapping is already done internally! 
 
 ## Implementing Channels
 

@@ -31,7 +31,8 @@ def health_checks():
 
 def health_check(name="", cache = 0, fail_if_slower_than = 0):
     """
-    Methods annotated with `@on_init` will be called when the instance is created."""
+    Methods annotated with `@on_init` will be called when the instance is created.
+    """
     def decorator(func):
         Decorators.add(func, health_check, name, cache, fail_if_slower_than)
         return func
@@ -39,6 +40,13 @@ def health_check(name="", cache = 0, fail_if_slower_than = 0):
     return decorator
 
 class HealthStatus(Enum):
+    """
+    A enum specifying the health status of a service. The values are:
+
+    - `OK` service is healthy
+    - `WARNING` service has some problems
+    - `CRITICAL` service is unhealthy
+    """
     OK = 1
     WARNING = 2
     ERROR = 3
@@ -49,6 +57,9 @@ class HealthStatus(Enum):
 
 @injectable()
 class HealthCheckManager:
+    """
+    The health manager is able to run all registered health checks and is able to return an overall status.
+    """
     logger = logging.getLogger("aspyx.service.health")
 
     # local classes
@@ -135,6 +146,11 @@ class HealthCheckManager:
     # check
 
     async def check(self) -> HealthCheckManager.Health:
+        """
+        run all registered health checks and return an overall result.
+        Returns: the overall result.
+
+        """
         self.logger.info("Checking health...")
 
         health = HealthCheckManager.Health()

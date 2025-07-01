@@ -122,4 +122,12 @@ class TypeDeserializer:
 
 @lru_cache(maxsize=512)
 def get_deserializer(typ):
+    """
+    return a function that is able to deserialize a value of the specified type
+    Args:
+        typ: the type
+
+    Returns:
+
+    """
     return TypeDeserializer(typ)

@@ -155,7 +155,7 @@ class ExceptionManager:
 
         # chain
 
-        for i in range(0, len(chain) - 2):
+        for i in range(0, len(chain) - 1):
             chain[i].next = chain[i + 1]
 
         if len(chain) > 0:

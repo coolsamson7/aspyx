@@ -64,6 +64,10 @@ class Server(ABC):
 
     @classmethod
     def get_local_ip(cls):
+        """
+        return the local ip address
+        Returns: the local ip address
+        """
         try:
             # create a dummy socket to an external address
 
@@ -98,23 +102,47 @@ class Component(Service):
     This is the base class for components.
     """
     @abstractmethod
-    def startup(self):
+    def startup(self) -> None:
+        """
+        startup callback
+        """
         pass
 
     @abstractmethod
-    def shutdown(self):
+    def shutdown(self)-> None:
+        """
+        shutdown callback
+        """
         pass
 
     @abstractmethod
     def get_addresses(self, port: int) -> list[ChannelAddress]:
+        """
+        returns a list of channel addresses that expose this components services.
+        Args:
+            port: the port of a server hosting this component
+
+        Returns:
+            list of channel addresses
+        """
         pass
 
     @abstractmethod
     def get_status(self) -> ComponentStatus:
+        """
+        return the component status callback
+
+        Returns: the component status
+        """
         pass
 
     @abstractmethod
     async def get_health(self) -> HealthCheckManager.Health:
+        """
+        return the component health
+
+        Returns: the component health
+        """
         pass
 
 class AbstractComponent(Component, ABC):
@@ -126,16 +154,23 @@ class AbstractComponent(Component, ABC):
     def __init__(self):
         self.status = ComponentStatus.VIRGIN
 
-    def startup(self):
+    def startup(self) -> None:
         self.status = ComponentStatus.RUNNING
 
-    def shutdown(self):
+    def shutdown(self) -> None:
         self.status = ComponentStatus.STOPPED
 
-    def get_status(self):
+    def get_status(self) -> ComponentStatus:
         return self.status
 
 def component(name = "", description="", services: list[Type] = []):
+    """
+    decorates component interfaces
+    Args:
+        name: the component name. If empty the class name is used
+        description: optional description
+        services: the list of hosted services
+    """
     def decorator(cls):
         Decorators.add(cls, component, name, description, services)
 
@@ -148,6 +183,12 @@ def component(name = "", description="", services: list[Type] = []):
     return decorator
 
 def service(name = "", description = ""):
+    """
+    decorates service interfaces
+    Args:
+        name: the service name. If empty the class name is used
+        description: optional description
+    """
     def decorator(cls):
         Decorators.add(cls, service, name, description)
 
@@ -157,16 +198,23 @@ def service(name = "", description = ""):
 
     return decorator
 
-
-def health(name = ""):
+def health(endpoint = ""):
+    """
+    specifies the health endpoint that will return the component health
+    Args:
+        endpoint: the  health endpoint
+    """
     def decorator(cls):
-        Decorators.add(cls, health, name)
+        Decorators.add(cls, health, endpoint)
 
         return cls
 
     return decorator
 
 def implementation():
+    """
+    decorates service or component implementations.
+    """
     def decorator(cls):
         Decorators.add(cls, implementation)
 
@@ -300,6 +348,13 @@ class ComponentDescriptor(BaseDescriptor[T]):
 
 @dataclass()
 class ServiceAddress:
+    """
+    a resolved channel address containing:
+
+    - component: the component name
+    - channel: the channel name
+    - urls: list of URLs
+    """
     component: str
     channel: str
     urls: list[str]
@@ -312,18 +367,33 @@ class ServiceAddress:
         self.urls : list[str] = sorted(urls)
 
 class ServiceException(Exception):
+    """
+    base class for service exceptions
+    """
     pass
 
 class LocalServiceException(ServiceException):
+    """
+    base class for service exceptions occurring locally
+    """
     pass
 
 class ServiceCommunicationException(ServiceException):
+    """
+    base class for service exceptions thrown by remoting errors
+    """
     pass
 
 class RemoteServiceException(ServiceException):
+    """
+    base class for service exceptions occurring on the server side
+    """
     pass
 
 class Channel(DynamicProxy.InvocationHandler, ABC):
+    """
+    A channel is a dynamic proxy invocation handler and transparently takes care of remoting.
+    """
     __slots__ = [
         "name",
         "component_descriptor",
@@ -331,11 +401,24 @@ class Channel(DynamicProxy.InvocationHandler, ABC):
     ]
 
     class URLSelector:
+        """
+        a url selector retrieves a URL for the next remoting call.
+        """
         @abstractmethod
         def get(self, urls: list[str]) -> str:
+            """
+            return the next URL given a list of possible URLS
+            Args:
+                urls: list of possible URLS
+
+            Returns: a URL
+            """
             pass
 
     class FirstURLSelector(URLSelector):
+        """
+        a url selector always retrieving the first URL given a list of possible URLS
+        """
         def get(self, urls: list[str]) -> str:
             if len(urls) == 0:
                 raise ServiceCommunicationException("no known url")
@@ -343,6 +426,9 @@ class Channel(DynamicProxy.InvocationHandler, ABC):
             return urls[0]
 
     class RoundRobinURLSelector(URLSelector):
+        """
+        a url selector that picks urls sequentially given a list of possible URLS
+        """
         def __init__(self):
             self.index = 0
 
@@ -358,25 +444,31 @@ class Channel(DynamicProxy.InvocationHandler, ABC):
 
     # constructor
 
-    def __init__(self, name: str):
-        self.name = name
+    def __init__(self):
+        self.name =  Decorators.get_decorator(type(self), channel).args[0]
         self.component_descriptor : Optional[ComponentDescriptor] = None
         self.address: Optional[ServiceAddress] = None
-        self.url_provider : Channel.URLSelector = Channel.FirstURLSelector()
+        self.url_selector : Channel.URLSelector = Channel.FirstURLSelector()
 
     # public
 
     def customize(self):
         pass
 
-    def select_round_robin(self):
-        self.url_provider = Channel.RoundRobinURLSelector()
+    def select_round_robin(self) -> None:
+        """
+        enable round robin
+        """
+        self.url_selector = Channel.RoundRobinURLSelector()
 
     def select_first_url(self):
-        self.url_provider = Channel.FirstURLSelector()
+        """
+        pick the first URL
+        """
+        self.url_selector = Channel.FirstURLSelector()
 
     def get_url(self) -> str:
-        return self.url_provider.get(self.address.urls)
+        return self.url_selector.get(self.address.urls)
 
     def set_address(self, address: Optional[ServiceAddress]):
         self.address = address
@@ -387,30 +479,58 @@ class Channel(DynamicProxy.InvocationHandler, ABC):
 
 
 class ComponentRegistry:
+    """
+    A component registry keeps track of components including their health
+    """
     @abstractmethod
-    def register(self, descriptor: ComponentDescriptor[Component], addresses: list[ChannelAddress]):
+    def register(self, descriptor: ComponentDescriptor[Component], addresses: list[ChannelAddress]) -> None:
+        """
+        register a component to the registry
+        Args:
+            descriptor: the descriptor
+            addresses: list of addresses
+        """
         pass
 
     @abstractmethod
-    def deregister(self, descriptor: ComponentDescriptor[Component]):
+    def deregister(self, descriptor: ComponentDescriptor[Component]) -> None:
+        """
+        deregister a component from the registry
+        Args:
+            descriptor: the component descriptor
+        """
         pass
 
     @abstractmethod
-    def watch(self, channel: Channel):
+    def watch(self, channel: Channel) -> None:
+        """
+        remember the passed channel and keep it informed about address changes
+        Args:
+            channel: a channel
+        """
         pass
 
     @abstractmethod
     def get_addresses(self, descriptor: ComponentDescriptor) -> list[ServiceAddress]:
+        """
+        return a list of addresses that can be used to call services belonging to this component
+        Args:
+            descriptor: teh component descriptor
+
+        Returns:
+            list of service addresses
+        """
         pass
 
     def map_health(self, health:  HealthCheckManager.Health) -> int:
         return 200
 
-    def shutdown(self):
-        pass
 
 @injectable()
 class ChannelManager:
+    """
+    Internal factory for channels.
+    """
     factories: dict[str, Type] = {}
 
     @classmethod
@@ -442,6 +562,11 @@ class ChannelManager:
         return result
 
 def channel(name):
+    """
+    this decorator is used to mark channel implementations.
+    Args:
+        name: the channel name
+    """
     def decorator(cls):
         Decorators.add(cls, channel, name)
 
@@ -460,6 +585,9 @@ class TypeAndChannel:
 
 @injectable()
 class ServiceManager:
+    """
+    Central class that manages services and components and is able to return proxies.
+    """
     # class property
 
     logger = logging.getLogger("aspyx.service")  # __name__ = module name
@@ -600,6 +728,15 @@ class ServiceManager:
         return address
 
     def get_service(self, service_type: Type[T], preferred_channel="") -> T:
+        """
+        return a service proxy given a service type and preferred channel name
+        Args:
+            service_type:  the service type
+            preferred_channel:  the preferred channel name
+
+        Returns:
+            the proxy
+        """
         service_descriptor = ServiceManager.get_descriptor(service_type)
         component_descriptor = service_descriptor.get_component_descriptor()
 
@@ -688,7 +825,7 @@ class LocalChannel(Channel):
     # constructor
 
     def __init__(self, manager: ServiceManager):
-        super().__init__("local")
+        super().__init__()
 
         self.manager = manager
         self.component = component
@@ -717,13 +854,13 @@ class LocalComponentRegistry(ComponentRegistry):
 
     # implement
 
-    def register(self, descriptor: ComponentDescriptor[Component], addresses: list[ChannelAddress]):
+    def register(self, descriptor: ComponentDescriptor[Component], addresses: list[ChannelAddress]) -> None:
         self.component_channels[descriptor] = addresses
 
-    def deregister(self, descriptor: ComponentDescriptor[Component]):
+    def deregister(self, descriptor: ComponentDescriptor[Component]) -> None:
         pass
 
-    def watch(self, channel: Channel):
+    def watch(self, channel: Channel) -> None:
         pass
 
     def get_addresses(self, descriptor: ComponentDescriptor) -> list[ServiceAddress]:
