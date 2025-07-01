@@ -1,3 +1,6 @@
+"""
+Tests
+"""
 import asyncio
 import logging
 import threading
@@ -5,8 +8,7 @@ import time
 from abc import abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, cast, Optional, Callable
-import atexit
+from typing import Dict, cast, Optional
 
 import consul
 import httpx
@@ -18,7 +20,7 @@ from aspyx.di.configuration import YamlConfigurationSource
 from aspyx_service import ConsulComponentRegistry, service, Service, component, Component, \
     implementation, health, AbstractComponent, ChannelAddress, inject_service, \
     FastAPIServer, Server, ServiceModule, DispatchJSONChannel, ServiceManager, ComponentDescriptor, health_checks, \
-    check, HealthCheckManager, HealthStatus
+    health_check, HealthCheckManager, get, post, Body, rest
 
 # configure logging
 
@@ -27,15 +29,15 @@ logging.basicConfig(
     format='[%(asctime)s] %(levelname)s in %(filename)s:%(lineno)d - %(message)s'
 )
 
-logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.ERROR)
 
 def configure_logging(levels: Dict[str, int]) -> None:
     for name in levels:
         logging.getLogger(name).setLevel(levels[name])
 
 configure_logging({
-    "aspyx.di": logging.DEBUG,
-    "aspyx.service": logging.DEBUG
+    "aspyx.di": logging.INFO,
+    "aspyx.service": logging.INFO
 })
 
 # just a test
@@ -65,7 +67,7 @@ class ChannelAdvice:
     def make_client(self, invocation: Invocation):
         rest_channel = cast(DispatchJSONChannel, invocation.args[0])
 
-        rest_channel.round_robin()
+        rest_channel.select_round_robin()
 
         return InterceptingClient()
 
@@ -117,8 +119,10 @@ data = Data("data-0", "data-1", "data-2", "data-3", "data-4", "data-5", "data-6"
 )
 
 @service(name="test-service", description="cool")
+@rest("/api")
 class TestService(Service):
     @abstractmethod
+    @get("/hello/{message}")
     def hello(self, message: str) -> str:
         pass
 
@@ -126,14 +130,15 @@ class TestService(Service):
     async def hello_async(self, message: str) -> str:
         pass
 
-    def data(self, data: Data) -> Data:
+    @post("/data/")
+    def data(self, data: Body(Data)) -> Data:
         pass
 
     async def data_async(self, data: Data) -> Data:
         pass
 
-@component(name="test-component", services =[TestService])
-class TestComponent(Component):
+@component(services =[TestService])
+class TestComponent(Component): # pylint: disable=abstract-method
     pass
 
 # implementation classes
@@ -144,17 +149,15 @@ class TestServiceImpl(TestService):
         pass
 
     def hello(self, message: str) -> str:
-        #print(f"hello {message}")
         return f"hello {message}"
 
     async def hello_async(self, message: str) -> str:
-        #print(f"hello {message}")
         return f"hello {message}"
 
     def data(self, data: Data) -> Data:
         return data
 
-    def data_async(self, data: Data) -> Data:
+    async def data_async(self, data: Data) -> Data:
         return data
 
 @implementation()
@@ -175,19 +178,20 @@ class TestComponentImpl(AbstractComponent, TestComponent):
 
     # implement
 
-    def get_health(self):
-        return self.health_check_manager.check()
+    async def get_health(self) -> HealthCheckManager.Health:
+        return await self.health_check_manager.check()
 
     def get_addresses(self, port: int) -> list[ChannelAddress]:
         return [
+            ChannelAddress("rest", f"http://{Server.get_local_ip()}:{port}"),
             ChannelAddress("dispatch-json", f"http://{Server.get_local_ip()}:{port}"),
             ChannelAddress("dispatch-msgpack", f"http://{Server.get_local_ip()}:{port}")
         ]
 
-    def startup(self):
+    def startup(self) -> None:
         print("### startup")
 
-    def shutdown(self):
+    def shutdown(self) -> None:
         print("### shutdown")
 
 @injectable()
@@ -195,28 +199,29 @@ class Bar:
     def __init__(self):
         pass
 
-@injectable()
+@injectable(eager=False)
 class Test:
     def __init__(self):
         self.service = None
 
-    #@inject_service() TODO
-    #def set_service(self, service: TestService):
-    #    self.service = service
-    #    print(service)
+    @inject_service(preferred_channel="")
+    def set_service(self, service: TestService, bla: str):
+        self.service = service
+        print(service)
 
 @health_checks()
+@injectable()
 class Checks:
     def __init__(self):
         pass
 
-    @check(fail_if_slower_than=1)
+    @health_check(fail_if_slower_than=1)
     def check_1(self, result: HealthCheckManager.Result):
         #result.set_status(HealthStatus.OK)
         #time.sleep(2)
         pass
 
-    @check(name="check-2", cache=10)
+    @health_check(name="check-2", cache=10)
     def check_2(self, result: HealthCheckManager.Result):
         pass # result.set_status(HealthStatus.OK)
 
@@ -247,11 +252,6 @@ async def main():
 
     service_manager = environment.get(ServiceManager)
 
-    def cleanup():
-        service_manager.shutdown()
-
-    atexit.register(cleanup)
-
     descriptor: ComponentDescriptor = cast(ComponentDescriptor, service_manager.get_descriptor(TestComponent))
 
     while True:
@@ -261,6 +261,10 @@ async def main():
 
         print("zzz...")
         time.sleep(1)
+
+    test_service = service_manager.get_service(TestService, preferred_channel="rest")
+
+    r = test_service.hello("world")
 
     test_service = service_manager.get_service(TestService, preferred_channel="dispatch-json")
     msgpack_test_service = service_manager.get_service(TestService, preferred_channel="dispatch-msgpack")
@@ -327,8 +331,38 @@ async def main():
         print(f"{title} {iterations} in {n_threads} threads: {took} ms, avg: {avg_ms}ms")
 
 
-    test_thread_test(title="sync call", n_threads=1, iterations=1000)
-    test_async_thread_test(title="async call",n_threads=1, iterations=1000)
+    #test_thread_test(title="sync call", n_threads=1, iterations=1000)
+    #test_async_thread_test(title="async call",n_threads=1, iterations=1000)
+
+    #####
+
+    test_service = service_manager.get_service(TestService, preferred_channel="rest")
+
+    loops = 1000
+    start = time.perf_counter()
+    for _ in range(loops):
+        test_service.data(data)
+        #test_service.hello("world")
+
+    end = time.perf_counter()
+
+    avg_ms = ((end - start) / loops) * 1000
+    print(f"Average time per rest call: {avg_ms:.3f} ms")
+
+    test_service = service_manager.get_service(TestService, preferred_channel="dispatch-msgpack")
+
+    loops = 1000
+    start = time.perf_counter()
+    for _ in range(loops):
+        #test_service.hello("andi")
+        test_service.data(data)
+
+    end = time.perf_counter()
+
+    avg_ms = ((end - start) / loops) * 1000
+    print(f"Average time per dispatch call: {avg_ms:.3f} ms")
+
+    return
 
     #####
 
@@ -386,10 +420,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
-
-
-
-
-
 
