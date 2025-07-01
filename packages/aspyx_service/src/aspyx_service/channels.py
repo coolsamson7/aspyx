@@ -3,6 +3,8 @@ Service management and dependency injection framework.
 """
 from __future__ import annotations
 
+import json
+from dataclasses import is_dataclass, asdict, fields
 from typing import Type, Optional, Any, Callable
 
 import msgpack
@@ -23,6 +25,33 @@ class HTTPXChannel(Channel):
         "service_names",
         "deserializers"
     ]
+
+    # class methods
+
+    @classmethod
+    def to_dict(cls, obj: Any) -> Any:
+        if isinstance(obj, BaseModel):
+            return obj.dict()
+
+
+        elif is_dataclass(obj):
+            return {
+                f.name: cls.to_dict(getattr(obj, f.name))
+
+                for f in fields(obj)
+            }
+
+        elif isinstance(obj, (list, tuple)):
+            return [cls.to_dict(item) for item in obj]
+
+        elif isinstance(obj, dict):
+            return {key: cls.to_dict(value) for key, value in obj.items()}
+
+        return obj
+
+    @classmethod
+    def to_json(cls, obj) -> str:
+        return json.dumps(cls.to_dict(obj))
 
     # constructor
 
@@ -117,9 +146,10 @@ class DispatchJSONChannel(HTTPXChannel):
         service_name = self.service_names[invocation.type]  # map type to registered service name
         request = Request(method=f"{self.component_descriptor.name}:{service_name}:{invocation.method.__name__}", args=invocation.args)
 
+        dict = self.to_dict(request)
         try:
             if self.client is not None:
-                result = Response(**self.get_client().post(f"{self.get_url()}/invoke", json=request.dict(), timeout=30000.0).json())
+                result = Response(**self.get_client().post(f"{self.get_url()}/invoke", json=dict, timeout=30000.0).json())
                 if result.exception is not None:
                     raise RemoteServiceException(f"server side exception {result.exception}")
 
@@ -134,9 +164,10 @@ class DispatchJSONChannel(HTTPXChannel):
         request = Request(method=f"{self.component_descriptor.name}:{service_name}:{invocation.method.__name__}",
                           args=invocation.args)
 
+        dict = self.to_dict(request)
         try:
             if self.async_client is not None:
-                data =  await self.async_client.post(f"{self.get_url()}/invoke", json=request.dict(), timeout=30000.0)
+                data =  await self.async_client.post(f"{self.get_url()}/invoke", json=dict, timeout=30000.0)
                 result = Response(**data.json())
                 if result.exception is not None:
                     raise RemoteServiceException(f"server side exception {result.exception}")
@@ -171,7 +202,7 @@ class DispatchMSPackChannel(HTTPXChannel):
                           args=invocation.args)
 
         try:
-            packed = msgpack.packb(request.dict(), use_bin_type=True)
+            packed = msgpack.packb(self.to_dict(request), use_bin_type=True)
 
             response = self.get_client().post(
                 f"{self.get_url()}/invoke",
@@ -196,7 +227,7 @@ class DispatchMSPackChannel(HTTPXChannel):
                           args=invocation.args)
 
         try:
-            packed = msgpack.packb(request.dict(), use_bin_type=True)
+            packed = msgpack.packb(self.to_dict(request), use_bin_type=True)
 
             response = await self.get_async_client().post(
                 f"{self.get_url()}/invoke",

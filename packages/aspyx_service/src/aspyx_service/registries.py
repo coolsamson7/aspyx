@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 
 import consul
 
+from aspyx.di.configuration import inject_value
 from aspyx.util import StringBuilder
 from aspyx.di import on_init
 from .healthcheck import HealthCheckManager, HealthStatus
@@ -24,35 +25,23 @@ class ConsulComponentRegistry(ComponentRegistry):
     """
     # constructor
 
-    def __init__(self, port: int, consul_url: str):
+    def __init__(self, port: int, consul: consul.Consul):
         self.port = port
         self.ip = Server.get_local_ip()
         self.running = False
-        self.consul = None
+        self.consul = consul
         self.watchdog = None
         self.interval = 5
         self.last_index = {}
         self.component_addresses : dict[str, dict[str, ChannelInstances]] = {} # comp -> channel -> address
         self.watch_channels : list[Channel] = []
+        self.watchdog_interval = 5
 
-        parsed = urlparse(consul_url)
+    # injections
 
-        self.consul_host = parsed.hostname
-        self.consul_port = parsed.port
-
-    def make_consul(self, host="", port="") -> consul.Consul:
-        """
-        create and return a consul instance
-
-        Args:
-            host: the host
-            port: the port
-
-        Returns:
-            a consul instance
-
-        """
-        return consul.Consul(host=host, port=port)
+    @inject_value("consul.watchdog.interval", default=5)
+    def set_interval(self, interval):
+        self.watchdog_interval = interval
 
     # lifecycle hooks
 
@@ -60,7 +49,6 @@ class ConsulComponentRegistry(ComponentRegistry):
     def setup(self):
         # create consul client
 
-        self.consul = self.make_consul(host=self.consul_host, port=self.consul_port)
         self.running = True
 
         # start thread
@@ -122,7 +110,7 @@ class ConsulComponentRegistry(ComponentRegistry):
 
             # time to sleep
 
-            time.sleep(5)
+            time.sleep(self.watchdog_interval)
 
     @abstractmethod
     def watch(self, channel: Channel) -> None:

@@ -88,7 +88,7 @@ class FastAPIServer(Server):
         start the fastapi server in a thread
         """
 
-        config = uvicorn.Config(self.fast_api, host=self.host, port=self.port, log_level="info")
+        config = uvicorn.Config(self.fast_api, host=self.host, port=self.port, log_level="debug")
         server = uvicorn.Server(config)
 
         thread = threading.Thread(target=server.run, daemon=True)

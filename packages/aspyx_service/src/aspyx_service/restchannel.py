@@ -189,19 +189,6 @@ class RestChannel(HTTPXChannel):
 
         return call
 
-    def to_dict(self, obj):
-        if obj is None:
-            return None
-        if is_dataclass(obj):
-            return asdict(obj)
-        elif isinstance(obj, BaseModel):
-            return obj.dict()
-        elif hasattr(obj, "__dict__"):
-            return vars(obj)
-        else:
-            # fallback for primitives etc.
-            return obj
-
     # override
 
     def invoke(self, invocation: DynamicProxy.Invocation):

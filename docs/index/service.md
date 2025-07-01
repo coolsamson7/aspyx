@@ -263,39 +263,20 @@ If not specified, the first registered channel is used, which btw. is a local ch
 
 The component registry is the place where component implementations are registered and retrieved.
 
-In addition to a `LocalCompoenetRegistry` ( which is used for testing purposes ) the only implementation is
+In addition to a `LocalComponentRegistry` ( which is used for testing purposes ) the only implementation is
 
 `ConsulComponentRegistry`
 
 Constructor arguments are
 
-- `port: int` the port
-- `consul_url: str` the url
+- `port: int` the own port
+- `consul: Consul` the consul instance
 
-As i didn't want to hassle too much about consul instances ( authentication, etc. ), a method
-
-```
-def make_consul(self, host: str, port: int) -> consul.Consul:
-```
-
-is called from within the class `ConsulComponentRegistry` that can easily be altered by implementing an `around` aspect.
-
-**Example**:
-
-```python
-@around(methods().of_type(ConsulComponentRegistry).named("make_consul"))
-def make_consul(self, invocation: Invocation):
-    port = invocation.kwargs["port"]
-    url = invocation.kwargs["url"]
-    consul = ...
-    return consul
-```
-
-The component registry is also responsible to execute regular health-checks in order to track component healths.
+The component registry is also responsible to execute regular health-checks to track component healths.
 As soon as - in our case consul - decides that a component is not alive anymore, it will notify the clients via regular heartbeats about address changes
 which will be propagated to channels talking to the appropriate component.
 
-Currently this only affects the list of possible URLs which are required by the channels!
+Currently, this only affects the list of possible URLs which are required by the channels!
 
 ## Channels
 
