@@ -6,7 +6,6 @@ import threading
 from abc import abstractmethod
 import time
 from typing import Optional
-from urllib.parse import urlparse
 
 import consul
 
@@ -36,12 +35,27 @@ class ConsulComponentRegistry(ComponentRegistry):
         self.component_addresses : dict[str, dict[str, ChannelInstances]] = {} # comp -> channel -> address
         self.watch_channels : list[Channel] = []
         self.watchdog_interval = 5
+        self.healthcheck_interval = "10s"
+        self.healthcheck_timeout= "5s"
+        self.healthcheck_deregister = "5m"
 
     # injections
 
     @inject_value("consul.watchdog.interval", default=5)
     def set_interval(self, interval):
         self.watchdog_interval = interval
+
+    @inject_value("consul.healthcheck.interval", default="10s")
+    def set_interval(self, interval):
+        self.healthcheck_interval = interval
+
+    @inject_value("consul.healthcheck.timeout", default="3s")
+    def set_interval(self, interval):
+        self.healthcheck_timeout = interval
+
+    @inject_value("consul.healthcheck.deregister", default="5m")
+    def set_interval(self, interval):
+        self.healthcheck_deregister = interval
 
     # lifecycle hooks
 
@@ -116,8 +130,6 @@ class ConsulComponentRegistry(ComponentRegistry):
     def watch(self, channel: Channel) -> None:
         self.watch_channels.append(channel)
 
-        #self.component_addresses[channel.component_descriptor.name] = {}
-
    # public
 
     def register_service(self, name, service_id, health: str, tags=None, meta=None) -> None:
@@ -130,9 +142,9 @@ class ConsulComponentRegistry(ComponentRegistry):
             meta=meta or {},
             check=consul.Check().http(
                 url=f"http://{self.ip}:{self.port}{health}",
-                interval="10s",
-                timeout="3s",
-                deregister="5m")
+                interval=self.healthcheck_interval,
+                timeout=self.healthcheck_timeout,
+                deregister=self.healthcheck_deregister)
             )
 
     def deregister(self, descriptor: ComponentDescriptor[Component]) -> None:
@@ -213,12 +225,13 @@ class ConsulComponentRegistry(ComponentRegistry):
 
         return list(component_addresses.values())
 
-    #200–299	passing	Service is healthy (OK, Created, No Content…)
-    #429	warning	Rate limited or degraded
-    #300–399	warning	Redirects interpreted as potential issues
-    #400–499	critical	Client errors (Bad Request, Unauthorized…)
-    #500–599	critical	Server errors (Internal Error, Timeout…)
-    #Other / No response	critical	Timeout, connection refused, etc.
+    # 200–299	passing	Service is healthy (OK, Created, No Content…)
+    # 429	warning	Rate limited or degraded
+    # 300–399	warning	Redirects interpreted as potential issues
+    # 400–499	critical	Client errors (Bad Request, Unauthorized…)
+    # 500–599	critical	Server errors (Internal Error, Timeout…)
+    # Other / No response	critical	Timeout, connection refused, etc.
+
     def map_health(self, health: HealthCheckManager.Health) -> int:
         if health.status is HealthStatus.OK:
             return 200

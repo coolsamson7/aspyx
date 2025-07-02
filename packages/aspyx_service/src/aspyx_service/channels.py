@@ -11,6 +11,7 @@ import msgpack
 from httpx import Client, AsyncClient
 from pydantic import BaseModel
 
+from aspyx.di.configuration import inject_value
 from aspyx.reflection import DynamicProxy, TypeDescriptor
 from .service import ServiceManager, ServiceCommunicationException
 
@@ -23,7 +24,8 @@ class HTTPXChannel(Channel):
         "client",
         "async_client",
         "service_names",
-        "deserializers"
+        "deserializers",
+        "timeout"
     ]
 
     # class methods
@@ -58,10 +60,17 @@ class HTTPXChannel(Channel):
     def __init__(self):
         super().__init__()
 
+        self.timeout = 1000.0
         self.client: Optional[Client] = None
         self.async_client: Optional[AsyncClient] = None
         self.service_names: dict[Type, str] = {}
         self.deserializers: dict[Callable, Callable] = {}
+
+    # inject
+
+    @inject_value("http.timeout", default=1000.0)
+    def set_timeout(self, timeout: float) -> None:
+        self.timeout = timeout
 
     # protected
 
@@ -149,7 +158,7 @@ class DispatchJSONChannel(HTTPXChannel):
 
         dict = self.to_dict(request)
         try:
-            result = Response(**self.get_client().post(f"{self.get_url()}/invoke", json=dict, timeout=30000.0).json())
+            result = Response(**self.get_client().post(f"{self.get_url()}/invoke", json=dict, timeout=self.timeout).json())
             if result.exception is not None:
                 raise RemoteServiceException(f"server side exception {result.exception}")
 
@@ -170,7 +179,7 @@ class DispatchJSONChannel(HTTPXChannel):
                           args=invocation.args)
         dict = self.to_dict(request)
         try:
-            data =  await self.get_async_client().post(f"{self.get_url()}/invoke", json=dict, timeout=30000.0)
+            data =  await self.get_async_client().post(f"{self.get_url()}/invoke", json=dict, timeout=self.timeout)
             result = Response(**data.json())
 
             if result.exception is not None:
@@ -217,7 +226,7 @@ class DispatchMSPackChannel(HTTPXChannel):
                 f"{self.get_url()}/invoke",
                 content=packed,
                 headers={"Content-Type": "application/msgpack"},
-                timeout=30.0
+                timeout=self.timeout
             )
 
             result = msgpack.unpackb(response.content, raw=False)
@@ -248,7 +257,7 @@ class DispatchMSPackChannel(HTTPXChannel):
                 f"{self.get_url()}/invoke",
                 content=packed,
                 headers={"Content-Type": "application/msgpack"},
-                timeout=30.0
+                timeout=self.timeout
             )
 
             result = msgpack.unpackb(response.content, raw=False)

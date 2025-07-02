@@ -341,15 +341,9 @@ class EnvironmentInstanceProvider(AbstractInstanceProvider):
 
     def resolve(self, context: Providers.ResolveContext):
         if self.dependencies is None:
+            self.dependencies = []
+            context.push(self)
             try:
-                context.push(self)
-
-                # resolve
-
-                self.dependencies = []
-
-                # check dependencies
-
                 type_and_params = self.provider.get_dependencies()
                 #params = type_and_params[1]
                 for type in type_and_params[0]:

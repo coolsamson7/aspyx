@@ -646,6 +646,7 @@ class ServiceManager:
         self.component_registry = component_registry
         self.channel_manager = channel_manager
         self.environment = None
+        self.preferred_channel = ""
 
         self.ip = Server.get_local_ip()
 
@@ -740,6 +741,9 @@ class ServiceManager:
 
         return address
 
+    def set_preferred_channel(self, preferred_channel: str):
+        self.preferred_channel = preferred_channel
+
     def get_service(self, service_type: Type[T], preferred_channel="") -> T:
         """
         return a service proxy given a service type and preferred channel name
@@ -751,6 +755,10 @@ class ServiceManager:
         Returns:
             the proxy
         """
+
+        if len(preferred_channel) == 0:
+            preferred_channel = self.preferred_channel
+
         service_descriptor = ServiceManager.get_descriptor(service_type)
         component_descriptor = service_descriptor.get_component_descriptor()
 
