@@ -645,7 +645,7 @@ class ServiceManager:
     def __init__(self, component_registry: ComponentRegistry, channel_manager: ChannelManager):
         self.component_registry = component_registry
         self.channel_manager = channel_manager
-        self.environment = None
+        self.environment : Optional[Environment] = None
         self.preferred_channel = ""
 
         self.ip = Server.get_local_ip()
@@ -870,12 +870,15 @@ class LocalComponentRegistry(ComponentRegistry):
     # constructor
 
     def __init__(self):
-        self.component_channels : dict[ComponentDescriptor, list[ChannelAddress]]  = {}
+        self.component_channels : dict[ComponentDescriptor, list[ChannelInstances]]  = {}
 
     # implement
 
     def register(self, descriptor: ComponentDescriptor[Component], addresses: list[ChannelAddress]) -> None:
-        self.component_channels[descriptor] = addresses
+        if self.component_channels.get(descriptor, None) is None:
+            self.component_channels[descriptor] = []
+
+        self.component_channels[descriptor].extend([ChannelInstances(descriptor.name, address.channel, [address.uri]) for address in addresses])
 
     def deregister(self, descriptor: ComponentDescriptor[Component]) -> None:
         pass

@@ -53,7 +53,7 @@ class TestFactory(Factory[Foo]):
         return Foo()
 ```
 
-As in `@injectable`, the same arguments are possible.
+`@factory` accepts the same arguments as `@injectable`
 
 ## Method 
 
@@ -71,7 +71,28 @@ class Foo:
         return Baz()
 ```
 
- The same arguments as in `@injectable` are possible.
+`@create`accepts the same arguments as `@injectable`
+
+The respective method can have any number of additional - injectable - arguments.
+This is handy, if the parameters are either required, or just to express a dependency, that will influence the order of instantiation.
+
+**Example**:
+```python
+@module(imports=[ServiceModule])
+class Module:
+    def __init__(self):
+        pass
+
+    @create()
+    def create_yaml_source(self) -> YamlConfigurationSource:
+        return YamlConfigurationSource(f"{Path(__file__).parent}/config.yaml")
+
+    @create()
+    def create_registry(self, source: YamlConfigurationSource) -> ConsulComponentRegistry:
+        return ConsulComponentRegistry(Server.port, consul.Consul(host="localhost", port=8000))
+```
+This will make sure, that the service classes already can access the yaml properties!
+
 
 ## Conditional
 

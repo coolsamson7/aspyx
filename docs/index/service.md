@@ -259,9 +259,15 @@ def get_service(self, service_type: Type[T], preferred_channel="") -> T
 
 If not specified, the first registered channel is used, which btw. is a local channel - called `local` -  in case of implementing services.
 
+The default can be set globally with the method `set_preferred_channel(channel: str)`
+
 ## Component Registry
 
-The component registry is the place where component implementations are registered and retrieved.
+The component registry is the place where component implementations are registered together with their supported channel addresses.
+Regular health checks guarantee, that the retrieved addresses relate to healthy servers only.
+
+Once a client binds to a specific address, the infrastructure will notify the established channels about any changes in form of added or removed URLs,
+giving them the chance to react accordingly.
 
 In addition to a `LocalComponentRegistry` ( which is used for testing purposes ) the only implementation is
 
@@ -272,11 +278,12 @@ Constructor arguments are
 - `port: int` the own port
 - `consul: Consul` the consul instance
 
-The component registry is also responsible to execute regular health-checks to track component healths.
-As soon as - in our case consul - decides that a component is not alive anymore, it will notify the clients via regular heartbeats about address changes
-which will be propagated to channels talking to the appropriate component.
+Several configuration values are respected:
 
-Currently, this only affects the list of possible URLs which are required by the channels!
+- "consul.watchdog.interval" time in s, that consul is polled.
+- "consul.healthcheck:interval" interval in which health checks are executed. Defaults to "10s"
+- "consul.healthcheck:timeout" health check timeout. Defaults to "5s"
+- "consul.healthcheck:deregister" time period after which unhealthy instances are removed. Defaults to "5m"
 
 ## Channels
 
@@ -322,6 +329,10 @@ class ChannelAdvice:
         return invocation.proceed()
 ```
 
+Several configuration values are respected:
+
+- "http.timeout": timeout in s. Defaults to 1
+- 
 ### Performance
 
 I benchmarked the different implementations with a recursive dataclass as an argument and return value.
