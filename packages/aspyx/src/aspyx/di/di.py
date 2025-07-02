@@ -316,7 +316,7 @@ class EnvironmentInstanceProvider(AbstractInstanceProvider):
 
         self.environment = environment
         self.provider = provider
-        self.dependencies : list[AbstractInstanceProvider] = []
+        self.dependencies : Optional[list[AbstractInstanceProvider]] = None # FOO
         self.scope_instance = Scopes.get(provider.get_scope(), environment)
 
     # public
@@ -340,27 +340,26 @@ class EnvironmentInstanceProvider(AbstractInstanceProvider):
     # implement
 
     def resolve(self, context: Providers.ResolveContext):
-        context.add(self)
-        context.push(self)
+        if self.dependencies is None:
+            try:
+                context.push(self)
 
-        if not context.is_resolved(self):
-            context.provider_dependencies[self] = [] #?
+                # resolve
 
-            type_and_params = self.provider.get_dependencies()
-            params = type_and_params[1]
-            for type in type_and_params[0]:
-                if params > 0:
-                    params -= 1
-                    self.dependencies.append(context.get_provider(type)) # try/catch TODO
+                self.dependencies = []
 
-                provider = context.add_provider_dependency(self, type)
-                if provider is not None and not context.is_resolved(provider):
+                # check dependencies
+
+                type_and_params = self.provider.get_dependencies()
+                #params = type_and_params[1]
+                for type in type_and_params[0]:
+                    provider = context.require_provider(type)
+
+                    self.dependencies.append(provider)
+
                     provider.resolve(context)
-
-        else:
-            context.add(*context.get_provider_dependencies(self))
-
-        context.pop()
+            finally:
+                context.pop()
 
     def get_module(self) -> str:
         return self.provider.get_module()
@@ -570,48 +569,23 @@ class PostProcessor(LifecycleProcessor):
 
 class Providers:
     """
-    The Providers class is a static class that manages the registration and resolution of InstanceProviders.
+    The Providers class is a static class used in the context of the registration and resolution of InstanceProviders.
     """
     # local class
 
     class ResolveContext:
         __slots__ = [
-            "dependencies",
             "providers",
-            "provider_dependencies",
             "path"
         ]
 
         # constructor
 
         def __init__(self, providers: Dict[Type, EnvironmentInstanceProvider]):
-            self.dependencies : list[EnvironmentInstanceProvider] = []
             self.providers = providers
             self.path = []
-            self.provider_dependencies : dict[EnvironmentInstanceProvider, list[EnvironmentInstanceProvider]] = {}
 
         # public
-
-        def is_resolved(self, provider: EnvironmentInstanceProvider) -> bool:
-            return self.provider_dependencies.get(provider, None) is not None
-
-        def get_provider_dependencies(self, provider: EnvironmentInstanceProvider) -> list[EnvironmentInstanceProvider]:
-            return self.provider_dependencies[provider]
-
-        def add_provider_dependency(self, provider: EnvironmentInstanceProvider, type: Type) -> Optional[EnvironmentInstanceProvider]:
-            provider_dependencies = self.provider_dependencies.get(provider, None)
-            if provider_dependencies is None:
-                provider_dependencies = []
-                self.provider_dependencies[provider] = provider_dependencies
-
-            provider = self.get_provider(type)
-
-            if any(issubclass(provider.get_type(), dependency.get_type()) for dependency in provider_dependencies):
-                return None
-
-            provider_dependencies.append(provider)
-
-            return provider
 
         def push(self, provider):
             self.path.append(provider)
@@ -619,23 +593,15 @@ class Providers:
         def pop(self):
             self.path.pop()
 
-        def next(self):
-            self.path.clear()
-            self.dependencies.clear()
-
-        def get_provider(self, type: Type) -> EnvironmentInstanceProvider:
+        def require_provider(self, type: Type) -> EnvironmentInstanceProvider:
             provider = self.providers.get(type, None)
             if provider is None:
                 raise DIRegistrationException(f"Provider for {type} is not defined")
 
+            if provider in self.path:
+                raise DIRegistrationException(self.cycle_report(provider))
+
             return provider
-
-        def add(self, *providers: EnvironmentInstanceProvider):
-            for provider in providers:
-                if next((p for p in self.dependencies if p.get_type() is provider.get_type()), None) is not None:
-                    raise DIRegistrationException(self.cycle_report(provider))
-
-                self.dependencies.append(provider)
 
         def cycle_report(self, provider: AbstractInstanceProvider):
             cycle = ""
@@ -788,7 +754,6 @@ class Providers:
         provider_context = Providers.ResolveContext(providers)
         for provider in mapped.values():
             provider.resolve(provider_context)
-            provider_context.next() # clear dependencies
 
         # done
 
@@ -1016,6 +981,11 @@ class Environment:
             parent (Optional[Environment]): Optional parent environment, whose objects are inherited.
         """
 
+        def add_provider(type: Type, provider: AbstractInstanceProvider):
+            Environment.logger.debug("\tadd provider %s for %s", provider, type)
+
+            self.providers[type] = provider
+
         Environment.logger.debug("create environment for class %s", env.__qualname__)
 
         # initialize
@@ -1036,9 +1006,11 @@ class Environment:
             for provider_type, inherited_provider in self.parent.providers.items():
                 if inherited_provider.get_scope() == "environment":
                     # replace with own environment instance provider
-                    self.providers[provider_type] = EnvironmentInstanceProvider(self, cast(EnvironmentInstanceProvider, inherited_provider).provider)
+                    provider = EnvironmentInstanceProvider(self, cast(EnvironmentInstanceProvider, inherited_provider).provider)
+                    provider.dependencies = [] # ??
+                    add_provider(provider_type, provider)
                 else:
-                    self.providers[provider_type] = inherited_provider
+                    add_provider(provider_type, inherited_provider)
 
             # inherit processors as is unless they have an environment scope
 
@@ -1058,11 +1030,6 @@ class Environment:
         prefix_list : list[str] = []
 
         loaded = set()
-
-        def add_provider(type: Type, provider: AbstractInstanceProvider):
-            Environment.logger.debug("\tadd provider %s for %s", provider, type)
-
-            self.providers[type] = provider
 
         def get_type_package(type: Type):
             module_name = type.__module__
