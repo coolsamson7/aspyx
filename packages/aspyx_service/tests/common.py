@@ -18,7 +18,7 @@ from aspyx.di.configuration import YamlConfigurationSource
 from aspyx_service import service, Service, component, Component, \
     implementation, health, AbstractComponent, ChannelAddress, inject_service, \
     FastAPIServer, Server, ServiceModule, ServiceManager, \
-    HealthCheckManager, get, post, rest, put, delete
+    HealthCheckManager, get, post, rest, put, delete, Body
 from aspyx_service.service import LocalComponentRegistry
 
 # configure logging
@@ -99,11 +99,11 @@ class TestRestService(Service):
         pass
 
     @post("/hello/{message}")
-    def post_pydantic(self, message: str, data: Pydantic) -> Pydantic:
+    def post_pydantic(self, message: str, data: Body(Pydantic)) -> Pydantic:
         pass
 
     @post("/hello/{message}")
-    def post_data(self, message: str, data: Data) -> Data:
+    def post_data(self, message: str, data: Body(Data)) -> Data:
         pass
 
     @delete("/hello/{message}")
@@ -123,11 +123,11 @@ class TestAsyncRestService(Service):
         pass
 
     @post("/hello/{message}")
-    async def post_pydantic(self, message: str, data: Pydantic) -> Pydantic:
+    async def post_pydantic(self, message: str, data: Body(Pydantic)) -> Pydantic:
         pass
 
     @post("/hello/{message}")
-    async def post_data(self, message: str, data: Data) -> Data:
+    async def post_data(self, message: str, data: Body(Data)) -> Data:
         pass
 
     @delete("/hello/{message}")

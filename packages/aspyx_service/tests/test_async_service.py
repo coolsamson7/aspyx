@@ -51,8 +51,8 @@ class TestAsyncRemoteService(unittest.IsolatedAsyncioTestCase):
 
         #
 
-        # result_pydantic = test_service.post_pydantic(pydantic)
-        # self.assertEqual(result_pydantic, pydantic)
+        result_pydantic = test_service.post_pydantic("message", pydantic)
+        self.assertEqual(result_pydantic, pydantic)
 
-        ##result_pydantic = test_service.post_data(pydantic)
-        # self.assertEqual(result_pydantic, pydantic)
+        #result_data = test_service.post_data("message", data)
+        #self.assertEqual(result_data, data)
