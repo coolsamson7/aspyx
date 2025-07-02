@@ -54,7 +54,12 @@ class Data:
     b: bool
     s: str
 
+class PydanticAndData(BaseModel):
     p: Pydantic
+
+@dataclass
+class DataAndPydantic:
+    d: Data
 
 # service
 

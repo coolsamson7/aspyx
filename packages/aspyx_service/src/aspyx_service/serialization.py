@@ -42,6 +42,9 @@ class TypeDeserializer:
         if is_dataclass(typ):
             field_deserializers = {f.name: TypeDeserializer(f.type) for f in fields(typ)}
             def deser_dataclass(value):
+                if is_dataclass(value):
+                    return value
+
                 return typ(**{
                     k: field_deserializers[k](v) for k, v in value.items()
                 })
