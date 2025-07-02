@@ -34,5 +34,5 @@ jobs:
         working-directory: packages/aspyx_service
         run: |
           hatch build
-          pip install dist/*.whl
+          pip install dist/*.whl 
           pytest
