@@ -12,7 +12,7 @@ from httpx import Client, AsyncClient
 from pydantic import BaseModel
 
 from aspyx.reflection import DynamicProxy, TypeDescriptor
-from .service import ServiceManager
+from .service import ServiceManager, ServiceCommunicationException
 
 from .service import ComponentDescriptor, ChannelInstances, ServiceException, channel, Channel, RemoteServiceException
 from .serialization import get_deserializer
@@ -99,16 +99,16 @@ class HTTPXChannel(Channel):
 
         return self.client
 
-    def get_async_client(self) -> Client:
+    def get_async_client(self) -> AsyncClient:
         if self.async_client is None:
             self.async_client = self.make_async_client()
 
         return self.async_client
 
-    def make_client(self):
+    def make_client(self) -> Client:
         return Client()  # base_url=url
 
-    def make_async_client(self):
+    def make_async_client(self) -> AsyncClient:
         return AsyncClient()  # base_url=url
 
 class Request(BaseModel):
@@ -144,40 +144,49 @@ class DispatchJSONChannel(HTTPXChannel):
 
     def invoke(self, invocation: DynamicProxy.Invocation):
         service_name = self.service_names[invocation.type]  # map type to registered service name
-        request = Request(method=f"{self.component_descriptor.name}:{service_name}:{invocation.method.__name__}", args=invocation.args)
-
-        dict = self.to_dict(request)
-        try:
-            if self.client is not None:
-                result = Response(**self.get_client().post(f"{self.get_url()}/invoke", json=dict, timeout=30000.0).json())
-                if result.exception is not None:
-                    raise RemoteServiceException(f"server side exception {result.exception}")
-
-                return self.get_deserializer(invocation.type, invocation.method)(result.result)
-            else:
-                raise ServiceException(f"no url for channel {self.name} for component {self.component_descriptor.name} registered")
-        except Exception as e:
-            raise ServiceException(f"communication exception {e}") from e
-
-    async def invoke_async(self, invocation: DynamicProxy.Invocation):
-        service_name = self.service_names[invocation.type]  # map type to registered service name
         request = Request(method=f"{self.component_descriptor.name}:{service_name}:{invocation.method.__name__}",
                           args=invocation.args)
 
         dict = self.to_dict(request)
         try:
-            if self.async_client is not None:
-                data =  await self.async_client.post(f"{self.get_url()}/invoke", json=dict, timeout=30000.0)
-                result = Response(**data.json())
-                if result.exception is not None:
-                    raise RemoteServiceException(f"server side exception {result.exception}")
+            result = Response(**self.get_client().post(f"{self.get_url()}/invoke", json=dict, timeout=30000.0).json())
+            if result.exception is not None:
+                raise RemoteServiceException(f"server side exception {result.exception}")
 
-                return self.get_deserializer(invocation.type, invocation.method)(result.result)
-            else:
-                raise ServiceException(
-                    f"no url for channel {self.name} for component {self.component_descriptor.name} registered")
+            return self.get_deserializer(invocation.type, invocation.method)(result.result)
+        except ServiceCommunicationException:
+            raise
+
+        except RemoteServiceException:
+            raise
+
         except Exception as e:
-            raise ServiceException(f"communication exception {e}") from e
+            raise ServiceCommunicationException(f"communication exception {e}") from e
+
+
+    async def invoke_async(self, invocation: DynamicProxy.Invocation):
+        service_name = self.service_names[invocation.type]  # map type to registered service name
+        request = Request(method=f"{self.component_descriptor.name}:{service_name}:{invocation.method.__name__}",
+                          args=invocation.args)
+        dict = self.to_dict(request)
+        try:
+            data =  await self.get_async_client().post(f"{self.get_url()}/invoke", json=dict, timeout=30000.0)
+            result = Response(**data.json())
+
+            if result.exception is not None:
+                raise RemoteServiceException(f"server side exception {result.exception}")
+
+            return self.get_deserializer(invocation.type, invocation.method)(result.result)
+
+        except ServiceCommunicationException:
+            raise
+
+        except RemoteServiceException:
+            raise
+
+        except Exception as e:
+            raise ServiceCommunicationException(f"communication exception {e}") from e
+
 
 @channel("dispatch-msgpack")
 class DispatchMSPackChannel(HTTPXChannel):
@@ -218,6 +227,12 @@ class DispatchMSPackChannel(HTTPXChannel):
 
             return self.get_deserializer(invocation.type, invocation.method)(result["result"])
 
+        except ServiceCommunicationException:
+            raise
+
+        except RemoteServiceException:
+            raise
+
         except Exception as e:
             raise ServiceException(f"msgpack exception: {e}") from e
 
@@ -242,6 +257,12 @@ class DispatchMSPackChannel(HTTPXChannel):
                 raise RemoteServiceException(f"server-side: {result['exception']}")
 
             return self.get_deserializer(invocation.type, invocation.method)(result["result"])
+
+        except ServiceCommunicationException:
+            raise
+
+        except RemoteServiceException:
+            raise
 
         except Exception as e:
             raise ServiceException(f"msgpack exception: {e}") from e

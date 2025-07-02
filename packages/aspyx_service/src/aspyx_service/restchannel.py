@@ -10,7 +10,7 @@ from typing import get_type_hints, TypeVar, Annotated, Callable, get_origin, get
 from pydantic import BaseModel
 
 from aspyx.reflection import DynamicProxy, Decorators
-from .service import ServiceException, channel
+from .service import ServiceException, channel, ServiceCommunicationException
 
 T = TypeVar("T")
 
@@ -229,6 +229,42 @@ class RestChannel(HTTPXChannel):
 
     # override
 
+    async def invoke_async(self, invocation: 'DynamicProxy.Invocation'):
+        call = self.get_call(invocation.type, invocation.method)
+
+        bound = call.signature.bind(self, *invocation.args, **invocation.kwargs)
+        bound.apply_defaults()
+        arguments = bound.arguments
+
+        # url
+
+        url = call.url_template.format(**arguments)
+        query_params = {k: arguments[k] for k in call.query_param_names if k in arguments}
+        body = {}
+        if call.body_param_name is not None:
+            body = self.to_dict(arguments.get(call.body_param_name))
+
+        # call
+
+        try:
+            result = None
+            if call.type == "get":
+                result = await self.get_client().get(self.get_url() + url, params=query_params, timeout=30000.0).json()
+            elif call.type == "put":
+                result = await self.get_client().put(self.get_url() + url, params=query_params, timeout=30000.0).json()
+            elif call.type == "delete":
+                result = await self.get_client().delete(self.get_url() + url, params=query_params, timeout=30000.0).json()
+            elif call.type == "post":
+                result = await self.get_client().post(self.get_url() + url, params=query_params, json=body,
+                                                timeout=30000.0).json()
+
+            return self.get_deserializer(invocation.type, invocation.method)(result)
+        except ServiceCommunicationException:
+            raise
+
+        except Exception as e:
+            raise ServiceCommunicationException(f"communication exception {e}") from e
+
     def invoke(self, invocation: DynamicProxy.Invocation):
         call = self.get_call(invocation.type, invocation.method)
 
@@ -247,20 +283,19 @@ class RestChannel(HTTPXChannel):
         # call
 
         try:
-            if self.client is not None:
-                result = None
-                if call.type == "get":
-                    result = self.client.get(self.get_url() + url, params=query_params, timeout=30000.0).json()
-                elif call.type == "put":
-                    result = self.client.put(self.get_url() + url, params=query_params, timeout=30000.0).json()
-                elif call.type == "delete":
-                    result = self.client.delete(self.get_url() + url, params=query_params, timeout=30000.0).json()
-                elif call.type == "post":
-                    result = self.client.post(self.get_url() + url, params=query_params, json=body, timeout=30000.0).json()
+            result = None
+            if call.type == "get":
+                result = self.get_client().get(self.get_url() + url, params=query_params, timeout=30000.0).json()
+            elif call.type == "put":
+                result = self.get_client().put(self.get_url() + url, params=query_params, timeout=30000.0).json()
+            elif call.type == "delete":
+                result = self.get_client().delete(self.get_url() + url, params=query_params, timeout=30000.0).json()
+            elif call.type == "post":
+                result = self.get_client().post(self.get_url() + url, params=query_params, json=body, timeout=30000.0).json()
 
-                return self.get_deserializer(invocation.type, invocation.method)(result)
-            else:
-                raise ServiceException(
-                    f"no url for channel {self.name} for component {self.component_descriptor.name} registered")
+            return self.get_deserializer(invocation.type, invocation.method)(result)
+        except ServiceCommunicationException:
+            raise
+
         except Exception as e:
-            raise ServiceException(f"communication exception {e}") from e
+            raise ServiceCommunicationException(f"communication exception {e}") from e

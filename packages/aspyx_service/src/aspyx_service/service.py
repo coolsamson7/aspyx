@@ -480,11 +480,13 @@ class Channel(DynamicProxy.InvocationHandler, ABC):
         self.url_selector = Channel.FirstURLSelector()
 
     def get_url(self) -> str:
+        if self.address is None:
+            raise ServiceCommunicationException(f"no url for channel {self.name} for component {self.component_descriptor.name} registered")
+
         return self.url_selector.get(self.address.urls)
 
     def set_address(self, address: Optional[ChannelInstances]):
         self.address = address
-        print(self.name + " got new address: " + str(address))
 
     def setup(self, component_descriptor: ComponentDescriptor, address: ChannelInstances):
         self.component_descriptor = component_descriptor
@@ -856,8 +858,6 @@ class LocalChannel(Channel):
 
         return getattr(instance, invocation.method.__name__)(*invocation.args, **invocation.kwargs)
 
-
-#@injectable()
 class LocalComponentRegistry(ComponentRegistry):
     # constructor
 

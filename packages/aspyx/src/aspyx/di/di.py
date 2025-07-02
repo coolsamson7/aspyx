@@ -1137,9 +1137,6 @@ class Environment:
         # construct eager objects for local providers
 
         for provider in set(self.providers.values()):
-            if isinstance(provider, EnvironmentInstanceProvider):
-                provider.print_tree()
-
             if provider.is_eager():
                 provider.create(self)
 
