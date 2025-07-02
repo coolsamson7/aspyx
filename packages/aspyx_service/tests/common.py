@@ -3,7 +3,6 @@ Common test stuff
 """
 import logging
 import time
-import unittest
 
 from abc import abstractmethod
 from dataclasses import dataclass

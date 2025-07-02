@@ -4,7 +4,7 @@ Tests
 
 import unittest
 
-from packages.aspyx_service.tests.common import start_server, TestService, TestRestService, Test, Pydantic, Data
+from .common import start_server, TestService, TestRestService, Test, Pydantic, Data
 
 
 pydantic = Pydantic(i=1, f=1.0, b=True, s="s")

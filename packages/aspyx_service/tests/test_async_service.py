@@ -3,36 +3,11 @@ Tests
 """
 import unittest
 
-import pytest
-
-from packages.aspyx_service.tests.common import TestAsyncService, start_server, TestService, TestAsyncRestService, \
-    Pydantic, Data, Test
+from .common import TestAsyncService, start_server, TestAsyncRestService, Pydantic, Data
 
 
 pydantic = Pydantic(i=1, f=1.0, b=True, s="s")
 data = Data(i=1, f=1.0, b=True, s="s", p=pydantic)
-
-class TestLocalService(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.service_manager = start_server()
-
-    def test_local(self):
-        test_service = self.service_manager.get_service(TestService, preferred_channel="local")
-
-        result = test_service.hello("hello")
-        self.assertEqual(result, "hello")
-
-        result_data = test_service.data(data)
-        self.assertEqual(result_data, data)
-
-        result_pydantic = test_service.pydantic(pydantic)
-        self.assertEqual(result_pydantic, pydantic)
-
-    def test_inject(self):
-        test = self.service_manager.environment.get(Test)
-
-        self.assertIsNotNone(test.service)
 
 class TestAsyncRemoteService(unittest.IsolatedAsyncioTestCase):
     @classmethod
