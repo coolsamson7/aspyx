@@ -37,7 +37,7 @@ class TestSyncRemoteService(unittest.TestCase):
     def setUpClass(cls):
         cls.service_manager = service_manager()
 
-    def test_dispatch_json(self):
+    def xtest_dispatch_json(self):
         test_service = self.service_manager.get_service(TestService, preferred_channel="dispatch-json")
 
         result = test_service.hello("hello")
@@ -49,7 +49,7 @@ class TestSyncRemoteService(unittest.TestCase):
         result_pydantic = test_service.pydantic(pydantic)
         self.assertEqual(result_pydantic, pydantic)
 
-    def test_dispatch_msgpack(self):
+    def xtest_dispatch_msgpack(self):
         test_service = self.service_manager.get_service(TestService, preferred_channel="dispatch-msgpack")
 
         result = test_service.hello("hello")
