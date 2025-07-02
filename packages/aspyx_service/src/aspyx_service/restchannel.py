@@ -10,7 +10,7 @@ from typing import get_type_hints, TypeVar, Annotated, Callable, get_origin, get
 from pydantic import BaseModel
 
 from aspyx.reflection import DynamicProxy, Decorators
-from .service import ServiceException, channel, ServiceCommunicationException
+from .service import channel, ServiceCommunicationException
 
 T = TypeVar("T")
 
