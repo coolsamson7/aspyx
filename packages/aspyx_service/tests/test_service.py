@@ -4,8 +4,7 @@ Tests
 
 import unittest
 
-from .common import start_server, TestService, TestRestService, Test, Pydantic, Data
-
+from .common import TestService, TestRestService, Test, Pydantic, Data, service_manager
 
 pydantic = Pydantic(i=1, f=1.0, b=True, s="s")
 data = Data(i=1, f=1.0, b=True, s="s", p=pydantic)
@@ -14,7 +13,7 @@ data = Data(i=1, f=1.0, b=True, s="s", p=pydantic)
 class TestLocalService(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.service_manager = start_server()
+        cls.service_manager = service_manager()
 
     def test_local(self):
         test_service = self.service_manager.get_service(TestService, preferred_channel="local")
@@ -36,7 +35,7 @@ class TestLocalService(unittest.TestCase):
 class TestSyncRemoteService(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.service_manager = start_server()
+        cls.service_manager = service_manager()
 
     def test_dispatch_json(self):
         test_service = self.service_manager.get_service(TestService, preferred_channel="dispatch-json")

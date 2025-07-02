@@ -3,8 +3,7 @@ Tests
 """
 import unittest
 
-from .common import TestAsyncService, start_server, TestAsyncRestService, Pydantic, Data
-
+from .common import TestAsyncService, TestAsyncRestService, Pydantic, Data, service_manager
 
 pydantic = Pydantic(i=1, f=1.0, b=True, s="s")
 data = Data(i=1, f=1.0, b=True, s="s", p=pydantic)
@@ -12,7 +11,7 @@ data = Data(i=1, f=1.0, b=True, s="s", p=pydantic)
 class TestAsyncRemoteService(unittest.IsolatedAsyncioTestCase):
     @classmethod
     def setUpClass(cls):
-        cls.service_manager = start_server()
+        cls.service_manager = service_manager()
 
     async def test_dispatch_json(self):
         test_service = self.service_manager.get_service(TestAsyncService, preferred_channel="dispatch-json")
