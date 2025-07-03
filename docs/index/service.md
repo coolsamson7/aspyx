@@ -108,15 +108,15 @@ determine a specific channel. As a local channel has the name "local", the appro
 The library offers:
 
 - sync and async support
-- multiple - extensible - channel implementations supporting dataclasses and pydantic data models.
-- ability to customize http calls with interceptors ( via the AOP abilities )
+- multiple and extensible channel implementations supporting dataclasses and pydantic data models.
+- ability to intercept http calls via the AOP abilities ( think of bearer tokens ) 
 - `fastapi` based channels covering simple rest endpoints including `msgpack` support.
-- `httpx` based clients for dispatching channels and simple rest endpoint with the help of low-level decorators.
+- thread-safe `httpx` based clients for dispatching channels and simple rest endpoint with the help of low-level decorators.
 - registry implementation based on `consul`
 - support for configurable health checks
 
 As well as the DI and AOP core, all mechanisms are heavily optimized.
-A simple benchmark resulted in message roundtrips in significantly under a ms per call.
+A simple benchmark resulted in message round-trips in significantly under a ms per call.
 
 Let's see some details
 
