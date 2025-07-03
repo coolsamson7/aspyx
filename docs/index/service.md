@@ -112,11 +112,11 @@ The library offers:
 - ability to customize http calls with interceptors ( via the AOP abilities )
 - `fastapi` based channels covering simple rest endpoints including `msgpack` support.
 - `httpx` based clients for dispatching channels and simple rest endpoint with the help of low-level decorators.
-- first registry implementation based on `consul`
+- registry implementation based on `consul`
 - support for configurable health checks
 
 As well as the DI and AOP core, all mechanisms are heavily optimized.
-A simple benchmark resulted in message roundtrips in significanlty under a ms per call.
+A simple benchmark resulted in message roundtrips in significantly under a ms per call.
 
 Let's see some details
 
@@ -277,13 +277,21 @@ Constructor arguments are
 
 - `port: int` the own port
 - `consul: Consul` the consul instance
+- 
+**Example**:
+
+```python
+ConsulComponentRegistry(Server.port, consul.Consul(host="localhost", port=8500))
+```
 
 Several configuration values are respected:
 
-- "consul.watchdog.interval" time in s, that consul is polled.
-- "consul.healthcheck:interval" interval in which health checks are executed. Defaults to "10s"
-- "consul.healthcheck:timeout" health check timeout. Defaults to "5s"
-- "consul.healthcheck:deregister" time period after which unhealthy instances are removed. Defaults to "5m"
+| Configuration                | Description                                             | Default |
+|----------------------------------------------------------------------------------------|---------|
+|consul.watchdog.interval      |  time in s, that consul is polled.                      | 5s      |
+|consul.healthcheck:interval   | interval in which health checks are executed            | 10s     |
+|consul.healthcheck:timeout    | health check timeout                                    | 5s      |
+|consul.healthcheck:deregister | time period after which unhealthy instances are removed | 5m      |
 
 ## Channels
 
@@ -292,9 +300,9 @@ Channels implement the possible transport layer protocols. In the sense of a dyn
 Several channels are implemented:
 
 - `dispatch-json`
-   channel that dispatches generic `Request` objects via a `invoke` POST-call
+   channel that dispatches generic `Request` objects via a generic `invoke` POST-call
 - `dispatch-msgpack`
-   channel that dispatches generic `Request` objects via a `invoke` POST-call after packing the json with msgpack
+   channel that dispatches generic `Request` objects via a generic `invoke` POST-call after packing the json with msgpack
 - `rest`
   channel that executes regular rest-calls as defined by a couple of decorators.
 
@@ -305,16 +313,11 @@ A so called `URLSelector` is used internally to provide URLs for every single ca
 - `FirstURLSelector` always returns the first URL of the list of possible URLs
 - `RoundRobinURLSelector` switches sequentially between all URLs.
 
-To customize the behavior, an around advice can be implemented easily:
+To customize the behavior, an `around` advice can be implemented easily:
 
 **Example**:
  
 ```python
-@advice
-class ChannelAdvice:
-    def __init__(self):
-        pass
-
 @advice
 class ChannelAdvice:
     def __init__(self):
@@ -331,8 +334,8 @@ class ChannelAdvice:
 
 Several configuration values are respected:
 
-- "http.timeout": timeout in s. Defaults to 1
-- 
+- `http.timeout`: timeout in s. Defaults to 1
+
 ### Performance
 
 I benchmarked the different implementations with a recursive dataclass as an argument and return value.

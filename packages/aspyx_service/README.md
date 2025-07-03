@@ -34,19 +34,23 @@ that lets you deploy, discover and call services with different remoting protoco
 
 The basic design consists of four different concepts:
 
-!!! info "Service"
+**Service**
+
   defines a group of methods that can be called either locally or remotely. 
   These methods represent the functional interface exposed to clients — similar to an interface in traditional programming
 
-!!! info "Component"
+**Component**
+
   a component bundles one or more services and declares the channels (protocols) used to expose them.
   Think of a component as a deployment unit or module.
 
-!!! info "Component Registry "
+**Component Registry**
+
   acts as the central directory for managing available components.
   It allows the framework to register, discover, and resolve components and their services.
 
-!!! info "Channel"
+**Channel**
+
   is a pluggable transport layer that defines how service method invocations are transmitted and handled.
 
 Let's look at the "interface" layer first.
@@ -75,7 +79,7 @@ class Module:
     
     @create()
     def create_registry(self) -> ConsulComponentRegistry:
-        return ConsulComponentRegistry(Server.port, "http://localhost:8500") # a consul based registry!
+        return ConsulComponentRegistry(Server.port, Consul(host="localhost", port=8500)) # a consul based registry!
 
 environment = Environment(Module)
 service_manager = environment.get(ServiceManager)
@@ -325,7 +329,7 @@ A so called `URLSelector` is used internally to provide URLs for every single ca
 - `FirstURLSelector` always returns the first URL of the list of possible URLs
 - `RoundRobinURLSelector` switches sequentially between all URLs.
 
-To customize the behavior, an around advice can be implemented easily:
+To customize the behavior, an `around` advice can be implemented easily:
 
 **Example**:
  
