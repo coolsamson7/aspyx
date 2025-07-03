@@ -769,11 +769,12 @@ class ServiceManager:
 
         # check proxy
 
-        key = TypeAndChannel(type=component_descriptor.type, channel=preferred_channel)
+        channel_key = TypeAndChannel(type=component_descriptor.type, channel=preferred_channel)
+        proxy_key   = TypeAndChannel(type=service_type, channel=preferred_channel)
 
-        proxy = self.proxy_cache.get(key, None)
+        proxy = self.proxy_cache.get(proxy_key, None)
         if proxy is None:
-            channel_instance = self.channel_cache.get(key, None)
+            channel_instance = self.channel_cache.get(channel_key, None)
 
             if channel_instance is None:
                 address = self.find_service_address(component_descriptor, preferred_channel)
@@ -786,9 +787,9 @@ class ServiceManager:
                 # channel may have changed
 
                 if address.channel != preferred_channel:
-                    key = TypeAndChannel(type=component_descriptor.type, channel=address.channel)
+                    channel_key = TypeAndChannel(type=component_descriptor.type, channel=address.channel)
 
-                channel_instance = self.channel_cache.get(key, None)
+                channel_instance = self.channel_cache.get(channel_key, None)
                 if channel_instance is None:
                     # create channel
 
@@ -796,7 +797,7 @@ class ServiceManager:
 
                     # cache
 
-                    self.channel_cache[key] =  channel_instance
+                    self.channel_cache[channel_key] =  channel_instance
 
                     # and watch for changes in the addresses
 
@@ -805,7 +806,7 @@ class ServiceManager:
             # create proxy
 
             proxy = DynamicProxy.create(service_type, channel_instance)
-            self.proxy_cache[key] = proxy
+            self.proxy_cache[proxy_key] = proxy
 
         return proxy
 

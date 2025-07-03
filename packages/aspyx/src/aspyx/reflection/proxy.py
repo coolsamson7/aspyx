@@ -75,7 +75,7 @@ class DynamicProxy(Generic[T]):
 
         if  inspect.iscoroutinefunction(method):
             async def async_wrapper(*args, **kwargs):
-                return  await self.invocation_handler.invoke_async(DynamicProxy.Invocation(self.type, method, *args, **kwargs))
+                return await self.invocation_handler.invoke_async(DynamicProxy.Invocation(self.type, method, *args, **kwargs))
 
             return async_wrapper
 
