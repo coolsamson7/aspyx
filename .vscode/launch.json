@@ -1,0 +1,16 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Profile: main.py",
+      "type": "python",
+      "request": "launch",
+      "module": "cProfile",
+      "args": [
+        "-s", "tottime",  // Sort by total time spent in functions
+        "${file}"
+      ],
+      "console": "integratedTerminal"
+    }
+  ]
+}
