@@ -287,12 +287,11 @@ ConsulComponentRegistry(Server.port, consul.Consul(host="localhost", port=8500))
 Several configuration values are respected:
 
 | Configuration                | Description                                             | Default |
-|----------------------------------------------------------------------------------------|---------|
-|consul.watchdog.interval      |  time in s, that consul is polled.                      | 5s      |
-|consul.healthcheck:interval   | interval in which health checks are executed            | 10s     |
-|consul.healthcheck:timeout    | health check timeout                                    | 5s      |
-|consul.healthcheck:deregister | time period after which unhealthy instances are removed | 5m      |
-
+|------------------------------|--------------------------------------------------------|---------|
+| consul.watchdog.interval     | Time in s, that consul is polled.                      | 5s      |
+| consul.healthcheck:interval  | Interval in which health checks are executed           | 10s     |
+| consul.healthcheck:timeout   | Health check timeout                                   | 5s      |
+| consul.healthcheck:deregister| Time period after which unhealthy instances are removed | 5m      |
 ## Channels
 
 Channels implement the possible transport layer protocols. In the sense of a dynamic proxy, they are the invocation handlers!
