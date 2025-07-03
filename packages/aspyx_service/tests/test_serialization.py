@@ -1,7 +1,6 @@
 """
 serialization tests
 """
-import unittest
 from dataclasses import dataclass
 
 from pydantic import BaseModel
@@ -34,7 +33,7 @@ data = Data(i=1, f=1.0, b=True, s="s")
 p_plus_d = PydanticAndData(data=data)
 d_plus_p = DataAndPydantic(pydantic=pydantic)
 
-class TestSerialization(unittest.TestCase):
+class TestSerialization:
     def test_pydantic(self):
         serializer = get_serializer(Pydantic)
         deserializer = get_deserializer(Pydantic)
@@ -42,7 +41,7 @@ class TestSerialization(unittest.TestCase):
         output = serializer(pydantic)
         reverse = deserializer(output)
 
-        self.assertEqual(reverse, pydantic)
+        assert reverse == pydantic
 
     def test_data(self):
         serializer = get_serializer(Data)
@@ -51,7 +50,7 @@ class TestSerialization(unittest.TestCase):
         output = serializer(data)
         reverse = deserializer(output)
 
-        self.assertEqual(reverse, data)
+        assert reverse == data
 
     def test_pydantic_plus_data(self):
         serializer = get_serializer(PydanticAndData)
@@ -60,7 +59,7 @@ class TestSerialization(unittest.TestCase):
         output = serializer(p_plus_d)
         reverse = deserializer(output)
 
-        self.assertEqual(p_plus_d, reverse)
+        assert p_plus_d == reverse
 
     def test_data_plus_pydantic(self):
         serializer = get_serializer(DataAndPydantic)
@@ -69,4 +68,4 @@ class TestSerialization(unittest.TestCase):
         output = serializer(d_plus_p)
         reverse = deserializer(output)
 
-        self.assertEqual(reverse, d_plus_p)
+        assert reverse == d_plus_p

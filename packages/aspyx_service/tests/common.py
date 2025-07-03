@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Optional
 
+import pytest
 from pydantic import BaseModel
 
 from aspyx.di import module, create, injectable
@@ -293,12 +294,7 @@ def start_server() -> ServiceManager:
 
     return service_manager
 
-manager : Optional[ServiceManager] = None
-
-#@pytest.fixture(scope="session")
-def service_manager() -> ServiceManager:
-    global manager
-    if manager is None:
-        manager = start_server()
-
-    return manager
+@pytest.fixture(scope="session")
+def service_manager():
+    manager = start_server()  # start server
+    yield manager

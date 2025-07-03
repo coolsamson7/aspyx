@@ -292,6 +292,7 @@ Several configuration values are respected:
 | consul.healthcheck:interval  | Interval in which health checks are executed           | 10s     |
 | consul.healthcheck:timeout   | Health check timeout                                   | 5s      |
 | consul.healthcheck:deregister| Time period after which unhealthy instances are removed | 5m      |
+
 ## Channels
 
 Channels implement the possible transport layer protocols. In the sense of a dynamic proxy, they are the invocation handlers!
