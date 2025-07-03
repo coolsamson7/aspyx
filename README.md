@@ -9,9 +9,9 @@
 
 ![image](https://github.com/user-attachments/assets/e808210a-b1a4-4fd0-93f1-b5f9845fa520)
 
-Please look at the two main libraries
+This is a mono repo hosting currently two python libraries related to DI & AOP and a microservice framework: 
 
 - [Aspyx](https://github.com/coolsamson7/aspyx/tree/main/packages/aspyx)
-- [Aspyx Service](https://github.com/coolsamson7/tree/main/packages/aspyx_service)
+- [Aspyx Service](https://github.com/coolsamson7/aspyx/tree/main/packages/aspyx_service)
       
 
