@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Optional
 
-import pytest
 from pydantic import BaseModel
 
 from aspyx.di import module, create, injectable

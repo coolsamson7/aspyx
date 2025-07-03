@@ -1,3 +1,6 @@
+"""
+serialization tests
+"""
 import unittest
 from dataclasses import dataclass
 
@@ -57,7 +60,7 @@ class TestSerialization(unittest.TestCase):
         output = serializer(p_plus_d)
         reverse = deserializer(output)
 
-        self.assertEqual(p_plus_d, p_plus_d)
+        self.assertEqual(p_plus_d, reverse)
 
     def test_data_plus_pydantic(self):
         serializer = get_serializer(DataAndPydantic)

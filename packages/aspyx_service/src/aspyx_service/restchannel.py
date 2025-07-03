@@ -169,7 +169,7 @@ class RestChannel(HTTPXChannel):
             for param_name, hint in hints.items():
                 if get_origin(hint) is Annotated:
                     metadata = get_args(hint)[1:]
-                    
+
                     if BodyMarker in metadata:
                         self.body_param_name = param_name
                         param_names.remove(param_name)

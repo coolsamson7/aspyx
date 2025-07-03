@@ -61,7 +61,7 @@ class TypeDeserializer:
 
         # Fallback
         return lambda v: v
-    
+
 class TypeSerializer:
     def __init__(self, typ):
         self.typ = typ

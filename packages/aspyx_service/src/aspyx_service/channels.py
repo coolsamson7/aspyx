@@ -4,7 +4,7 @@ Service management and dependency injection framework.
 from __future__ import annotations
 
 import json
-from dataclasses import is_dataclass, asdict, fields
+from dataclasses import is_dataclass, fields
 from typing import Type, Optional, Any, Callable
 
 import msgpack

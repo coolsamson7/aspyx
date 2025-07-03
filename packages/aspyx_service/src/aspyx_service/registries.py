@@ -42,19 +42,19 @@ class ConsulComponentRegistry(ComponentRegistry):
     # injections
 
     @inject_value("consul.watchdog.interval", default=5)
-    def set_interval(self, interval):
+    def set_watchdog_interval(self, interval):
         self.watchdog_interval = interval
 
     @inject_value("consul.healthcheck.interval", default="10s")
-    def set_interval(self, interval):
+    def set_healthcheck_interval(self, interval):
         self.healthcheck_interval = interval
 
     @inject_value("consul.healthcheck.timeout", default="3s")
-    def set_interval(self, interval):
+    def set_healthcheck_timeout(self, interval):
         self.healthcheck_timeout = interval
 
     @inject_value("consul.healthcheck.deregister", default="5m")
-    def set_interval(self, interval):
+    def set_healthcheck_deregister(self, interval):
         self.healthcheck_deregister = interval
 
     # lifecycle hooks

@@ -2,7 +2,6 @@
 Tests
 """
 import asyncio
-import logging
 import threading
 import time
 
@@ -202,4 +201,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
