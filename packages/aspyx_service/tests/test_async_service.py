@@ -13,7 +13,7 @@ class TestAsyncRemoteService(unittest.IsolatedAsyncioTestCase):
     def setUpClass(cls):
         cls.service_manager = service_manager()
 
-    async def xtest_dispatch_json(self):
+    async def test_dispatch_json(self):
         test_service = self.service_manager.get_service(TestAsyncService, preferred_channel="dispatch-json")
 
         result = await test_service.hello("hello")
@@ -25,7 +25,7 @@ class TestAsyncRemoteService(unittest.IsolatedAsyncioTestCase):
         result_pydantic = await test_service.pydantic(pydantic)
         self.assertEqual(result_pydantic, pydantic)
 
-    async def xtest_dispatch_msgpack(self):
+    async def test_dispatch_msgpack(self):
         test_service = self.service_manager.get_service(TestAsyncService, preferred_channel="dispatch-msgpack")
 
         result = await test_service.hello("hello")
@@ -37,7 +37,7 @@ class TestAsyncRemoteService(unittest.IsolatedAsyncioTestCase):
         result_pydantic = await test_service.pydantic(pydantic)
         self.assertEqual(result_pydantic, pydantic)
 
-    async def xtest_dispatch_rest(self):
+    async def test_rest(self):
         test_service = self.service_manager.get_service(TestAsyncRestService, preferred_channel="rest")
 
         result = await test_service.get("hello")
@@ -49,10 +49,8 @@ class TestAsyncRemoteService(unittest.IsolatedAsyncioTestCase):
         result = await test_service.delete("hello")
         self.assertEqual(result, "hello")
 
-        #
-
-        result_pydantic = test_service.post_pydantic("message", pydantic)
+        result_pydantic = await test_service.post_pydantic("message", pydantic)
         self.assertEqual(result_pydantic, pydantic)
 
-        #result_data = test_service.post_data("message", data)
-        #self.assertEqual(result_data, data)
+        result_data = await test_service.post_data("message", data)
+        self.assertEqual(result_data, data)
