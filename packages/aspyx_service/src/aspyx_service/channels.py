@@ -13,6 +13,7 @@ from pydantic import BaseModel
 
 from aspyx.di.configuration import inject_value
 from aspyx.reflection import DynamicProxy, TypeDescriptor
+from aspyx.threading import ThreadLocal
 from .service import ServiceManager, ServiceCommunicationException
 
 from .service import ComponentDescriptor, ChannelInstances, ServiceException, channel, Channel, RemoteServiceException
@@ -27,6 +28,11 @@ class HTTPXChannel(Channel):
         "deserializers",
         "timeout"
     ]
+
+    # class properties
+
+    client_local = ThreadLocal[Client]()
+    async_client_local = ThreadLocal[AsyncClient]()
 
     # class methods
 
@@ -61,8 +67,6 @@ class HTTPXChannel(Channel):
         super().__init__()
 
         self.timeout = 1000.0
-        self.client: Optional[Client] = None
-        self.async_client: Optional[AsyncClient] = None
         self.service_names: dict[Type, str] = {}
         self.deserializers: dict[Callable, Callable] = {}
 
@@ -95,24 +99,25 @@ class HTTPXChannel(Channel):
         for service in component_descriptor.services:
             self.service_names[service.type] = service.name
 
-        # make client
-
-        self.client = self.make_client()
-        self.async_client = self.make_async_client()
-
     # public
 
     def get_client(self) -> Client:
-        if self.client is None:
-            self.client = self.make_client()
+        client = self.client_local.get()
 
-        return self.client
+        if client is None:
+            client = self.make_client()
+            self.client_local.set(client)
+
+        return client
 
     def get_async_client(self) -> AsyncClient:
-        if self.async_client is None:
-            self.async_client = self.make_async_client()
+        async_client = self.async_client_local.get()
 
-        return self.async_client
+        if async_client is None:
+            async_client = self.make_async_client()
+            self.async_client_local.set(async_client)
+
+        return async_client
 
     def make_client(self) -> Client:
         return Client()  # base_url=url
