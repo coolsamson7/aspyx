@@ -17,6 +17,7 @@ theme:
     - pymdownx.superfences
     - pymdownx.tabbed
     - pymdownx.snippets
+    - tables
     - toc:
         permalink: true
     - admonition
