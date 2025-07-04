@@ -255,22 +255,6 @@ class Test:
     def set_service(self, service: TestService):
         self.service = service
 
-
-@service(description="login service")
-class LoginService(Service):
-    @abstractmethod
-    def login(self, user: str, password: str) -> Optional[str]:
-        pass
-
-    @abstractmethod
-    def secured(self):
-        pass
-
-
-@component(name="login-component", services=[LoginService])
-class LoginComponent(Component): # pylint: disable=abstract-method
-    pass
-
 # module
 
 @module(imports=[ServiceModule])

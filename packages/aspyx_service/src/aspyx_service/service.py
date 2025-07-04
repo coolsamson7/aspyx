@@ -691,11 +691,17 @@ class ServiceManager:
 
                     # fetch health
 
-                    descriptor.health = Decorators.get_decorator(descriptor.implementation, health).args[0]
+                    health_name = None
+                    health_descriptor = Decorators.get_decorator(descriptor.implementation, health)
+
+                    if health_descriptor is not None:
+                        health_name = health_descriptor.args[0]
+
+                    descriptor.health = health_name
 
                     self.component_registry.register(descriptor.get_component_descriptor(), [ChannelAddress("local", "")])
 
-                    health_name = next((decorator.args[0] for decorator in Decorators.get(descriptor.type) if decorator.decorator is health), None)
+                    #health_name = next((decorator.args[0] for decorator in Decorators.get(descriptor.type) if decorator.decorator is health), None)
 
                     # startup
 
@@ -703,7 +709,8 @@ class ServiceManager:
 
                     # add health route
 
-                    server.route_health(health_name, instance.get_health)
+                    if health_name is not None:
+                        server.route_health(health_name, instance.get_health)
 
                     # register addresses
 
