@@ -3,6 +3,7 @@ This module provides aspect-oriented programming (AOP) capabilities for Python a
 """
 from __future__ import annotations
 
+import functools
 from abc import ABC, abstractmethod
 import inspect
 import re
@@ -673,13 +674,15 @@ class AdviceProcessor(PostProcessor):
         for member, aspects in aspect_dict.items():
             Environment.logger.debug("add aspects for %s:%s", type(instance), member.__name__)
 
-            def wrap(jp):
+            def wrap(jp, member=member):
+                @functools.wraps(member)
                 def sync_wrapper(*args, **kwargs):
                     return Invocation(member, jp).call(*args, **kwargs)
 
                 return sync_wrapper
 
-            def wrap_async(jp):
+            def wrap_async(jp, member=member):
+                @functools.wraps(member)
                 async def async_wrapper(*args, **kwargs):
                     return await Invocation(member, jp).call_async(*args, **kwargs)
 

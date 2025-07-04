@@ -42,11 +42,15 @@ class Decorators:
             decorator: the decorator
             *args: any arguments supplied to the decorator
         """
-        decorators = getattr(func_or_class, '__decorators__', None)
-        if decorators is None:
+        current = func_or_class.__dict__.get('__decorators__')
+        if current is None:
             setattr(func_or_class, '__decorators__', [DecoratorDescriptor(decorator, *args)])
         else:
-            decorators.append(DecoratorDescriptor(decorator, *args))
+            # Avoid mutating inherited list
+            if '__decorators__' not in func_or_class.__dict__:
+                current = list(current)
+                setattr(func_or_class, '__decorators__', current)
+            current.append(DecoratorDescriptor(decorator, *args))
 
     @classmethod
     def has_decorator(cls, func_or_class, callable: Callable) -> bool:
@@ -82,7 +86,7 @@ class Decorators:
         if inspect.ismethod(func_or_class):
             func_or_class = func_or_class.__func__  # unwrap bound method
 
-        #return getattr(func_or_class, '__decorators__', []) will return inherited as well
+        #return getattr(func_or_class, '__decorators__', []) #will return inherited as well
         return func_or_class.__dict__.get('__decorators__', [])
 
 
