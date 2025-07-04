@@ -255,6 +255,22 @@ class Test:
     def set_service(self, service: TestService):
         self.service = service
 
+
+@service(description="login service")
+class LoginService(Service):
+    @abstractmethod
+    def login(self, user: str, password: str) -> Optional[str]:
+        pass
+
+    @abstractmethod
+    def secured(self):
+        pass
+
+
+@component(name="login-component", services=[LoginService])
+class LoginComponent(Component): # pylint: disable=abstract-method
+    pass
+
 # module
 
 @module(imports=[ServiceModule])
@@ -273,15 +289,14 @@ class Module:
 # main
 
 def start_server() -> ServiceManager:
-    server = FastAPIServer(host="0.0.0.0", port=8000)
+    server = FastAPIServer.start(module=Module, host="0.0.0.0", port=8000)
 
-    server.boot(Module)
-
-    service_manager = server.get(ServiceManager)
+    service_manager = server.service_manager
     descriptor = service_manager.get_descriptor(TestComponent).get_component_descriptor()
 
     # Give the server a second to start
 
+    print("wait for server to start")
     while True:
         addresses = service_manager.component_registry.get_addresses(descriptor)
         if len(addresses) > 0:

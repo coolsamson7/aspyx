@@ -17,7 +17,7 @@ from aspyx.di import injectable, Environment, Providers, ClassInstanceProvider, 
     Lifecycle, LifecycleCallable, InstanceProvider
 from aspyx.reflection import Decorators, DynamicProxy, DecoratorDescriptor, TypeDescriptor
 from aspyx.util import StringBuilder
-from .healthcheck import HealthCheckManager
+from .healthcheck import HealthCheckManager, HealthStatus
 
 T = TypeVar("T")
 
@@ -54,10 +54,6 @@ class Server(ABC):
 
     def get(self, type: Type[T]) -> T:
         return self.environment.get(type)
-
-    @abstractmethod
-    def boot(self, module_type: Type):
-        pass
 
     @abstractmethod
     def route(self, url : str, callable: Callable):
@@ -163,6 +159,9 @@ class AbstractComponent(Component, ABC):
 
     def get_status(self) -> ComponentStatus:
         return self.status
+
+    async def get_health(self) -> HealthCheckManager.Health:
+        return HealthCheckManager.Health(HealthStatus.OK)
 
 def to_snake_case(name: str) -> str:
     return re.sub(r'(?<!^)(?=[A-Z])', '-', name).lower()

@@ -3,7 +3,6 @@ Tests
 """
 import pytest
 
-from aspyx_service import ServiceManager
 from .common import TestAsyncService, TestAsyncRestService, Pydantic, Data, service_manager
 
 pydantic = Pydantic(i=1, f=1.0, b=True, s="s")

@@ -66,7 +66,7 @@ class HTTPXChannel(Channel):
     def __init__(self):
         super().__init__()
 
-        self.timeout = 1000.0
+        self.timeout = 100000.0 #TODO
         self.service_names: dict[Type, str] = {}
         self.deserializers: dict[Callable, Callable] = {}
 

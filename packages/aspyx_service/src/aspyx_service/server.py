@@ -11,8 +11,10 @@ import msgpack
 import uvicorn
 
 from fastapi import FastAPI, APIRouter, Request as HttpRequest, Response as HttpResponse
+from starlette.middleware.base import BaseHTTPMiddleware
+import contextvars
 
-from aspyx.di import Environment
+from aspyx.di import Environment, injectable, on_init, inject_environment
 from aspyx.reflection import TypeDescriptor, Decorators
 
 from .service import ComponentRegistry
@@ -25,24 +27,69 @@ from .channels import Request, Response
 
 from .restchannel import get, post, put, delete, rest
 
+class RequestContext(BaseHTTPMiddleware):
+    request_var = contextvars.ContextVar("request")
 
+    @classmethod
+    def get_request(cls) -> HttpRequest:
+        return cls.request_var.get()
+
+    # override
+
+    async def dispatch(self, request: HttpRequest, call_next):
+        token = self.request_var.set(request)
+        try:
+            response = await call_next(request)
+        finally:
+            self.request_var.reset(token)
+
+        return response
+
+@injectable()
 class FastAPIServer(Server):
     """
     A server utilizing fastapi framework.
     """
+
+    # class methods
+
+    @classmethod
+    def start(cls, module: Type, host="0.0.0.0", port=8000) -> 'FastAPIServer':
+        """
+        boot the DI infrastructure of the supplied module and start fastapi given the url
+        Args:
+            module: the module to initialize the environment
+            host: listen address
+            port: the port
+
+        Returns:
+
+        """
+        cls.port = port
+
+        environment = Environment(module)
+
+        server = environment.get(FastAPIServer)
+
+        server.start_fastapi(host)
+
+        return server
+
     # constructor
 
-    def __init__(self, host="0.0.0.0", port=8000, **kwargs):
+    def __init__(self, service_manager: ServiceManager, component_registry: ComponentRegistry):
         super().__init__()
 
-        self.host = host
-        Server.port = port
+        self.environment : Optional[Environment] = None
+        self.service_manager = service_manager
+        self.component_registry = component_registry
+
+        self.host = "localhost"
         self.server_thread = None
-        self.service_manager : Optional[ServiceManager] = None
-        self.component_registry: Optional[ComponentRegistry] = None
 
         self.router = APIRouter()
         self.fast_api = FastAPI()
+        self.fast_api.add_middleware(RequestContext)
 
         # cache
 
@@ -51,6 +98,31 @@ class FastAPIServer(Server):
         # that's the overall dispatcher
 
         self.router.post("/invoke")(self.invoke)
+
+    # inject
+
+    @inject_environment()
+    def set_environment(self, environment: Environment):
+        self.environment = environment
+
+    @on_init()
+    def on_init(self):
+        self.service_manager.startup(self)
+
+        # add routes
+
+        self.add_routes()
+        self.fast_api.include_router(self.router)
+
+        # for route in self.fast_api.routes:
+        #    print(f"{route.name}: {route.path} [{route.methods}]")
+
+        # add cleanup hook
+
+        def cleanup():
+            self.service_manager.shutdown()
+
+        atexit.register(cleanup)
 
     # private
 
@@ -82,10 +154,11 @@ class FastAPIServer(Server):
                             response_model=method.return_type,
                         )
 
-    def start_fastapi_thread(self):
+    def start_fastapi(self, host: str):
         """
         start the fastapi server in a thread
         """
+        self.host = host
 
         config = uvicorn.Config(self.fast_api, host=self.host, port=self.port, access_log=False) #log_level="debug"
         server = uvicorn.Server(config)
@@ -136,14 +209,14 @@ class FastAPIServer(Server):
         request = Request(**data)
 
         if content == "json":
-            return await self.dispatch(request)
+            return await self.dispatch(http_request, request)
         else:
             return HttpResponse(
                 content=msgpack.packb(await self.dispatch(request), use_bin_type=True),
                 media_type="application/msgpack"
             )
 
-    async def dispatch(self, request: Request) :
+    async def dispatch(self, http_request: HttpRequest, request: Request) :
         ServiceManager.logger.debug("dispatch request %s", request.method)
 
         # <comp>:<service>:<method>
@@ -185,44 +258,3 @@ class FastAPIServer(Server):
             )
 
         self.router.get(url)(get_health_response)
-
-    def boot(self, module_type: Type) -> Environment:
-        """
-        startup the service manager, DI framework and the fastapi server based on the supplied module
-
-        Args:
-            module_type: the module
-
-        Returns:
-
-        """
-        # setup environment
-
-        self.environment = Environment(module_type)
-        self.service_manager = self.environment.get(ServiceManager)
-        self.component_registry = self.environment.get(ComponentRegistry)
-
-        self.service_manager.startup(self)
-
-        # add routes
-
-        self.add_routes()
-        self.fast_api.include_router(self.router)
-
-        #for route in self.fast_api.routes:
-        #    print(f"{route.name}: {route.path} [{route.methods}]")
-
-        # start server thread
-
-        self.start_fastapi_thread()
-
-        # shutdown
-
-        def cleanup():
-            self.service_manager.shutdown()
-
-        atexit.register(cleanup)
-
-        # done
-
-        return self.environment
