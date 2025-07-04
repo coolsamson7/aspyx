@@ -65,7 +65,7 @@ class AspectTarget(ABC):
     def __init__(self):
         self._clazz = None
         self._instance = None
-        self._async = False
+        self._async : Optional[bool] = None
         self._function = None
         self._type = None
 
@@ -117,6 +117,16 @@ class AspectTarget(ABC):
             AspectTarget: self
         """
         self._async = True
+        return self
+
+    def that_are_sync(self) -> AspectTarget:
+        """
+        matches methods that are async
+
+        Returns:
+            AspectTarget: self
+        """
+        self._async = False
         return self
 
     def of_type(self, type: Type) -> AspectTarget:
@@ -231,7 +241,7 @@ class MethodAspectTarget(AspectTarget):
 
         # async
 
-        if self._async is not method_descriptor.is_async():
+        if self._async is not None and self._async is not method_descriptor.is_async():
             return False
 
         # type

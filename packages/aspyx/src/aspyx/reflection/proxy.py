@@ -1,6 +1,7 @@
 """
 Dynamic proxies for method interception and delegation.
 """
+import functools
 import inspect
 from typing import Generic, TypeVar, Type, Callable
 
@@ -74,12 +75,15 @@ class DynamicProxy(Generic[T]):
         method = getattr(self.type, name)
 
         if inspect.iscoroutinefunction(method):
+
+            @functools.wraps(method)
             async def async_wrapper(*args, **kwargs):
                 return await self.invocation_handler.invoke_async(DynamicProxy.Invocation(self.type, method, *args, **kwargs))
 
             return async_wrapper
 
         else:
+            @functools.wraps(method)
             def sync_wrapper(*args, **kwargs):
                 return self.invocation_handler.invoke(DynamicProxy.Invocation(self.type, method, *args, **kwargs))
 

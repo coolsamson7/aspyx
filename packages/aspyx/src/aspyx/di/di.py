@@ -998,13 +998,13 @@ class Environment:
             # inherit providers from parent
 
             for provider_type, inherited_provider in self.parent.providers.items():
+                provider = inherited_provider
                 if inherited_provider.get_scope() == "environment":
                     # replace with own environment instance provider
                     provider = EnvironmentInstanceProvider(self, cast(EnvironmentInstanceProvider, inherited_provider).provider)
                     provider.dependencies = [] # ??
-                    add_provider(provider_type, provider)
-                else:
-                    add_provider(provider_type, inherited_provider)
+
+                add_provider(provider_type, provider)
 
             # inherit processors as is unless they have an environment scope
 
@@ -1012,8 +1012,7 @@ class Environment:
                 if self.providers[type(processor)].get_scope() != "environment":
                     self.lifecycle_processors.append(processor)
                 else:
-                    # create and remember
-                    self.lifecycle_processors.append(self.get(type(processor)))
+                    self.get(type(processor)) # will automatically be appended
         else:
             self.providers[SingletonScope] = SingletonScopeInstanceProvider()
             self.providers[RequestScope]   = RequestScopeInstanceProvider()
