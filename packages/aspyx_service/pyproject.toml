@@ -28,5 +28,12 @@ source = "src"
 [tool.hatch.build.targets.wheel]
 packages = ["src/aspyx_service"]
 
+[tool.hatch.envs.test]
+dependencies = [
+  "pytest",
+  "pytest-cov",
+  "pytest-asyncio"
+]
+
 [tool.hatch.metadata]
 allow-direct-references = true
