@@ -16,7 +16,8 @@ projects = [
 
 [tool.hatch.envs.default]
 dependencies = [
-    "pytest"
+    "pytest",
+    "pytest-asyncio"
 ]
 
 #    "aspyx @ packages/aspyx",
