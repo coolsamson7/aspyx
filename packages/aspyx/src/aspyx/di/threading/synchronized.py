@@ -38,7 +38,7 @@ class SynchronizeAdvice:
 
     # around
 
-    @around(methods().decorated_with(synchronized))
+    @around(methods().decorated_with(synchronized).that_are_sync())
     def synchronize_sync(self, invocation: Invocation):
         with self.get_lock(invocation.args[0]):
             return invocation.proceed()
