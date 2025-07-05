@@ -115,7 +115,7 @@ class UserSession(Session):
 
 T = TypeVar("T")
 
-#@injectable()
+@injectable()
 class SessionManager:
     current_session = ThreadLocal[Session]()
     sessions : dict[str, Session] = {}
@@ -221,8 +221,8 @@ class AuthorizationManager:
 class ChannelAdvice:
     # constructor
 
-    def __init__(self, authorization_manager: AuthorizationManager):# TODO ??? , session_manager: SessionManager):
-        self.session_manager = SessionManager()
+    def __init__(self, authorization_manager: AuthorizationManager, session_manager: SessionManager):
+        self.session_manager = session_manager
         self.authorization_manager = authorization_manager
 
     # internal
