@@ -160,7 +160,7 @@ class FastAPIServer(Server):
         """
         self.host = host
 
-        config = uvicorn.Config(self.fast_api, host=self.host, port=self.port, access_log=False) #log_level="debug"
+        config = uvicorn.Config(self.fast_api, host=self.host, port=self.port, access_log=False, loop="asyncio") #log_level="debug"
         server = uvicorn.Server(config)
 
         thread = threading.Thread(target=server.run, daemon=True)
@@ -212,7 +212,7 @@ class FastAPIServer(Server):
             return await self.dispatch(http_request, request)
         else:
             return HttpResponse(
-                content=msgpack.packb(await self.dispatch(request), use_bin_type=True),
+                content=msgpack.packb(await self.dispatch(http_request, request), use_bin_type=True),
                 media_type="application/msgpack"
             )
 

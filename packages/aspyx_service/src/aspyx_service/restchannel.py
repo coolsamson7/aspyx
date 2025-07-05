@@ -3,18 +3,21 @@ rest channel implementation
 """
 import inspect
 import re
-from dataclasses import is_dataclass, asdict
+from dataclasses import is_dataclass
 
 from typing import get_type_hints, TypeVar, Annotated, Callable, get_origin, get_args, Type
 
+
 from pydantic import BaseModel
+
+from .channels import HTTPXChannel
 
 from aspyx.reflection import DynamicProxy, Decorators
 from .service import channel, ServiceCommunicationException
 
 T = TypeVar("T")
 
-from .channels import HTTPXChannel
+
 
 class BodyMarker:
     pass
@@ -248,14 +251,11 @@ class RestChannel(HTTPXChannel):
 
         try:
             result = None
-            if call.type == "get":
-                result = await self.get_async_client().get(self.get_url() + url, params=query_params, timeout=self.timeout)
-            elif call.type == "put":
-                result = await self.get_async_client().put(self.get_url() + url, params=query_params, timeout=self.timeout)
-            elif call.type == "delete":
-                result = await self.get_async_client().delete(self.get_url() + url, params=query_params, timeout=self.timeout)
+            if call.type in ["get", "put", "delete"]:
+                result = await self.request_async(call.type, self.get_url() + url, params=query_params, timeout=self.timeout)
+
             elif call.type == "post":
-                result = await self.get_async_client().post(self.get_url() + url, params=query_params, json=body, timeout=self.timeout)
+                result = await self.request_async("post", self.get_url() + url, params=query_params, json=body, timeout=self.timeout)
 
             return self.get_deserializer(invocation.type, invocation.method)(result.json())
         except ServiceCommunicationException:
@@ -283,14 +283,11 @@ class RestChannel(HTTPXChannel):
 
         try:
             result = None
-            if call.type == "get":
-                result = self.get_client().get(self.get_url() + url, params=query_params, timeout=self.timeout)
-            elif call.type == "put":
-                result = self.get_client().put(self.get_url() + url, params=query_params, timeout=self.timeout)
-            elif call.type == "delete":
-                result = self.get_client().delete(self.get_url() + url, params=query_params, timeout=self.timeout)
+            if call.type in ["get", "put", "delete"]:
+                result = self.request("get", self.get_url() + url, params=query_params, timeout=self.timeout)
+
             elif call.type == "post":
-                result = self.get_client().post(self.get_url() + url, params=query_params, json=body, timeout=self.timeout)
+                result = self.request( "post", self.get_url() + url, params=query_params, json=body, timeout=self.timeout)
 
             return self.get_deserializer(invocation.type, invocation.method)(result.json())
         except ServiceCommunicationException:

@@ -1,9 +1,13 @@
+"""
+test for health checks
+"""
 import time
 
 import pytest
 
-from aspyx.di import injectable, module, Environment
 from aspyx_service import health_checks, health_check, HealthCheckManager, ServiceModule, HealthStatus
+
+from aspyx.di import injectable, module, Environment
 
 @health_checks()
 @injectable()

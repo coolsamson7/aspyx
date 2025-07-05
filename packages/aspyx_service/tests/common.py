@@ -12,14 +12,13 @@ from typing import Dict, Optional
 import pytest
 from pydantic import BaseModel
 
-from aspyx.di import module, create, injectable
-from aspyx.di.configuration import YamlConfigurationSource
-
 from aspyx_service import service, Service, component, Component, \
     implementation, health, AbstractComponent, ChannelAddress, inject_service, \
     FastAPIServer, Server, ServiceModule, ServiceManager, \
     HealthCheckManager, get, post, rest, put, delete, Body
 from aspyx_service.service import LocalComponentRegistry
+from aspyx.di import module, create, injectable
+from aspyx.di.configuration import YamlConfigurationSource
 
 # configure logging
 

@@ -121,7 +121,7 @@ class AspectTarget(ABC):
 
     def that_are_sync(self) -> AspectTarget:
         """
-        matches methods that are async
+        matches methods that are sync
 
         Returns:
             AspectTarget: self

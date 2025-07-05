@@ -4,11 +4,14 @@ Service management and dependency injection framework.
 from __future__ import annotations
 
 import json
+import typing
 from dataclasses import is_dataclass, fields
 from typing import Type, Optional, Any, Callable
 
+import httpx
 import msgpack
-from httpx import Client, AsyncClient
+from httpx import Client, AsyncClient, USE_CLIENT_DEFAULT
+from httpx._types import QueryParamTypes, HeaderTypes, TimeoutTypes
 from pydantic import BaseModel
 
 from aspyx.di.configuration import inject_value
@@ -66,6 +69,7 @@ class HTTPXChannel(Channel):
     def __init__(self):
         super().__init__()
 
+        self.token = None
         self.timeout = 100000.0 #TODO
         self.service_names: dict[Type, str] = {}
         self.deserializers: dict[Callable, Callable] = {}
@@ -125,6 +129,48 @@ class HTTPXChannel(Channel):
     def make_async_client(self) -> AsyncClient:
         return AsyncClient()  # base_url=url
 
+    def request(self, http_method: str, url: str, json: Optional[typing.Any] = None,
+                params: Optional[Any] = None, headers: Optional[Any] = None,
+                timeout: Any = USE_CLIENT_DEFAULT, content: Optional[Any] = None) -> httpx.Response:
+
+        if self.token is not None:
+            if headers is None:  # None is also valid!
+                headers = {}
+
+            ## add bearer token
+
+            headers["Authorization"] = f"Bearer {self.token}"
+
+        return self.get_client().request(http_method, url, params=params, json=json, headers=headers, timeout=timeout, content=content)
+
+    async def request_async (self, http_method: str, url: str, json: Optional[typing.Any] = None,
+                params: Optional[Any] = None, headers: Optional[Any] = None,
+                timeout: Any = USE_CLIENT_DEFAULT, content: Optional[Any] = None) -> httpx.Response:
+
+        if self.token is not None:
+            if headers is None:  # None is also valid!
+                headers = {}
+
+            ## add bearer token
+
+            headers["Authorization"] = f"Bearer {self.token}"
+
+        return await self.get_async_client().request(http_method, url, params=params, json=json, headers=headers, timeout=timeout, content=content)
+
+
+def remember_token(service: Any, token: str):
+    if isinstance(service.invocation_handler, HTTPXChannel):
+        channel: HTTPXChannel = service.invocation_handler
+
+        channel.token = token
+
+
+def clear_token(service: Any, token: str):
+    if isinstance(service.invocation_handler, HTTPXChannel):
+        channel: HTTPXChannel = service.invocation_handler
+
+        channel.token = token
+
 class Request(BaseModel):
     method: str  # component:service:method
     args: tuple[Any, ...]
@@ -163,7 +209,8 @@ class DispatchJSONChannel(HTTPXChannel):
 
         dict = self.to_dict(request)
         try:
-            result = Response(**self.get_client().post(f"{self.get_url()}/invoke", json=dict, timeout=self.timeout).json())
+            http_result = self.request( "post", f"{self.get_url()}/invoke", json=dict, timeout=self.timeout)
+            result = Response(**http_result.json())
             if result.exception is not None:
                 raise RemoteServiceException(f"server side exception {result.exception}")
 
@@ -184,7 +231,7 @@ class DispatchJSONChannel(HTTPXChannel):
                           args=invocation.args)
         dict = self.to_dict(request)
         try:
-            data =  await self.get_async_client().post(f"{self.get_url()}/invoke", json=dict, timeout=self.timeout)
+            data =  await self.request_async("post", f"{self.get_url()}/invoke", json=dict, timeout=self.timeout)
             result = Response(**data.json())
 
             if result.exception is not None:
@@ -227,7 +274,7 @@ class DispatchMSPackChannel(HTTPXChannel):
         try:
             packed = msgpack.packb(self.to_dict(request), use_bin_type=True)
 
-            response = self.get_client().post(
+            response = self.request("post",
                 f"{self.get_url()}/invoke",
                 content=packed,
                 headers={"Content-Type": "application/msgpack"},
@@ -258,7 +305,7 @@ class DispatchMSPackChannel(HTTPXChannel):
         try:
             packed = msgpack.packb(self.to_dict(request), use_bin_type=True)
 
-            response = await self.get_async_client().post(
+            response = await self.request_async("post",
                 f"{self.get_url()}/invoke",
                 content=packed,
                 headers={"Content-Type": "application/msgpack"},

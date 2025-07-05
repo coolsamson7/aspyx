@@ -1,5 +1,18 @@
+"""
+jwt sample test
+"""
+import faulthandler; faulthandler.enable()
+
+import inspect
 import logging
-from typing import Optional, cast, Dict
+from abc import abstractmethod
+import httpx
+import jwt
+import datetime
+from typing import Optional, cast, Dict, Any, TypeVar, Type
+from fastapi import Request as HttpRequest, HTTPException
+
+from aspyx.threading import ThreadLocal
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -18,12 +31,8 @@ configure_logging({
     "xaspyx.service": logging.DEBUG
 })
 
-from abc import abstractmethod
-
-
-import httpx
-import jwt
-import datetime
+from aspyx_service import Service, service, component, implementation, AbstractComponent, \
+    DispatchJSONChannel, Component, ChannelAddress, Server, health, RequestContext, HTTPXChannel, remember_token
 
 from aspyx.reflection import Decorators
 
@@ -31,87 +40,56 @@ from aspyx.reflection import Decorators
 
 from aspyx.di import injectable
 from aspyx.di.aop import advice, around, Invocation, methods, classes
-from aspyx_service import Service, service, component, implementation, AbstractComponent, \
-    DispatchJSONChannel, Component, ChannelAddress, Server, health, RequestContext
+
 
 from .common import service_manager
-
-from fastapi import Request as HttpRequest, HTTPException
 
 SECRET_KEY = "your-secret-key"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-# in-memory user "database"
-
-fake_users_db = {
-    "andi": {
-        "username": "andi",
-        "password": "secret",  # For demo only – use hashing in real apps!
-    }
-}
-
-def create_jwt(user_id: str) -> str:
-    payload = {
-        "sub": user_id,
-        "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=1),
-        "iat": datetime.datetime.utcnow(),
-        "roles": ["user"]
-    }
-    token = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
-
-    return token
-
-def verify_jwt(token: str):
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
-        return payload  # token is valid
-    except jwt.ExpiredSignatureError:
-        print("Token expired")
-    except jwt.InvalidTokenError:
-        print("Invalid token")
+def get_method_class(method):
+    if inspect.ismethod(method) or inspect.isfunction(method):
+        qualname = method.__qualname__
+        parts = qualname.split('.')
+        if len(parts) > 1:
+            cls_name = parts[-2]
+            module = inspect.getmodule(method)
+            if module:
+                for name, obj in inspect.getmembers(module, inspect.isclass):
+                    if name == cls_name and hasattr(obj, method.__name__):
+                        return obj
     return None
 
-# channel stuff
+class TokenManager:
+    def __init__(self, secret: str, algorithm: str):
+        self.secret = secret
+        self.algorithm = algorithm
 
-@injectable()
-class TokenProvider:
-    def __init__(self):
-        self.token : Optional[str] = None
+    def create_jwt(self, user_id: str) -> str:
+        payload = {
+            "sub": user_id,
+            "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=1),
+            "iat": datetime.datetime.utcnow(),
+            "roles": ["user"]
+        }
+        token = jwt.encode(payload, self.secret, algorithm=self.algorithm)
 
-    def set_token(self, token: str):
-        self.token = token
+        return token
 
-    def provide_token(self) -> Optional[str]:
-        return self.token
+    def verify_jwt(self, token: str):
+        try:
+            payload = jwt.decode(token, self.secret, algorithms=[self.algorithm])
 
+            return payload  # token is valid
+        except jwt.ExpiredSignatureError:
+            print("Token expired")
+        except jwt.InvalidTokenError:
+            print("Invalid token")
 
-class InterceptingClient(httpx.Client):
-    # constructor
+        return None
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        self.token_provider : Optional[TokenProvider] = None
-
-    # override
-
-    def request(self, method, url, *args, **kwargs):
-        token = None
-        if self.token_provider is not None:
-            token = self.token_provider.provide_token()
-
-        if token is not None:
-            headers = kwargs.pop("headers", {})
-            if headers is None: # None is also valid!
-                headers = {}
-
-            ## add bearer token
-
-            headers["Authorization"] = f"Bearer {token}"
-            kwargs["headers"] = headers
-
-        return super().request(method, url, *args, **kwargs)
+token_manager = TokenManager(SECRET_KEY, ALGORITHM)
 
 # decorator
 
@@ -123,14 +101,51 @@ def secure():
 
     return decorator
 
+# session
+
+class Session:
+    def __init__(self):
+        pass
+
+class UserSession(Session):
+    def __init__(self, user: str, roles: list[str]):
+        super().__init__()
+
+        self.user = user
+        self.roles = roles
+
+T = TypeVar("T")
+
+#@injectable()
+class SessionManager:
+    current_session = ThreadLocal[Session]()
+    sessions : dict[str, Session] = {}
+
+    @classmethod
+    def current(cls, type: Type[T]) -> T:
+        return cls.current_session.get()
+
+    @classmethod
+    def set_session(cls, session: Session):
+        cls.current_session.set(session)
+
+    @classmethod
+    def delete_session(cls):
+        cls.current_session.clear()
+
+    # constructor
+
+    def __init__(self):
+        pass
+
 # advice
 
 @advice
 class ChannelAdvice:
     # constructor
 
-    def __init__(self, token_provider: TokenProvider):
-        self.token_provider = token_provider
+    def __init__(self):# TODO ??? , session_manager: SessionManager):
+        self.session_manager = SessionManager()
 
     # internal
 
@@ -141,33 +156,59 @@ class ChannelAdvice:
 
         return auth_header.split(" ")[1]
 
-    def verify_token(self, http_request: HttpRequest):
-        token = self.extract_token_from_request(http_request)
-        ok = verify_jwt(token)
-        if ok is None:
+    def verify_token(self, token: str) -> dict:
+        payload = token_manager.verify_jwt(token)
+        if payload is None:
             raise HTTPException(status_code=401, detail="Invalid token")
+
+        return payload
 
     # aspects
 
-    @around(methods().named("make_client").of_type(DispatchJSONChannel))
-    def make_client(self, invocation: Invocation):
-        intercepting_client = InterceptingClient()
-
-        intercepting_client.token_provider = self.token_provider
-
-        return intercepting_client
+    # TODO that_are_sync...
 
     @around(classes().decorated_with(secure))
-    def check_jwt(self, invocation: Invocation):
-        print("check jwt")
-        # local method
-
+    def check_authentication(self, invocation: Invocation):
         http_request = RequestContext.get_request()
 
         if http_request is not None:
-            self.verify_token(http_request)
+            token = self.extract_token_from_request(http_request)
 
-        return invocation.proceed()
+            session = self.session_manager.sessions.get(token, None)
+            if session is None:
+                # TODO LRU, expiry, etc...
+
+                # verify token
+
+                payload = self.verify_token(token)
+
+                # create session object
+
+                session = UserSession(payload["sub"], payload["roles"])
+
+                SessionManager.sessions[token] = session
+
+            # set thread local
+
+            SessionManager.set_session(session)
+
+        # test
+
+        # check method and class
+
+        method = invocation.func
+        clazz = get_method_class(method)
+
+
+
+        # test
+
+        # continue wih established session
+
+        try:
+            return invocation.proceed()
+        finally:
+            SessionManager.delete_session()
 
 # some services
 
@@ -192,17 +233,19 @@ class JWTComponent(Component): # pylint: disable=abstract-method
 @implementation()
 class LoginServiceImpl(LoginService):
     def __init__(self):
-        pass
+        self.users ={
+            "andi": {
+                "username": "andi",
+                "password": "secret",
+            }
+        }
 
     def login(self, user: str, password: str) -> Optional[str]:
-        profile = fake_users_db.get(user, None)
-        if profile is not None:
-            if profile.get("password") == password:
-                return create_jwt(user)
-            else:
-                return None
-        else:
-            return None
+        profile = self.users.get(user, None)
+        if profile is not None and profile.get("password") == password:
+            return token_manager.create_jwt(user)
+
+        return None
 
 @implementation()
 @secure()
@@ -211,7 +254,9 @@ class SecureServiceServiceImpl(SecureService):
         pass
 
     def secured(self):
-        pass
+        session = SessionManager.current(UserSession)
+
+        print(session.user)
 
 
 @implementation()
@@ -230,16 +275,15 @@ class JWTComponentImpl(AbstractComponent, JWTComponent):
             ChannelAddress("dispatch-msgpack", f"http://{Server.get_local_ip()}:{port}")
         ]
 
-
 class TestLocalService():
     def test_login(self, service_manager):
         login_service = service_manager.get_service(LoginService, preferred_channel="dispatch-json")
+
         secure_service = service_manager.get_service(SecureService, preferred_channel="dispatch-json")
-        token_provider = service_manager.environment.get(TokenProvider)
 
         token = login_service.login("andi", "secret")
 
-        token_provider.set_token(token)
+        remember_token(login_service, token)
 
         secure_service.secured()
 
