@@ -6,7 +6,6 @@ import faulthandler; faulthandler.enable()
 import inspect
 import logging
 from abc import abstractmethod
-import httpx
 import jwt
 import datetime
 from typing import Optional, cast, Dict, Any, TypeVar, Type, Callable
@@ -254,7 +253,7 @@ class ChannelAdvice:
 
             session = self.session_manager.sessions.get(token, None)
             if session is None:
-                # TODO LRU, expiry, etc...
+                # TODO LRU, expiry, etc... session locals, strategy create
 
                 # verify token
 

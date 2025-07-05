@@ -32,7 +32,8 @@ packages = ["src/aspyx_service"]
 dependencies = [
   "pytest",
   "pytest-cov",
-  "pytest-asyncio"
+  "pytest-asyncio",
+  "PyJWT"
 ]
 
 [tool.hatch.metadata]
