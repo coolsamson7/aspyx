@@ -9,7 +9,7 @@ from abc import abstractmethod
 import httpx
 import jwt
 import datetime
-from typing import Optional, cast, Dict, Any, TypeVar, Type
+from typing import Optional, cast, Dict, Any, TypeVar, Type, Callable
 from fastapi import Request as HttpRequest, HTTPException
 
 from aspyx.threading import ThreadLocal
@@ -32,11 +32,10 @@ configure_logging({
 })
 
 from aspyx_service import Service, service, component, implementation, AbstractComponent, \
-    DispatchJSONChannel, Component, ChannelAddress, Server, health, RequestContext, HTTPXChannel, remember_token
+    DispatchJSONChannel, Component, ChannelAddress, Server, health, RequestContext, HTTPXChannel, remember_token, \
+    clear_token
 
-from aspyx.reflection import Decorators
-
-
+from aspyx.reflection import Decorators, TypeDescriptor
 
 from aspyx.di import injectable
 from aspyx.di.aop import advice, around, Invocation, methods, classes
@@ -66,12 +65,12 @@ class TokenManager:
         self.secret = secret
         self.algorithm = algorithm
 
-    def create_jwt(self, user_id: str) -> str:
+    def create_jwt(self, user_id: str, roles: list[str]) -> str:
         payload = {
             "sub": user_id,
             "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=1),
             "iat": datetime.datetime.utcnow(),
-            "roles": ["user"]
+            "roles": roles
         }
         token = jwt.encode(payload, self.secret, algorithm=self.algorithm)
 
@@ -140,12 +139,91 @@ class SessionManager:
 
 # advice
 
+def requires_role(role=""):
+    """
+    Methods decorated with `@around` will be executed around the target method.
+    Every around method must accept a single parameter of type Invocation and needs to call proceed
+    on this parameter to proceed to the next around method.
+    """
+    def decorator(func):
+        Decorators.add(func, requires_role, role)
+
+        return func
+
+    return decorator
+
+class AuthorizationException(Exception):
+    pass
+
+@injectable()
+class AuthorizationManager:
+    class Check():
+        def check(self):
+            pass
+
+    class RoleCheck(Check):
+        def __init__(self, role: str):
+            self.role = role
+
+        def check(self):
+            if not self.role in SessionManager.current(UserSession).roles:
+                raise AuthorizationException(f"expected role {self.role}")
+
+    class Analyzer():
+        def compute_check(self, method_descriptor: TypeDescriptor.MethodDescriptor) -> Optional['AuthorizationManager.Check']:
+            pass
+
+    class RoleAnalyzer(Analyzer):
+        def compute_check(self, method_descriptor: TypeDescriptor.MethodDescriptor) -> Optional['AuthorizationManager.Check']:
+            if method_descriptor.has_decorator(requires_role):
+                role = method_descriptor.get_decorator(requires_role).args[0]
+                return AuthorizationManager.RoleCheck(role)
+
+            return None
+
+    def __init__(self):
+        self.analyzers : list[AuthorizationManager.Analyzer] = []
+        self.checks : dict[Callable, list[AuthorizationManager.Check]] = {}
+
+        self.add_analyzer(AuthorizationManager.RoleAnalyzer())
+
+    def add_analyzer(self, analyzer: 'AuthorizationManager.Analyzer'):
+        self.analyzers.append(analyzer)
+
+    # internal
+
+    def compute_checks(self, func: Callable) -> list[Check]:
+        checks = []
+
+        clazz = get_method_class(func)
+
+        descriptor = TypeDescriptor.for_type(clazz).get_method(func.__name__)
+
+        for analyzer in self.analyzers:
+            check = analyzer.compute_check(descriptor)
+            if check is not None:
+                checks.append(check)
+
+        return checks
+
+
+    # public
+
+    def get_checks(self, func: Callable) -> list[Check]:
+        checks = self.checks.get(func, None)
+        if checks is None:
+            checks = self.compute_checks(func)
+            self.checks[func] = checks
+
+        return checks
+
 @advice
 class ChannelAdvice:
     # constructor
 
-    def __init__(self):# TODO ??? , session_manager: SessionManager):
+    def __init__(self, authorization_manager: AuthorizationManager):# TODO ??? , session_manager: SessionManager):
         self.session_manager = SessionManager()
+        self.authorization_manager = authorization_manager
 
     # internal
 
@@ -192,16 +270,13 @@ class ChannelAdvice:
 
             SessionManager.set_session(session)
 
-        # test
+        # authorization?
 
-        # check method and class
-
-        method = invocation.func
-        clazz = get_method_class(method)
-
-
-
-        # test
+        try:
+            for check in self.authorization_manager.get_checks(invocation.func):
+                check.check()
+        except AuthorizationException as e:
+            raise HTTPException(status_code=403, detail=str(e))
 
         # continue wih established session
 
@@ -218,11 +293,19 @@ class LoginService(Service):
     def login(self, user: str, password: str) -> Optional[str]:
         pass
 
+    @abstractmethod
+    def logout(self):
+        pass
+
 @service(description="secured service")
 @secure()
 class SecureService(Service):
     @abstractmethod
     def secured(self):
+        pass
+
+    @abstractmethod
+    def secured_admin(self):
         pass
 
 
@@ -233,19 +316,28 @@ class JWTComponent(Component): # pylint: disable=abstract-method
 @implementation()
 class LoginServiceImpl(LoginService):
     def __init__(self):
-        self.users ={
+        self.users = {
+            "hugo": {
+                "username": "hugo",
+                "password": "secret",
+                "roles": ["user"]
+            },
             "andi": {
                 "username": "andi",
                 "password": "secret",
+                "roles": ["user", "admin"]
             }
         }
 
     def login(self, user: str, password: str) -> Optional[str]:
         profile = self.users.get(user, None)
         if profile is not None and profile.get("password") == password:
-            return token_manager.create_jwt(user)
+            return token_manager.create_jwt(user, profile.get("roles"))
 
         return None
+
+    def logout(self):
+        pass
 
 @implementation()
 @secure()
@@ -254,6 +346,12 @@ class SecureServiceServiceImpl(SecureService):
         pass
 
     def secured(self):
+        session = SessionManager.current(UserSession)
+
+        print(session.user)
+
+    @requires_role("admin")
+    def secured_admin(self):
         session = SessionManager.current(UserSession)
 
         print(session.user)
@@ -281,10 +379,27 @@ class TestLocalService():
 
         secure_service = service_manager.get_service(SecureService, preferred_channel="dispatch-json")
 
-        token = login_service.login("andi", "secret")
+        token = login_service.login("hugo", "secret")
 
         remember_token(login_service, token)
 
         secure_service.secured()
+
+        try:
+            secure_service.secured_admin()
+        except Exception as e:
+            print(e)
+
+        login_service.logout()
+
+        clear_token(login_service, token)
+
+        # now andi
+
+        token = login_service.login("andi", "secret")
+
+        remember_token(login_service, token)
+
+        secure_service.secured_admin()
 
         print("hmmm")

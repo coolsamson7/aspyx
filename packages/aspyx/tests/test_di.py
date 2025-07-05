@@ -8,7 +8,7 @@ import time
 import logging
 import unittest
 from typing import Dict
-
+from di_import import ImportedModule, ImportedClass
 from aspyx.di.configuration import EnvConfigurationSource
 
 # not here
@@ -33,10 +33,11 @@ def configure_logging(levels: Dict[str, int]) -> None:
 
 configure_logging({"aspyx.di": logging.DEBUG})
 
+
 from aspyx.di import DIException, injectable, order, on_init, on_running, on_destroy, inject_environment, inject, \
     Factory, create, module, Environment, PostProcessor, factory, requires_feature, conditional, requires_class
 
-from di_import import ImportedModule, ImportedClass
+
 
 ### TEST
 

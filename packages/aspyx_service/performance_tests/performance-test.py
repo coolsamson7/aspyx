@@ -7,9 +7,9 @@ import time
 
 from typing import Callable, TypeVar, Type, Awaitable, Any
 
+
 from packages.aspyx_service.tests.common import service_manager, TestService, TestRestService, Pydantic, Data, \
-    TestAsyncRestService, TestAsyncService
-from packages.aspyx_service.tests.test_async_service import data
+   TestAsyncRestService, TestAsyncService, start_server
 
 T = TypeVar("T")
 
@@ -101,7 +101,7 @@ def run_threaded_sync_loops(name: str, loops: int, n_threads: int,  type: Type[T
 async def main():
     # get service manager
 
-    manager = service_manager()
+    manager = start_server()
     loops = 1000
 
     # tests
