@@ -36,7 +36,7 @@ from aspyx_service import Service, service, component, implementation, AbstractC
 
 from aspyx.reflection import Decorators, TypeDescriptor
 
-from aspyx.di import injectable, inject
+from aspyx.di import injectable
 from aspyx.di.aop import advice, around, Invocation, methods, classes
 
 
@@ -203,7 +203,7 @@ class AuthenticationAndAuthorizationAdvice:
 
     @around(methods().that_are_async().decorated_with(secure),
             methods().that_are_async().declared_by(classes().decorated_with(secure)))
-    async def check_authentication(self, invocation: Invocation):
+    async def check_async_authentication(self, invocation: Invocation):
         self.check_session(invocation.func)
 
         # continue wih established session
@@ -281,6 +281,7 @@ class LoginServiceImpl(LoginService):
 @secure()
 class SecureServiceServiceImpl(SecureService):
     def __init__(self):
+        print("create SecureServiceServiceImpl")
         pass
 
     def secured(self):
@@ -323,7 +324,6 @@ class TestLocalService():
 
         secure_service.secured()
 
-        print("check secured_admin")
         try:
             secure_service.secured_admin()
         except Exception as e:
@@ -335,14 +335,8 @@ class TestLocalService():
 
         # now andi
 
-        print("login as admin")
-
         token = login_service.login("andi", "secret")
 
         HTTPXChannel.remember_token(login_service, token)
 
-        print("check secured_admin")
-
         secure_service.secured_admin()
-
-        print("hmmm")

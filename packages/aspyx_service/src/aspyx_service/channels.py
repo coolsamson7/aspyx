@@ -40,6 +40,8 @@ class HTTPXChannel(Channel):
             channel: HTTPXChannel = service.invocation_handler
 
             channel.token = token
+        else:
+            raise ServiceException("service channel {service.invocation_handler} is not a HTTPXChannel")
 
     @classmethod
     def clear_token(cls, service: Any, token: str):
@@ -47,6 +49,8 @@ class HTTPXChannel(Channel):
             channel: HTTPXChannel = service.invocation_handler
 
             channel.token = token
+        else:
+            raise ServiceException("service channel {service.invocation_handler} is not a HTTPXChannel")
 
     # class properties
 

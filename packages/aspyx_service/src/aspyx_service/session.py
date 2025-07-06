@@ -2,7 +2,7 @@
 session stuff
 """
 from typing import Type, Optional, Callable, Any, TypeVar
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from cachetools import TTLCache
 
 from aspyx.di import injectable
