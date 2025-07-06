@@ -160,7 +160,7 @@ class ExceptionManager:
         for i in range(0, len(chain) - 1):
             chain[i].next = chain[i + 1]
 
-        if len(chain) > 0:
+        if chain:
             return chain[0]
         else:
             return None

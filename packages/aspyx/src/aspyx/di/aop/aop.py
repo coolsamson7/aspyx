@@ -197,25 +197,25 @@ class ClassAspectTarget(AspectTarget):
         #descriptor = TypeDescriptor.for_type(func)
         # type
 
-        if len(self.types) > 0:
+        if self.types:
             if next((type for type in self.types if issubclass(clazz, type)), None) is None:
                 return False
 
         # decorators
 
-        if len(self.decorators) > 0:
+        if self.decorators:
             if next((decorator for decorator in self.decorators if class_descriptor.has_decorator(decorator)), None) is None:
                 return False
 
         # names
 
-        if len(self.names) > 0:
+        if self.names:
             if next((name for name in self.names if name == clazz.__name__), None) is None:
                 return False
 
         # patterns
 
-        if len(self.patterns) > 0:
+        if self.patterns:
             if next((pattern for pattern in self.patterns if re.fullmatch(pattern, clazz.__name__) is not None), None) is None:
                 return False
 
@@ -245,7 +245,7 @@ class MethodAspectTarget(AspectTarget):
 
         # classes
 
-        if len(self.belonging_to) > 0:
+        if self.belonging_to:
             match = False
             for classes in self.belonging_to:
                 if classes._matches(clazz, func):
@@ -262,25 +262,25 @@ class MethodAspectTarget(AspectTarget):
 
         # type
 
-        if len(self.types) > 0:
+        if self.types:
             if next((type for type in self.types if issubclass(clazz, type)), None) is None:
                 return False
 
         # decorators
 
-        if len(self.decorators) > 0:
+        if self.decorators:
             if next((decorator for decorator in self.decorators if method_descriptor.has_decorator(decorator)), None) is None:
                 return False
 
         # names
 
-        if len(self.names) > 0:
+        if self.names:
             if next((name for name in self.names if name == func.__name__), None) is None:
                 return False
 
         # patterns
 
-        if len(self.patterns) > 0:
+        if self.patterns:
             if next((pattern for pattern in self.patterns if re.fullmatch(pattern, func.__name__) is not None), None) is None:
                 return False
 
@@ -474,7 +474,7 @@ class Invocation:
         """
         Proceed to the next aspect in the around chain up to the original method.
         """
-        if len(args) > 0 or len(kwargs) > 0:  # as soon as we have args, we replace the current ones
+        if args or kwargs:  # as soon as we have args, we replace the current ones
             self.args = args
             self.kwargs = kwargs
 
@@ -486,7 +486,7 @@ class Invocation:
         """
         Proceed to the next aspect in the around chain up to the original method.
         """
-        if len(args) > 0 or len(kwargs) > 0:  # as soon as we have args, we replace the current ones
+        if args or kwargs:  # as soon as we have args, we replace the current ones
             self.args = args
             self.kwargs = kwargs
 
@@ -575,7 +575,7 @@ class Advices:
         afters = cls.collect(clazz, member, AspectType.AFTER, environment)
         errors = cls.collect(clazz, member, AspectType.ERROR, environment)
 
-        if len(befores) > 0 or len(arounds) > 0 or len(afters) > 0  or len(errors) > 0:
+        if befores or arounds or afters  or errors:
             return Aspects(
                 before=befores,
                 around=arounds,
