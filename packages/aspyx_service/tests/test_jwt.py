@@ -323,6 +323,7 @@ class TestLocalService():
 
         secure_service.secured()
 
+        print("check secured_admin")
         try:
             secure_service.secured_admin()
         except Exception as e:
@@ -334,9 +335,13 @@ class TestLocalService():
 
         # now andi
 
+        print("login as admin")
+
         token = login_service.login("andi", "secret")
 
         HTTPXChannel.remember_token(login_service, token)
+
+        print("check secured_admin")
 
         secure_service.secured_admin()
 

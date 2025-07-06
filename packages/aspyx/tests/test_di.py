@@ -276,6 +276,14 @@ class TestDI(unittest.TestCase):
         self.assertEqual(baz.inited, True)
         self.assertEqual(foo.inited, True)
 
+    def test_baseclass(self):
+        env = TestDI.testEnvironment
+
+        bar = env.get(Bar)
+        base = env.get(Base)
+
+        self.assertIs(bar, base)
+
     def test_inject_base_class(self):
         env = TestDI.testEnvironment
 

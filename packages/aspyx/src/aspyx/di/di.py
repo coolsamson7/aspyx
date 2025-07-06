@@ -552,7 +552,7 @@ class PostProcessor(LifecycleProcessor):
     """
     __slots__ = []
 
-
+    @abstractmethod
     def process(self, instance: object, environment: Environment):
         pass
 
