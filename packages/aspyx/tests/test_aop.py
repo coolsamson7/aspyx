@@ -66,6 +66,7 @@ class Foo:
         raise Exception("ouch")
 
 @advice
+@injectable()
 class SampleAdvice:
     # constructor
 

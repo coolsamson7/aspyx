@@ -142,6 +142,7 @@ class RoleAnalyzer(AbstractAnalyzer):
         return None
 
 @advice
+@injectable()
 class AuthenticationAndAuthorizationAdvice:
     # constructor
 

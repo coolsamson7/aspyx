@@ -51,6 +51,7 @@ class Service:
         raise DerivedException()
 
 @advice
+@injectable()
 class ExceptionAdvice:
     def __init__(self, exception_manager: ExceptionManager):
         self.exception_manager = exception_manager

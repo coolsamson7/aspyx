@@ -107,6 +107,24 @@ class ExceptionManager:
 
     # internal
 
+    def collect_handlers(self, instance: Any):
+        type_descriptor = TypeDescriptor.for_type(type(instance))
+
+        # analyze methods
+
+        for method in type_descriptor.get_methods():
+            if method.has_decorator(handle):
+                if len(method.param_types) == 1:
+                    exception_type = method.param_types[0]
+
+                    self.handler.append(Handler(
+                        exception_type,
+                        instance,
+                        method.method,
+                    ))
+                else:
+                    print(f"handler {method.method} expected to have one parameter")
+
     @inject_environment()
     def set_environment(self, environment: Environment):
         self.environment = environment
@@ -114,23 +132,7 @@ class ExceptionManager:
     @on_running()
     def setup(self):
         for handler_class in self.exception_handler_classes:
-            type_descriptor = TypeDescriptor.for_type(handler_class)
-            instance = self.environment.get(handler_class)
-
-            # analyze methods
-
-            for method in type_descriptor.get_methods():
-                if method.has_decorator(handle):
-                    if len(method.param_types) == 1:
-                        exception_type = method.param_types[0]
-
-                        self.handler.append(Handler(
-                            exception_type,
-                            instance,
-                            method.method,
-                        ))
-                    else:
-                        print(f"handler {method.method} expected to have one parameter")
+            self.collect_handlers(self.environment.get(handler_class))
 
     def get_handlers(self, clazz: Type) -> Optional[Chain]:
         chain = self.cache.get(clazz, None)

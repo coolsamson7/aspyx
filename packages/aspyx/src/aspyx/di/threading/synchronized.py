@@ -6,6 +6,7 @@ from __future__ import annotations
 import threading
 from weakref import WeakKeyDictionary
 
+from aspyx.di import injectable
 from aspyx.reflection import Decorators
 from aspyx.di.aop import advice, around, methods, Invocation
 
@@ -20,6 +21,7 @@ def synchronized():
     return decorator
 
 @advice
+@injectable()
 class SynchronizeAdvice:
     # constructor
 

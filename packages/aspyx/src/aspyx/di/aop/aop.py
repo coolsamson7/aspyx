@@ -597,7 +597,7 @@ def advice(cls):
     Classes decorated with `@advice` are treated as advice classes.
     They can contain methods decorated with `@before`, `@after`, `@around`, or `@error` to define aspects.
     """
-    Providers.register(ClassInstanceProvider(cls, True))
+    #Providers.register(ClassInstanceProvider(cls, True))
 
     Decorators.add(cls, advice)
 

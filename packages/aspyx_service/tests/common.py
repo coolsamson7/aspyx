@@ -7,17 +7,21 @@ import time
 from abc import abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, Type
 
 import pytest
 from pydantic import BaseModel
 
+from aspyx.di.aop import advice, around, error, Invocation, classes
+from aspyx.di.aop.aop import ClassAspectTarget
+from aspyx.exception import ExceptionManager, handle
+from aspyx.reflection import TypeDescriptor
 from aspyx_service import service, Service, component, Component, \
     implementation, health, AbstractComponent, ChannelAddress, inject_service, \
     FastAPIServer, Server, ServiceModule, ServiceManager, \
     HealthCheckManager, get, post, rest, put, delete, Body
-from aspyx_service.service import LocalComponentRegistry
-from aspyx.di import module, create, injectable
+from aspyx_service.service import LocalComponentRegistry, component_services
+from aspyx.di import module, create, injectable, Environment, on_running
 from aspyx.di.configuration import YamlConfigurationSource
 
 # configure logging
@@ -66,6 +70,10 @@ class DataAndPydantic:
 class TestService(Service):
     @abstractmethod
     def hello(self, message: str) -> str:
+        pass
+
+    @abstractmethod
+    def throw(self, message: str) -> str:
         pass
 
     @abstractmethod
@@ -157,6 +165,9 @@ class TestServiceImpl(TestService):
     def hello(self, message: str) -> str:
         return message
 
+    def throw(self, message: str) -> str:
+        raise Exception(message)
+
     def data(self, data: Data) -> Data:
         return data
 
@@ -219,6 +230,7 @@ class TestAsyncRestServiceImpl(TestAsyncRestService):
 
 @implementation()
 @health("/health")
+@advice
 class TestComponentImpl(AbstractComponent, TestComponent):
     # constructor
 
@@ -226,6 +238,27 @@ class TestComponentImpl(AbstractComponent, TestComponent):
         super().__init__()
 
         self.health_check_manager : Optional[HealthCheckManager] = None
+        self.exception_manager = ExceptionManager()
+        self.exception_manager.collect_handlers(self)
+
+    # exception handler
+
+    @handle()
+    def handle_exception(self, exception: Exception):
+        print("caught exception!")
+        return exception
+
+    # aspects
+
+    @error(component_services(TestComponent))
+    def catch(self, invocation: Invocation):
+        return self.exception_manager.handle(invocation.exception)
+
+    # lifecycle
+
+    @on_running()
+    def setup_exception_handlers(self):
+        pass#self.exception_manager.collect_handlers(self)
 
     # implement
 

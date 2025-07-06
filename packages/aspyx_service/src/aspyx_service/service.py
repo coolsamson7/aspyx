@@ -15,6 +15,7 @@ from typing import Type, TypeVar, Generic, Callable, Optional, cast
 
 from aspyx.di import injectable, Environment, Providers, ClassInstanceProvider, inject_environment, order, \
     Lifecycle, LifecycleCallable, InstanceProvider
+from aspyx.di.aop.aop import ClassAspectTarget
 from aspyx.reflection import Decorators, DynamicProxy, DecoratorDescriptor, TypeDescriptor
 from aspyx.util import StringBuilder
 from .healthcheck import HealthCheckManager, HealthStatus
@@ -914,3 +915,13 @@ class ServiceLifecycleCallable(LifecycleCallable):
 
     def args(self, decorator: DecoratorDescriptor, method: TypeDescriptor.MethodDescriptor, environment: Environment):
         return [self.manager.get_service(method.param_types[0], preferred_channel=decorator.args[0])]
+
+def component_services(component_type: Type) -> ClassAspectTarget:
+    target = ClassAspectTarget()
+
+    descriptor = TypeDescriptor.for_type(component_type)
+
+    for service_type in descriptor.get_decorator(component).args[2]:
+        target.of_type(service_type)
+
+    return target
