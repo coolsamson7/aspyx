@@ -10,6 +10,8 @@ from .registries import ConsulComponentRegistry
 from .server import FastAPIServer, RequestContext
 from .healthcheck import health_checks, health_check, HealthCheckManager, HealthStatus
 from .restchannel import RestChannel, post, get, put, delete, QueryParam, Body, rest
+from .session import Session, SessionManager
+from .authorization import AuthorizationManager, AbstractAnalyzer, AuthorizationException
 
 
 @module()
@@ -38,6 +40,17 @@ __all__ = [
     "service",
     "implementation",
     "inject_service",
+
+    # authorization
+
+    "AuthorizationManager",
+    "AbstractAnalyzer",
+    "AuthorizationException",
+
+    # session
+
+    "Session",
+    "SessionManager",
 
     # healthcheck
 

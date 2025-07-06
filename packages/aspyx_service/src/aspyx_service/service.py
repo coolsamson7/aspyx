@@ -117,7 +117,7 @@ class Component(Service):
     @abstractmethod
     def get_addresses(self, port: int) -> list[ChannelAddress]:
         """
-        returns a list of channel addresses that expose this components services.
+        returns a list of channel addresses that expose this component's services.
 
         Args:
             port: the port of a server hosting this component
