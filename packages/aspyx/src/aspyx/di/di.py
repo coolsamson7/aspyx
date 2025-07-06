@@ -1011,8 +1011,8 @@ class Environment:
             for processor in self.parent.lifecycle_processors:
                 if self.providers[type(processor)].get_scope() != "environment":
                     self.lifecycle_processors.append(processor)
-                #else:
-                #    self.get(type(processor)) # will automatically be appended
+                else:
+                    self.get(type(processor)) # will automatically be appended
         else:
             self.providers[SingletonScope] = SingletonScopeInstanceProvider()
             self.providers[RequestScope]   = RequestScopeInstanceProvider()
