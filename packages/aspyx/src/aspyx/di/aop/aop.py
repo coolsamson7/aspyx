@@ -228,16 +228,32 @@ class MethodAspectTarget(AspectTarget):
        An AspectTarget matching methods
        """
 
-    # properties
+    __slots__ = ["belonging_to"]
 
-    __slots__ = [ ]
+    # constructor
 
+    def __init__(self):
+        super().__init__()
+
+        self.belonging_to : list[ClassAspectTarget] = []
     # public
 
     def _matches_self(self, clazz : Type, func):
         descriptor = TypeDescriptor.for_type(clazz)
 
         method_descriptor = descriptor.get_method(func.__name__)
+
+        # classes
+
+        if len(self.belonging_to) > 0:
+            match = False
+            for classes in self.belonging_to:
+                if classes._matches(clazz, func):
+                    match = True
+                    break
+
+            if not match:
+                return False
 
         # async
 
@@ -272,7 +288,14 @@ class MethodAspectTarget(AspectTarget):
 
         return True
 
-def methods() -> AspectTarget:
+    # fluent
+
+    def declared_by(self, classes: ClassAspectTarget) -> MethodAspectTarget:
+        self.belonging_to.append(classes)
+
+        return self
+
+def methods() -> MethodAspectTarget:
     """
     Create a new AspectTarget instance to define method aspect targets.
 
@@ -281,7 +304,7 @@ def methods() -> AspectTarget:
     """
     return MethodAspectTarget()
 
-def classes() -> AspectTarget:
+def classes() -> ClassAspectTarget:
     """
     Create a new AspectTarget instance to define class aspect targets.
 
