@@ -134,7 +134,7 @@ class RoleAnalyzer(AbstractAnalyzer):
                 raise AuthorizationException(f"expected role {self.role}")
     # implement
 
-    def compute_check(self, method_descriptor: TypeDescriptor.MethodDescriptor) -> Optional['AuthorizationManager.Check']:
+    def compute_check(self, method_descriptor: TypeDescriptor.MethodDescriptor) -> Optional[AuthorizationManager.Check]:
         if method_descriptor.has_decorator(requires_role):
             role = method_descriptor.get_decorator(requires_role).args[0]
             return RoleAnalyzer.RoleCheck(role)
@@ -281,13 +281,10 @@ class LoginServiceImpl(LoginService):
 @secure()
 class SecureServiceServiceImpl(SecureService):
     def __init__(self):
-        print("create SecureServiceServiceImpl")
         pass
 
     def secured(self):
         session = SessionManager.current(UserSession)
-
-        print(session.user)
 
     @requires_role("admin")
     def secured_admin(self):

@@ -432,7 +432,7 @@ class Channel(DynamicProxy.InvocationHandler, ABC):
         a url selector always retrieving the first URL given a list of possible URLS
         """
         def get(self, urls: list[str]) -> str:
-            if len(urls) == 0:
+            if not urls:
                 raise ServiceCommunicationException("no known url")
 
             return urls[0]
@@ -445,7 +445,7 @@ class Channel(DynamicProxy.InvocationHandler, ABC):
             self.index = 0
 
         def get(self, urls: list[str]) -> str:
-            if len(urls) > 0:
+            if urls:
                 try:
                     return urls[self.index]
                 finally:
@@ -740,7 +740,7 @@ class ServiceManager:
         addresses = self.component_registry.get_addresses(component_descriptor)  # component, channel + urls
         address = next((address for address in addresses if address.channel == preferred_channel), None)
         if address is None:
-            if len(addresses) > 0:
+            if addresses:
                 # return the first match
                 address = addresses[0]
             else:

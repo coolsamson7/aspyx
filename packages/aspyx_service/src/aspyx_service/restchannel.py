@@ -182,7 +182,7 @@ class RestChannel(HTTPXChannel):
 
             # check if something is missing
 
-            if len(param_names) > 0:
+            if param_names:
                 # check body params
                 if self.type in ("post", "put", "patch"):
                     if self.body_param_name is None:

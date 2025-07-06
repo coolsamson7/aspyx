@@ -117,7 +117,7 @@ class HealthCheckManager:
                 "status": str(self.status),
             }
 
-            if len(self.details) > 0:
+            if self.details:
                 result["details"] = self.details
 
             return result

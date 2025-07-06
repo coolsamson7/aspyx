@@ -220,7 +220,7 @@ class ConsulComponentRegistry(ComponentRegistry):
 
             # only cache if non-empty
 
-            if len(component_addresses) > 0:
+            if component_addresses:
                 self.component_addresses[descriptor.name] = component_addresses
 
         return list(component_addresses.values())

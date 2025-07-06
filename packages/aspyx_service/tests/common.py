@@ -12,16 +12,14 @@ from typing import Dict, Optional, Type
 import pytest
 from pydantic import BaseModel
 
-from aspyx.di.aop import advice, around, error, Invocation, classes
-from aspyx.di.aop.aop import ClassAspectTarget
+from aspyx.di.aop import advice, error, Invocation
 from aspyx.exception import ExceptionManager, handle
-from aspyx.reflection import TypeDescriptor
 from aspyx_service import service, Service, component, Component, \
     implementation, health, AbstractComponent, ChannelAddress, inject_service, \
     FastAPIServer, Server, ServiceModule, ServiceManager, \
     HealthCheckManager, get, post, rest, put, delete, Body
 from aspyx_service.service import LocalComponentRegistry, component_services
-from aspyx.di import module, create, injectable, Environment, on_running
+from aspyx.di import module, create, injectable, on_running
 from aspyx.di.configuration import YamlConfigurationSource
 
 # configure logging
@@ -239,7 +237,6 @@ class TestComponentImpl(AbstractComponent, TestComponent):
 
         self.health_check_manager : Optional[HealthCheckManager] = None
         self.exception_manager = ExceptionManager()
-        self.exception_manager.collect_handlers(self)
 
     # exception handler
 
@@ -258,7 +255,7 @@ class TestComponentImpl(AbstractComponent, TestComponent):
 
     @on_running()
     def setup_exception_handlers(self):
-        pass#self.exception_manager.collect_handlers(self)
+        self.exception_manager.collect_handlers(self)
 
     # implement
 
@@ -315,7 +312,7 @@ def start_server() -> ServiceManager:
     print("wait for server to start")
     while True:
         addresses = service_manager.component_registry.get_addresses(descriptor)
-        if len(addresses) > 0:
+        if addresses:
             break
 
         print("zzz...")

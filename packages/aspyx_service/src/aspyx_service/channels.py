@@ -64,7 +64,6 @@ class HTTPXChannel(Channel):
         if isinstance(obj, BaseModel):
             return obj.dict()
 
-
         elif is_dataclass(obj):
             return {
                 f.name: cls.to_dict(getattr(obj, f.name))
