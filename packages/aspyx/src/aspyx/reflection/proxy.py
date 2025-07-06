@@ -3,6 +3,7 @@ Dynamic proxies for method interception and delegation.
 """
 import functools
 import inspect
+from abc import ABC, abstractmethod
 from typing import Generic, TypeVar, Type, Callable
 
 T = TypeVar("T")
@@ -45,10 +46,12 @@ class DynamicProxy(Generic[T]):
             self.args = args
             self.kwargs = kwargs
 
-    class InvocationHandler:
+    class InvocationHandler(ABC):
+        @abstractmethod
         def invoke(self, invocation: 'DynamicProxy.Invocation'):
             pass
 
+        @abstractmethod
         async def invoke_async(self, invocation: 'DynamicProxy.Invocation'):
             return self.invoke(invocation)
 
