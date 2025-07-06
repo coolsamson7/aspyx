@@ -15,8 +15,6 @@ dependencies = [
     "httpx~=0.28.1",
     "msgpack~=1.1.1",
     "cachetools~= 5.5.2",
-    "PyJWT",
-    "anyio",
     "uvicorn[standard]"
 ]
 

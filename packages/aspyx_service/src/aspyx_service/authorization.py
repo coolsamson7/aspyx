@@ -1,4 +1,5 @@
 import inspect
+from abc import abstractmethod, ABC
 from typing import Optional, Callable
 
 from aspyx.di import injectable, inject
@@ -27,7 +28,8 @@ class AuthorizationManager:
         def check(self):
             pass
 
-    class Analyzer:
+    class Analyzer(ABC):
+        @abstractmethod
         def compute_check(self, method_descriptor: TypeDescriptor.MethodDescriptor) -> Optional['AuthorizationManager.Check']:
             pass
 
