@@ -35,6 +35,7 @@ dependencies = [
   "pytest",
   "pytest-cov",
   "pytest-asyncio",
+  "anyio",
   "PyJWT"
 ]
 
