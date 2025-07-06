@@ -689,7 +689,7 @@ class Providers:
             return True
 
         def is_injectable(type: Type) -> bool:
-            if type is object:
+            if type in [object, ABC]:
                 return False
 
             if inspect.isabstract(type):
@@ -1011,8 +1011,8 @@ class Environment:
             for processor in self.parent.lifecycle_processors:
                 if self.providers[type(processor)].get_scope() != "environment":
                     self.lifecycle_processors.append(processor)
-                else:
-                    self.get(type(processor)) # will automatically be appended
+                #else:
+                #    self.get(type(processor)) # will automatically be appended
         else:
             self.providers[SingletonScope] = SingletonScopeInstanceProvider()
             self.providers[RequestScope]   = RequestScopeInstanceProvider()
