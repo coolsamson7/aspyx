@@ -30,6 +30,7 @@ packages = ["src/aspyx_service"]
 
 [tool.hatch.envs.test]
 dependencies = [
+  ".",
   "pytest",
   "pytest-cov",
   "pytest-asyncio",
