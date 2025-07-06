@@ -27,23 +27,27 @@ from .channels import Request, Response
 
 from .restchannel import get, post, put, delete, rest
 
-class RequestContext(BaseHTTPMiddleware):
+class RequestContext:
     request_var = contextvars.ContextVar("request")
 
     @classmethod
-    def get_request(cls) -> HttpRequest:
+    def get_request(cls) -> Request:
         return cls.request_var.get()
 
-    # override
+    def __init__(self, app):
+        self.app = app
 
-    async def dispatch(self, request: HttpRequest, call_next):
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        request = HttpRequest(scope)
         token = self.request_var.set(request)
         try:
-            response = await call_next(request)
+            await self.app(scope, receive, send)
         finally:
             self.request_var.reset(token)
-
-        return response
 
 @injectable()
 class FastAPIServer(Server):
@@ -160,7 +164,7 @@ class FastAPIServer(Server):
         """
         self.host = host
 
-        config = uvicorn.Config(self.fast_api, host=self.host, port=self.port, access_log=False, loop="asyncio") #log_level="debug"
+        config = uvicorn.Config(self.fast_api, host=self.host, port=self.port, access_log=False)
         server = uvicorn.Server(config)
 
         thread = threading.Thread(target=server.run, daemon=True)
