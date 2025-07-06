@@ -26,6 +26,7 @@ jobs:
       - name: Build aspyx package
         working-directory: packages/aspyx
         run: |
+          pip install pytest pytest-asyncio anyio pyjwt
           hatch build
           pip install dist/*.whl
           hatch run pytest
@@ -33,6 +34,7 @@ jobs:
       - name: Build aspyx_service package
         working-directory: packages/aspyx_service
         run: |
+          pip install pytest pytest-asyncio anyio pyjwt
           hatch build
           pip install dist/*.whl
           hatch run pytest
