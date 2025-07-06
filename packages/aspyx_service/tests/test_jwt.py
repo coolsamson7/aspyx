@@ -13,8 +13,6 @@ from fastapi import Request as HttpRequest, HTTPException
 
 from datetime import datetime, timezone, timedelta
 
-from aspyx.threading import ThreadLocal
-
 logging.basicConfig(
     level=logging.DEBUG,
     format='[%(asctime)s] %(levelname)s in %(filename)s:%(lineno)d - %(message)s'
@@ -33,8 +31,8 @@ configure_logging({
 })
 
 from aspyx_service import Service, service, component, implementation, AbstractComponent, \
-    DispatchJSONChannel, Component, ChannelAddress, Server, health, RequestContext, HTTPXChannel, remember_token, \
-    clear_token, AbstractAnalyzer, AuthorizationManager, SessionManager, AuthorizationException, Session
+     Component, ChannelAddress, Server, health, RequestContext, HTTPXChannel, \
+    AbstractAnalyzer, AuthorizationManager, SessionManager, AuthorizationException, Session
 
 from aspyx.reflection import Decorators, TypeDescriptor
 
@@ -320,7 +318,7 @@ class TestLocalService():
 
         token = login_service.login("hugo", "secret")
 
-        remember_token(login_service, token)
+        HTTPXChannel.remember_token(login_service, token)
 
         secure_service.secured()
 
@@ -331,13 +329,13 @@ class TestLocalService():
 
         login_service.logout()
 
-        clear_token(login_service, token)
+        HTTPXChannel.clear_token(login_service, token)
 
         # now andi
 
         token = login_service.login("andi", "secret")
 
-        remember_token(login_service, token)
+        HTTPXChannel.remember_token(login_service, token)
 
         secure_service.secured_admin()
 

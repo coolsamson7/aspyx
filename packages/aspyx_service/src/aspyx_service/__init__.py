@@ -5,7 +5,7 @@ This module provides the core Aspyx service management framework allowing for se
 from aspyx.di import module
 
 from .service import ServiceException, Server, Channel, ComponentDescriptor, inject_service, ChannelAddress, ChannelInstances, ServiceManager, Component, Service, AbstractComponent, ComponentStatus, ComponentRegistry, implementation, health, component, service
-from .channels import HTTPXChannel, DispatchJSONChannel, remember_token, clear_token
+from .channels import HTTPXChannel, DispatchJSONChannel
 from .registries import ConsulComponentRegistry
 from .server import FastAPIServer, RequestContext
 from .healthcheck import health_checks, health_check, HealthCheckManager, HealthStatus
@@ -67,8 +67,6 @@ __all__ = [
 
     "HTTPXChannel",
     "DispatchJSONChannel",
-    "remember_token",
-    "clear_token"
 
     # rest
 

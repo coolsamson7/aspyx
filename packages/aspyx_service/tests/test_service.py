@@ -2,7 +2,7 @@
 Tests
 """
 
-from .common import TestService, TestRestService, Test, Pydantic, Data, service_manager
+from .common import TestService, TestRestService, Pydantic, Data, service_manager, Foo
 
 pydantic = Pydantic(i=1, f=1.0, b=True, s="s")
 data = Data(i=1, f=1.0, b=True, s="s")
@@ -22,7 +22,7 @@ class TestLocalService():
         assert result_pydantic == pydantic
 
     def test_inject(self, service_manager):
-        test = service_manager.environment.get(Test)
+        test = service_manager.environment.get(Foo)
 
         assert test.service is not None
 

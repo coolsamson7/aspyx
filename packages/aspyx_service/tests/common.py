@@ -246,7 +246,7 @@ class TestComponentImpl(AbstractComponent, TestComponent):
         print("### shutdown")
 
 @injectable(eager=False)
-class Test:
+class Foo:
     def __init__(self):
         self.service = None
 

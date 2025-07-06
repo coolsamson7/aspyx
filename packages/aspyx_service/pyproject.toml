@@ -14,7 +14,6 @@ dependencies = [
     "fastapi~=0.115.13",
     "httpx~=0.28.1",
     "msgpack~=1.1.1",
-    "PyJWT~= 2.10.1",
     "cachetools~= 5.5.2",
     "uvicorn[standard]"
 ]

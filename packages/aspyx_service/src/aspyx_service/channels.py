@@ -32,6 +32,22 @@ class HTTPXChannel(Channel):
         "timeout"
     ]
 
+    # class methods
+
+    @classmethod
+    def remember_token(cls, service: Any, token: str):
+        if isinstance(service.invocation_handler, HTTPXChannel):
+            channel: HTTPXChannel = service.invocation_handler
+
+            channel.token = token
+
+    @classmethod
+    def clear_token(cls, service: Any, token: str):
+        if isinstance(service.invocation_handler, HTTPXChannel):
+            channel: HTTPXChannel = service.invocation_handler
+
+            channel.token = token
+
     # class properties
 
     client_local = ThreadLocal[Client]()
@@ -156,20 +172,6 @@ class HTTPXChannel(Channel):
             headers["Authorization"] = f"Bearer {self.token}"
 
         return await self.get_async_client().request(http_method, url, params=params, json=json, headers=headers, timeout=timeout, content=content)
-
-
-def remember_token(service: Any, token: str):
-    if isinstance(service.invocation_handler, HTTPXChannel):
-        channel: HTTPXChannel = service.invocation_handler
-
-        channel.token = token
-
-
-def clear_token(service: Any, token: str):
-    if isinstance(service.invocation_handler, HTTPXChannel):
-        channel: HTTPXChannel = service.invocation_handler
-
-        channel.token = token
 
 class Request(BaseModel):
     method: str  # component:service:method
