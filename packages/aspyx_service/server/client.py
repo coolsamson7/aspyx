@@ -13,10 +13,22 @@ from aspyx_service import ServiceModule, delete, post, put, get, rest, Body
 from aspyx_service.service import  component, Component, Service, service
 
 class Pydantic(BaseModel):
-    i : int
-    f : float
+    i: int
+    f: float
     b: bool
     s: str
+
+    str0 : str
+    str1: str
+    str2: str
+    str3: str
+    str4: str
+    str5: str
+    str6: str
+    str7: str
+    str8: str
+    str9: str
+
 
 @dataclass
 class Data:
@@ -24,6 +36,17 @@ class Data:
     f: float
     b: bool
     s: str
+
+    str0: str
+    str1: str
+    str2: str
+    str3: str
+    str4: str
+    str5: str
+    str6: str
+    str7: str
+    str8: str
+    str9: str
 
 class PydanticAndData(BaseModel):
     p: Pydantic

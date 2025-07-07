@@ -1,7 +1,7 @@
 """
 Tests
 """
-
+import os
 from typing import Optional
 
 from consul import Consul
@@ -14,6 +14,7 @@ from aspyx_service.service import inject_service, ChannelAddress, Server, \
     component_services, AbstractComponent, implementation, health, ComponentRegistry
 
 from client import ClientModule, TestService, TestAsyncService, Data, Pydantic, TestRestService, TestAsyncRestService, TestComponent
+
 
 # implementation classes
 
@@ -150,4 +151,4 @@ class ServerModule:
 
     @create()
     def create_registry(self) -> ComponentRegistry:
-        return ConsulComponentRegistry(port=8000, consul=Consul(host="localhost", port=8500))
+        return ConsulComponentRegistry(port=int(os.getenv("FAST_API_PORT", 8000)), consul=Consul(host="localhost", port=8500))

@@ -6,14 +6,15 @@ import threading
 import time
 import logging
 
-from typing import Callable, TypeVar, Type, Awaitable, Any, Dict
+from typing import Callable, TypeVar, Type, Awaitable, Any, Dict, cast
 
 from consul import Consul
 
 from aspyx.di import module, Environment, create
+from aspyx.di.aop import advice, around, methods, Invocation
 
-from aspyx_service import ServiceModule, ConsulComponentRegistry
-from aspyx_service.service import ServiceManager, ComponentRegistry
+from aspyx_service import ConsulComponentRegistry
+from aspyx_service.service import ServiceManager, ComponentRegistry, Channel
 
 logging.basicConfig(
     level=logging.ERROR,
@@ -37,6 +38,19 @@ from client import TestService, TestRestService, Pydantic, Data, TestAsyncRestSe
 
 # main
 
+@advice
+class ChannelAdvice:
+    def __init__(self):
+        pass
+
+    @around(methods().named("customize").of_type(Channel))
+    def customize_channel(self, invocation: Invocation):
+        channel = cast(Channel, invocation.args[0])
+
+        channel.select_round_robin() # or select_first_url()
+
+        return invocation.proceed()
+
 @module(imports=[ClientModule])
 class TestModule:
     def __init__(self):
@@ -57,8 +71,32 @@ T = TypeVar("T")
 
 # main
 
-pydantic = Pydantic(i=1, f=1.0, b=True, s="s")
-data = Data(i=1, f=1.0, b=True, s="s")
+lorem_ipsum = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua"
+
+pydantic = Pydantic(i=1, f=1.0, b=True, s="s",
+                    str0=lorem_ipsum,
+                    str1=lorem_ipsum,
+                    str2=lorem_ipsum,
+                    str3=lorem_ipsum,
+                    str4=lorem_ipsum,
+                    str5=lorem_ipsum,
+                    str6=lorem_ipsum,
+                    str7=lorem_ipsum,
+                    str8=lorem_ipsum,
+                    str9=lorem_ipsum
+                    )
+data = Data(i=1, f=1.0, b=True, s="s",
+                    str0=lorem_ipsum,
+                    str1=lorem_ipsum,
+                    str2=lorem_ipsum,
+                    str3=lorem_ipsum,
+                    str4=lorem_ipsum,
+                    str5=lorem_ipsum,
+                    str6=lorem_ipsum,
+                    str7=lorem_ipsum,
+                    str8=lorem_ipsum,
+                    str9=lorem_ipsum
+            )
 
 def run_loops(name: str, loops: int, type: Type[T], instance: T,  callable: Callable[[T], None]):
     start = time.perf_counter()
@@ -155,7 +193,7 @@ async def main():
 
     # tests
 
-    #run_loops("rest", loops, TestRestService, manager.get_service(TestRestService, preferred_channel="rest"), lambda service: service.get("world"))
+    run_loops("rest", loops, TestRestService, manager.get_service(TestRestService, preferred_channel="rest"), lambda service: service.get("world"))
     run_loops("json", loops, TestService, manager.get_service(TestService, preferred_channel="dispatch-json"), lambda service: service.hello("world"))
     run_loops("msgpack", loops, TestService, manager.get_service(TestService, preferred_channel="dispatch-msgpack"), lambda service: service.hello("world"))
 
