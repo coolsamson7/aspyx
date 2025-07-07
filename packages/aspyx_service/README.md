@@ -24,6 +24,8 @@
   - [Rest Calls](#rest-calls)
   - [Intercepting calls](#intercepting-calls)
 - [FastAPI server](#fastapi-server)
+- [Session](#session)
+- [Authorization](#authorization)
 - [Implementing Channels](#implementing-channels)
 - [Version History](#version-history)
 
@@ -130,8 +132,22 @@ environment = server.boot(Module)
 Of course, service can also be called locally. In case of multiple possible channels, a keyword argument is used to 
 determine a specific channel. As a local channel has the name "local", the appropriate call is:
 
+**Example**:
+
 ```python
  service = service_manager.get_service(TestService, preferred_channel="local")
+```
+
+The default can be set globally with the method `set_preferred_channel(channel: str)`
+
+Injecting services is also possible via the decorator `@inject_service(preferred_channel=""")`
+
+**Example**:
+
+```python
+@inject_service()
+def set_service(self, service: TestService)
+   self.service = service
 ```
 
 ## Features
@@ -316,11 +332,13 @@ Channels implement the possible transport layer protocols. In the sense of a dyn
 Several channels are implemented:
 
 - `dispatch-json`
-   channel that dispatches generic `Request` objects via a `invoke` POST-call
+   channel that posts generic `Request` objects via a `invoke` POST-call
 - `dispatch-msgpack`
-   channel that dispatches generic `Request` objects via a `invoke` POST-call after packing the json with msgpack
+   channel that posts generic `Request` objects via a `invoke` POST-call after packing the json with msgpack
 - `rest`
   channel that executes regular rest-calls as defined by a couple of decorators.
+
+The `dispatch`channels have the big advantage, that you don`t have to deal with additional http decorators!
 
 All channels react on changed URLs as provided by the component registry.
 
@@ -445,6 +463,14 @@ class Module():
 
 This setup will also expose all service interfaces decorated with the corresponding http decorators!
 No need to add any FastAPI decorators, since the mapping is already done internally! 
+
+## Session
+
+TODO
+
+## Authorization
+
+TODO
 
 ## Implementing Channels
 

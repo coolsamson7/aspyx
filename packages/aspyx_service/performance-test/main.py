@@ -2,7 +2,7 @@ import logging
 import os
 
 from aspyx.util import ConfigureLogger
-from aspyx_service import ServiceManager, FastAPIServer
+from aspyx_service import FastAPIServer
 from server import  ServerModule
 
 ConfigureLogger(default_level=logging.DEBUG, levels={
@@ -14,14 +14,7 @@ ConfigureLogger(default_level=logging.DEBUG, levels={
 
 PORT = int(os.getenv("FAST_API_PORT", 8000))
 
-print(PORT)
-
-def boot() -> ServiceManager:
-    server = FastAPIServer.start(module=ServerModule, host="0.0.0.0", port=PORT, start = False)
-
-    return server.service_manager
-
-manager = boot()
+FastAPIServer.boot(module=ServerModule, host="0.0.0.0", port=PORT, start = False)
 
 app = FastAPIServer.fast_api
 

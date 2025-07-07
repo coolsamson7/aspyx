@@ -26,7 +26,6 @@ ConfigureLogger(default_level=logging.DEBUG, levels={
 
 from client import TestService, TestRestService, Pydantic, Data, TestAsyncRestService, TestAsyncService, ClientModule
 
-
 # main
 
 @advice

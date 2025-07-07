@@ -27,11 +27,22 @@ from .channels import Request, Response
 from .restchannel import get, post, put, delete, rest
 
 class RequestContext:
+    """
+    A request context is used to remember the current http request in the current thread
+    """
     request_var = contextvars.ContextVar("request")
 
     @classmethod
     def get_request(cls) -> Request:
+        """
+        Return the current http request
+
+        Returns:
+            the current http request
+        """
         return cls.request_var.get()
+
+    # constructor
 
     def __init__(self, app):
         self.app = app
@@ -66,16 +77,16 @@ class FastAPIServer(Server):
     # class methods
 
     @classmethod
-    def start(cls, module: Type, host="0.0.0.0", port=8000, start = True) -> 'FastAPIServer':
+    def boot(cls, module: Type, host="0.0.0.0", port=8000, start = True) -> 'FastAPIServer':
         """
-        boot the DI infrastructure of the supplied module and start fastapi given the url
+        boot the DI infrastructure of the supplied module and optionally start a fastapi thread given the url
         Args:
             module: the module to initialize the environment
             host: listen address
             port: the port
 
         Returns:
-
+            thr created server
         """
         cls.port = port
 

@@ -81,6 +81,8 @@ nav:
         - Registries: api/registries.md
         - Channels: api/channels.md
         - Health Checks: api/healthcheck.md
+        - Session: api/session.md
+        - Authorization: api/authorization.md
 
 
 markdown_extensions:

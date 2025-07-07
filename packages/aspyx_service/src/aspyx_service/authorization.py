@@ -10,6 +10,9 @@ from aspyx.reflection import TypeDescriptor
 
 
 class AuthorizationException(Exception):
+    """
+    Any authorization exception
+    """
     pass
 
 def get_method_class(method):
@@ -27,37 +30,57 @@ def get_method_class(method):
 
 @injectable()
 class AuthorizationManager:
-    class Check():
+    """
+    The authorization manager is used to remember and execute pluggable authorization checks.
+    """
+    class Authorization():
+        """
+        Base class for authorization checks
+        """
         def check(self):
+            """
+            execute the authorization check. Throws an exception in case of violations,
+            """
             pass
 
-    class Analyzer(ABC):
+    class AuthorizationFactory(ABC):
+        """
+        An authorization factory is used to create possible authorization checks given a method descriptor
+        """
         @abstractmethod
-        def compute_check(self, method_descriptor: TypeDescriptor.MethodDescriptor) -> Optional['AuthorizationManager.Check']:
+        def compute_authorization(self, method_descriptor: TypeDescriptor.MethodDescriptor) -> Optional['AuthorizationManager.Authorization']:
+            """
+            return a possible authorization check given a method descriptor
+            Args:
+                method_descriptor: the corresponding method descriptor
+
+            Returns:
+                an authorization check or None
+            """
             pass
 
     # constructor
 
     def __init__(self):
-        self.analyzers : list[AuthorizationManager.Analyzer] = []
-        self.checks : dict[Callable, list[AuthorizationManager.Check]] = {}
+        self.factories : list[AuthorizationManager.AuthorizationFactory] = []
+        self.checks : dict[Callable, list[AuthorizationManager.Authorization]] = {}
 
     # public
 
-    def register_analyzer(self, analyzer: 'AuthorizationManager.Analyzer'):
-        self.analyzers.append(analyzer)
+    def register_factory(self, factory: 'AuthorizationManager.AuthorizationFactory'):
+        self.factories.append(factory)
 
     # internal
 
-    def compute_checks(self, func: Callable) -> list[Check]:
+    def compute_checks(self, func: Callable) -> list[Authorization]:
         checks = []
 
         clazz = get_method_class(func)
 
         descriptor = TypeDescriptor.for_type(clazz).get_method(func.__name__)
 
-        for analyzer in self.analyzers:
-            check = analyzer.compute_check(descriptor)
+        for factory in self.factories:
+            check = factory.compute_authorization(descriptor)
             if check is not None:
                 checks.append(check)
 
@@ -66,7 +89,16 @@ class AuthorizationManager:
 
     # public
 
-    def get_checks(self, func: Callable) -> list[Check]:
+    def get_checks(self, func: Callable) -> list[Authorization]:
+        """
+        return a list of authorization checks given a function.
+
+        Args:
+            func: the corresponding function.
+
+        Returns:
+            list of authorization checks
+        """
         checks = self.checks.get(func, None)
         if checks is None:
             checks = self.compute_checks(func)
@@ -74,10 +106,18 @@ class AuthorizationManager:
 
         return checks
 
-class AbstractAnalyzer(AuthorizationManager.Analyzer):
+class AbstractAuthorizationFactory(AuthorizationManager.AuthorizationFactory):
+    """
+    Abstract base class for authorization factories
+    """
+
+    # constructor
+
     def __init__(self):
         pass
 
+    # inject
+
     @inject()
     def set_authorization_manager(self, authorization_manager: AuthorizationManager):
-        authorization_manager.register_analyzer(self)
+        authorization_manager.register_factory(self)

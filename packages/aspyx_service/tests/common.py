@@ -294,7 +294,7 @@ class Module:
 # main
 
 def start_server() -> ServiceManager:
-    server = FastAPIServer.start(module=Module, host="0.0.0.0", port=8000)
+    server = FastAPIServer.boot(module=Module, host="0.0.0.0", port=8000)
 
     service_manager = server.service_manager
     descriptor = service_manager.get_descriptor(TestComponent).get_component_descriptor()

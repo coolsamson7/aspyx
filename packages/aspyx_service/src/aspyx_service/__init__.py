@@ -11,7 +11,7 @@ from .server import FastAPIServer, RequestContext
 from .healthcheck import health_checks, health_check, HealthCheckManager, HealthStatus
 from .restchannel import RestChannel, post, get, put, delete, QueryParam, Body, rest
 from .session import Session, SessionManager
-from .authorization import AuthorizationManager, AbstractAnalyzer, AuthorizationException
+from .authorization import AuthorizationManager, AbstractAuthorizationFactory, AuthorizationException
 
 
 @module()
@@ -45,7 +45,7 @@ __all__ = [
     # authorization
 
     "AuthorizationManager",
-    "AbstractAnalyzer",
+    "AbstractAuthorizationFactory",
     "AuthorizationException",
 
     # session
@@ -87,5 +87,6 @@ __all__ = [
 
     # server
 
-    "FastAPIServer"
+    "FastAPIServer",
+    "RequestContext"
 ]

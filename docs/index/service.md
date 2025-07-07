@@ -261,6 +261,18 @@ If not specified, the first registered channel is used, which btw. is a local ch
 
 The default can be set globally with the method `set_preferred_channel(channel: str)`
 
+Injecting services is also possible via the decorator `@inject_service()`
+
+**Example**:
+
+```python
+@inject_service()
+def set_service(self, service: TestService)
+   self.service = service
+```
+
+The decorator accepts a `preferred_channel` keyword.
+
 ## Component Registry
 
 The component registry is the place where component implementations are registered together with their supported channel addresses.
@@ -433,6 +445,14 @@ class Module():
 
 This setup will also expose all service interfaces decorated with the corresponding http decorators!
 No need to add any FastAPI decorators, since the mapping is already done internally! 
+
+## Session
+
+TODO
+
+## Authorization
+
+TODO
 
 ## Implementing Channels
 

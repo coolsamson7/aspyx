@@ -26,7 +26,7 @@ ConfigureLogger(default_level=logging.DEBUG, levels={
 
 from aspyx_service import Service, service, component, implementation, AbstractComponent, \
      Component, ChannelAddress, Server, health, RequestContext, HTTPXChannel, \
-    AbstractAnalyzer, AuthorizationManager, SessionManager, AuthorizationException, Session
+    AbstractAuthorizationFactory, AuthorizationManager, SessionManager, AuthorizationException, Session
 
 from aspyx.reflection import Decorators, TypeDescriptor
 
@@ -90,9 +90,7 @@ class UserSession(Session):
 
 def requires_role(role=""):
     """
-    Methods decorated with `@around` will be executed around the target method.
-    Every around method must accept a single parameter of type Invocation and needs to call proceed
-    on this parameter to proceed to the next around method.
+    Methods decorated with `@requires_role` will only be allowed if the current user has the given role.
     """
     def decorator(func):
         Decorators.add(func, requires_role, role)
@@ -103,10 +101,10 @@ def requires_role(role=""):
 
 
 @injectable()
-class RoleAnalyzer(AbstractAnalyzer):
+class RoleAuthorizationFactory(AbstractAuthorizationFactory):
     # local class
 
-    class RoleCheck(AuthorizationManager.Check):
+    class RoleAuthorization(AuthorizationManager.Authorization):
         # constructor
 
         def __init__(self, role: str):
@@ -119,10 +117,10 @@ class RoleAnalyzer(AbstractAnalyzer):
                 raise AuthorizationException(f"expected role {self.role}")
     # implement
 
-    def compute_check(self, method_descriptor: TypeDescriptor.MethodDescriptor) -> Optional[AuthorizationManager.Check]:
+    def compute_authorization(self, method_descriptor: TypeDescriptor.MethodDescriptor) -> Optional[AuthorizationManager.Authorization]:
         if method_descriptor.has_decorator(requires_role):
             role = method_descriptor.get_decorator(requires_role).args[0]
-            return RoleAnalyzer.RoleCheck(role)
+            return RoleAuthorizationFactory.RoleAuthorization(role)
 
         return None
 
@@ -134,7 +132,7 @@ class AuthenticationAndAuthorizationAdvice:
     def __init__(self, authorization_manager: AuthorizationManager, session_manager: SessionManager):
         self.session_manager = session_manager
         self.authorization_manager = authorization_manager
-        self.session_manager.set_session_creator(lambda token:
+        self.session_manager.set_session_factory(lambda token:
                                              UserSession(user=token.get("sub"), roles=token.get("roles")))
 
     # internal
@@ -271,8 +269,6 @@ class SecureServiceServiceImpl(SecureService):
     @requires_role("admin")
     def secured_admin(self):
         session = SessionManager.current(UserSession)
-
-        print(session.user)
 
 
 @implementation()
