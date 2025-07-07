@@ -462,6 +462,8 @@ class Channel(DynamicProxy.InvocationHandler, ABC):
         self.address: Optional[ChannelInstances] = None
         self.url_selector : Channel.URLSelector = Channel.FirstURLSelector()
 
+        self.select_round_robin()
+
     # public
 
     def customize(self):
