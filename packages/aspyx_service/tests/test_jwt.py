@@ -3,6 +3,8 @@ jwt sample test
 """
 import faulthandler
 
+from aspyx.util import ConfigureLogger
+
 faulthandler.enable()
 
 from typing import Optional, Dict, Callable
@@ -15,21 +17,11 @@ from fastapi import Request as HttpRequest, HTTPException
 
 from datetime import datetime, timezone, timedelta
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='[%(asctime)s] %(levelname)s in %(filename)s:%(lineno)d - %(message)s'
-)
-
-logging.getLogger("httpx").setLevel(logging.INFO)
-
-def configure_logging(levels: Dict[str, int]) -> None:
-    for name in levels:
-        logging.getLogger(name).setLevel(levels[name])
-
-configure_logging({
-    "xaspyx.di": logging.INFO,
-    "xaspyx.di.aop": logging.INFO,
-    "xaspyx.service": logging.DEBUG
+ConfigureLogger(default_level=logging.DEBUG, levels={
+    "httpx": logging.ERROR,
+    "aspyx.di": logging.ERROR,
+    "aspyx.di.aop": logging.ERROR,
+    "aspyx.service": logging.ERROR
 })
 
 from aspyx_service import Service, service, component, implementation, AbstractComponent, \

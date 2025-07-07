@@ -14,6 +14,7 @@ from pydantic import BaseModel
 
 from aspyx.di.aop import advice, error, Invocation
 from aspyx.exception import ExceptionManager, handle
+from aspyx.util import ConfigureLogger
 from aspyx_service import service, Service, component, Component, \
     implementation, health, AbstractComponent, ChannelAddress, inject_service, \
     FastAPIServer, Server, ServiceModule, ServiceManager, \
@@ -24,20 +25,11 @@ from aspyx.di.configuration import YamlConfigurationSource
 
 # configure logging
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='[%(asctime)s] %(levelname)s in %(filename)s:%(lineno)d - %(message)s'
-)
-
-logging.getLogger("httpx").setLevel(logging.ERROR)
-
-def configure_logging(levels: Dict[str, int]) -> None:
-    for name in levels:
-        logging.getLogger(name).setLevel(levels[name])
-
-configure_logging({
+ConfigureLogger(default_level=logging.DEBUG, levels={
+    "httpx": logging.ERROR,
     "aspyx.di": logging.INFO,
-    "aspyx.service": logging.INFO
+    "aspyx.di.aop": logging.ERROR,
+    "aspyx.service": logging.ERROR
 })
 
 # classes

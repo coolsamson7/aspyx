@@ -1,22 +1,12 @@
 import logging
 import os
-from typing import Dict
 
+from aspyx.util import ConfigureLogger
 from aspyx_service import ServiceManager, FastAPIServer
 from server import  ServerModule
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='[%(asctime)s] %(levelname)s in %(filename)s:%(lineno)d - %(message)s'
-)
-
-logging.getLogger("httpx").setLevel(logging.ERROR)
-
-def configure_logging(levels: Dict[str, int]) -> None:
-    for name in levels:
-        logging.getLogger(name).setLevel(levels[name])
-
-configure_logging({
+ConfigureLogger(default_level=logging.DEBUG, levels={
+    "httpx": logging.ERROR,
     "aspyx.di": logging.ERROR,
     "aspyx.di.aop": logging.ERROR,
     "aspyx.service": logging.ERROR
