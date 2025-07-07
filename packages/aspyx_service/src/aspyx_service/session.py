@@ -1,12 +1,13 @@
 """
 session stuff
 """
+import contextvars
 from typing import Type, Optional, Callable, Any, TypeVar
 from datetime import datetime, timezone
 from cachetools import TTLCache
 
 from aspyx.di import injectable
-from aspyx.threading import ThreadLocal
+#from aspyx.threading import ThreadLocal
 
 
 class Session:
@@ -17,7 +18,8 @@ T = TypeVar("T")
 
 @injectable()
 class SessionManager:
-    current_session = ThreadLocal[Session]()
+    #current_session = ThreadLocal[Session]()
+    current_session  = contextvars.ContextVar("session")
 
     @classmethod
     def current(cls, type: Type[T]) -> T:
@@ -29,7 +31,7 @@ class SessionManager:
 
     @classmethod
     def delete_session(cls):
-        cls.current_session.clear()
+        cls.current_session.set(None)#clear()
 
     # constructor
 

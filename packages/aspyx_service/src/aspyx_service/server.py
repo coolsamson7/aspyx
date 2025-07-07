@@ -48,16 +48,25 @@ class RequestContext:
         finally:
             self.request_var.reset(token)
 
+def create_server() -> FastAPI:
+    server = FastAPI()
+
+    server.add_middleware(RequestContext)
+
+    return server
+
 @injectable()
 class FastAPIServer(Server):
     """
     A server utilizing fastapi framework.
     """
 
+    fast_api = create_server()
+
     # class methods
 
     @classmethod
-    def start(cls, module: Type, host="0.0.0.0", port=8000) -> 'FastAPIServer':
+    def start(cls, module: Type, host="0.0.0.0", port=8000, start = True) -> 'FastAPIServer':
         """
         boot the DI infrastructure of the supplied module and start fastapi given the url
         Args:
@@ -74,7 +83,8 @@ class FastAPIServer(Server):
 
         server = environment.get(FastAPIServer)
 
-        server.start_fastapi(host)
+        if start:
+            server.start_fastapi(host)
 
         return server
 
@@ -91,8 +101,6 @@ class FastAPIServer(Server):
         self.server_thread = None
 
         self.router = APIRouter()
-        self.fast_api = FastAPI()
-        self.fast_api.add_middleware(RequestContext)
 
         # cache
 
@@ -117,7 +125,7 @@ class FastAPIServer(Server):
         self.add_routes()
         self.fast_api.include_router(self.router)
 
-        # for route in self.fast_api.routes:
+        #for route in self.fast_api.routes:
         #    print(f"{route.name}: {route.path} [{route.methods}]")
 
         # add cleanup hook
