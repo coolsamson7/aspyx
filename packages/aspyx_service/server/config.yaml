@@ -1,0 +1,13 @@
+server:
+  port: 8000
+http:
+  timeout: 1000.0
+consul:
+  watchdog:
+    interval: 5
+  healthcheck:
+    interval: 10s
+    timeout: 5s
+    deregister: 5m
+  host: localhost
+  port: 8500

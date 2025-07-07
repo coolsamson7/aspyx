@@ -1,0 +1,153 @@
+"""
+Tests
+"""
+
+from typing import Optional
+
+from consul import Consul
+
+from aspyx.di import injectable, on_running, module, create
+from aspyx.di.aop import Invocation, advice, error
+from aspyx.exception import handle, ExceptionManager
+from aspyx_service import HealthCheckManager, ServiceModule, ConsulComponentRegistry
+from aspyx_service.service import inject_service, ChannelAddress, Server, \
+    component_services, AbstractComponent, implementation, health, ComponentRegistry
+
+from client import ClientModule, TestService, TestAsyncService, Data, Pydantic, TestRestService, TestAsyncRestService, TestComponent
+
+# implementation classes
+
+@implementation()
+class TestServiceImpl(TestService):
+    def __init__(self):
+        pass
+
+    def hello(self, message: str) -> str:
+        return message
+
+    def throw(self, message: str) -> str:
+        raise Exception(message)
+
+    def data(self, data: Data) -> Data:
+        return data
+
+    def pydantic(self, data: Pydantic) -> Pydantic:
+        return data
+
+@implementation()
+class TestAsyncServiceImpl(TestAsyncService):
+    def __init__(self):
+        pass
+
+    async def hello(self, message: str) -> str:
+        return message
+
+    async def data(self, data: Data) -> Data:
+        return data
+
+    async def pydantic(self, data: Pydantic) -> Pydantic:
+        return data
+
+@implementation()
+class TestRestServiceImpl(TestRestService):
+    def __init__(self):
+        pass
+
+    def get(self, message: str) -> str:
+        return message
+
+    def put(self, message: str) -> str:
+        return message
+
+    def post_pydantic(self, message: str, data: Pydantic) -> Pydantic:
+        return data
+
+    def post_data(self, message: str, data: Data) -> Data:
+        return data
+
+    def delete(self, message: str) -> str:
+        return message
+
+@implementation()
+class TestAsyncRestServiceImpl(TestAsyncRestService):
+    def __init__(self):
+        pass
+
+    async def get(self, message: str) -> str:
+        return message
+
+    async def put(self, message: str) -> str:
+        return message
+
+    async def post_pydantic(self, message: str, data: Pydantic) -> Pydantic:
+        return data
+
+    async def post_data(self, message: str, data: Data) -> Data:
+        return data
+
+    async def delete(self, message: str) -> str:
+        return message
+
+@implementation()
+@health("/health")
+@advice
+class TestComponentImpl(AbstractComponent, TestComponent):
+    # constructor
+
+    def __init__(self):
+        super().__init__()
+
+        self.health_check_manager : Optional[HealthCheckManager] = None
+        self.exception_manager = ExceptionManager()
+
+    # exception handler
+
+    @handle()
+    def handle_exception(self, exception: Exception):
+        print("caught exception!")
+        return exception
+
+    # aspects
+
+    @error(component_services(TestComponent))
+    def catch(self, invocation: Invocation):
+        return self.exception_manager.handle(invocation.exception)
+
+    # lifecycle
+
+    @on_running()
+    def setup_exception_handlers(self):
+        self.exception_manager.collect_handlers(self)
+
+    # implement
+
+    async def get_health(self) -> HealthCheckManager.Health:
+        return HealthCheckManager.Health()
+
+    def get_addresses(self, port: int) -> list[ChannelAddress]:
+        return [
+            ChannelAddress("rest", f"http://{Server.get_local_ip()}:{port}"),
+            ChannelAddress("dispatch-json", f"http://{Server.get_local_ip()}:{port}"),
+            ChannelAddress("dispatch-msgpack", f"http://{Server.get_local_ip()}:{port}")
+        ]
+
+    def startup(self) -> None:
+        print("### startup")
+
+    def shutdown(self) -> None:
+        print("### shutdown")
+
+# module
+
+@module(imports=[ClientModule, ServiceModule])
+class ServerModule:
+    def __init__(self):
+        pass
+
+    #@create()
+    #def create_yaml_source(self) -> YamlConfigurationSource:
+    #    return YamlConfigurationSource(f"{Path(__file__).parent}/config.yaml")
+
+    @create()
+    def create_registry(self) -> ComponentRegistry:
+        return ConsulComponentRegistry(port=8000, consul=Consul(host="localhost", port=8500))
