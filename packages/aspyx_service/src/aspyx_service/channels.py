@@ -61,7 +61,7 @@ class HTTPXChannel(Channel):
     @classmethod
     def to_dict(cls, obj: Any) -> Any:
         if isinstance(obj, BaseModel):
-            return obj.dict()
+            return obj.model_dump()
 
         elif is_dataclass(obj):
             return {

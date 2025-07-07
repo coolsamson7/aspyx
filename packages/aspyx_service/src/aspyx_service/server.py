@@ -250,9 +250,9 @@ class FastAPIServer(Server):
             else:
                 result = method(*args)
 
-            return Response(result=result, exception=None).dict()
+            return Response(result=result, exception=None).model_dump()
         except Exception as e:
-            return Response(result=None, exception=str(e)).dict()
+            return Response(result=None, exception=str(e)).model_dump()
 
     # override
 
