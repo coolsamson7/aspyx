@@ -322,7 +322,13 @@ def start_server() -> ServiceManager:
 
     return service_manager
 
+manager : Optional[ServiceManager] = None
+
 @pytest.fixture(scope="session")
 def service_manager():
-    manager = start_server()  # start server
+    global manager
+
+    if  manager is None:
+        manager = start_server()  # start server
+
     yield manager

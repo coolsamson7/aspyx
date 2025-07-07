@@ -197,11 +197,9 @@ class AuthenticationAndAuthorizationAdvice:
     @around(methods().that_are_async().decorated_with(secure),
             methods().that_are_async().declared_by(classes().decorated_with(secure)))
     async def check_async_authentication(self, invocation: Invocation):
-        self.check_session(invocation.func)
-
-        # continue wih established session
-
         try:
+            self.check_session(invocation.func)
+
             return await invocation.proceed_async()
         finally:
             SessionManager.delete_session()
@@ -209,11 +207,9 @@ class AuthenticationAndAuthorizationAdvice:
     @around(methods().that_are_sync().decorated_with(secure),
             methods().that_are_sync().declared_by(classes().decorated_with(secure)))
     def check_authentication(self, invocation: Invocation):
-        self.check_session(invocation.func)
-
-        # continue wih established session
-
         try:
+            self.check_session(invocation.func)
+
             return invocation.proceed()
         finally:
             SessionManager.delete_session()
