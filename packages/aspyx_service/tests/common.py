@@ -7,7 +7,7 @@ import time
 from abc import abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Optional, Type
+from typing import Dict, Optional
 
 import pytest
 from pydantic import BaseModel

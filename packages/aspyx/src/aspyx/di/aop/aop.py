@@ -14,7 +14,7 @@ from enum import auto, Enum
 from typing import Optional, Dict, Type, Callable
 
 from aspyx.reflection import Decorators, TypeDescriptor
-from aspyx.di import injectable, order, Providers, ClassInstanceProvider, Environment, PostProcessor
+from aspyx.di import injectable, order, Environment, PostProcessor
 
 class AOPException(Exception):
     """

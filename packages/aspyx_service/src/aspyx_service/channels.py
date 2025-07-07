@@ -3,7 +3,6 @@ Service management and dependency injection framework.
 """
 from __future__ import annotations
 
-import json
 import typing
 from dataclasses import is_dataclass, fields
 from typing import Type, Optional, Any, Callable
@@ -11,7 +10,6 @@ from typing import Type, Optional, Any, Callable
 import httpx
 import msgpack
 from httpx import Client, AsyncClient, USE_CLIENT_DEFAULT
-from httpx._types import QueryParamTypes, HeaderTypes, TimeoutTypes
 from pydantic import BaseModel
 
 from aspyx.di.configuration import inject_value
@@ -20,7 +18,7 @@ from aspyx.threading import ThreadLocal
 from .service import ServiceManager, ServiceCommunicationException
 
 from .service import ComponentDescriptor, ChannelInstances, ServiceException, channel, Channel, RemoteServiceException
-from .serialization import get_deserializer
+from .serialization import get_deserializer, TypeDeserializer, TypeSerializer, get_serializer
 
 
 class HTTPXChannel(Channel):
@@ -29,7 +27,8 @@ class HTTPXChannel(Channel):
         "async_client",
         "service_names",
         "deserializers",
-        "timeout"
+        "timeout",
+        "optimize_serialization"
     ]
 
     # class methods
@@ -79,19 +78,17 @@ class HTTPXChannel(Channel):
 
         return obj
 
-    @classmethod
-    def to_json(cls, obj) -> str:
-        return json.dumps(cls.to_dict(obj))
-
     # constructor
 
     def __init__(self):
         super().__init__()
 
         self.token = None
-        self.timeout = 100000.0 #TODO
+        self.timeout = 1000.0
         self.service_names: dict[Type, str] = {}
+        self.serializers: dict[Callable, list[Callable]] = {}
         self.deserializers: dict[Callable, Callable] = {}
+        self.optimize_serialization = False
 
     # inject
 
@@ -101,7 +98,27 @@ class HTTPXChannel(Channel):
 
     # protected
 
-    def get_deserializer(self, type: Type, method: Callable) -> Type:
+    def serialize_args(self, invocation: DynamicProxy.Invocation) -> list[Any]:
+        deserializers = self.get_serializers(invocation.type, invocation.method)
+
+        args = list(invocation.args)
+        for index, deserializer in enumerate(deserializers):
+            args[index] = deserializer(args[index])
+
+        return args
+
+    def get_serializers(self, type: Type, method: Callable) -> list[TypeSerializer]:
+        serializers = self.serializers.get(method, None)
+        if serializers is None:
+            param_types = TypeDescriptor.for_type(type).get_method(method.__name__).param_types
+
+            serializers = [get_serializer(type) for type in param_types]
+
+            self.serializers[method] = serializers
+
+        return serializers
+
+    def get_deserializer(self, type: Type, method: Callable) -> TypeDeserializer:
         deserializer = self.deserializers.get(method, None)
         if deserializer is None:
             return_type = TypeDescriptor.for_type(type).get_method(method.__name__).return_type
@@ -209,17 +226,24 @@ class DispatchJSONChannel(HTTPXChannel):
 
     def invoke(self, invocation: DynamicProxy.Invocation):
         service_name = self.service_names[invocation.type]  # map type to registered service name
-        request = Request(method=f"{self.component_descriptor.name}:{service_name}:{invocation.method.__name__}",
-                          args=invocation.args)
 
-        dict = self.to_dict(request)
+        request : dict = {
+            "method": f"{self.component_descriptor.name}:{service_name}:{invocation.method.__name__}"
+            #"args": invocation.args
+        }
+
+        if self.optimize_serialization:
+            request["args"] = self.serialize_args(invocation)
+        else:
+            request["args"] = self.to_dict(invocation.args)
+
         try:
-            http_result = self.request( "post", f"{self.get_url()}/invoke", json=dict, timeout=self.timeout)
-            result = Response(**http_result.json())
-            if result.exception is not None:
-                raise RemoteServiceException(f"server side exception {result.exception}")
+            http_result = self.request( "post", f"{self.get_url()}/invoke", json=request, timeout=self.timeout)
+            result = http_result.json()
+            if result["exception"] is not None:
+                raise RemoteServiceException(f"server side exception {result['exception']}")
 
-            return self.get_deserializer(invocation.type, invocation.method)(result.result)
+            return self.get_deserializer(invocation.type, invocation.method)(result["result"])
         except ServiceCommunicationException:
             raise
 
@@ -232,17 +256,23 @@ class DispatchJSONChannel(HTTPXChannel):
 
     async def invoke_async(self, invocation: DynamicProxy.Invocation):
         service_name = self.service_names[invocation.type]  # map type to registered service name
-        request = Request(method=f"{self.component_descriptor.name}:{service_name}:{invocation.method.__name__}",
-                          args=invocation.args)
-        dict = self.to_dict(request)
+        request : dict = {
+            "method": f"{self.component_descriptor.name}:{service_name}:{invocation.method.__name__}"
+        }
+
+        if self.optimize_serialization:
+            request["args"] = self.serialize_args(invocation)
+        else:
+            request["args"] = self.to_dict(invocation.args)
+
         try:
-            data =  await self.request_async("post", f"{self.get_url()}/invoke", json=dict, timeout=self.timeout)
-            result = Response(**data.json())
+            data =  await self.request_async("post", f"{self.get_url()}/invoke", json=request, timeout=self.timeout)
+            result = data.json()
 
-            if result.exception is not None:
-                raise RemoteServiceException(f"server side exception {result.exception}")
+            if result["exception"] is not None:
+                raise RemoteServiceException(f"server side exception {result['exception']}")
 
-            return self.get_deserializer(invocation.type, invocation.method)(result.result)
+            return self.get_deserializer(invocation.type, invocation.method)(result["result"])
 
         except ServiceCommunicationException:
             raise
@@ -273,11 +303,17 @@ class DispatchMSPackChannel(HTTPXChannel):
 
     def invoke(self, invocation: DynamicProxy.Invocation):
         service_name = self.service_names[invocation.type]  # map type to registered service name
-        request = Request(method=f"{self.component_descriptor.name}:{service_name}:{invocation.method.__name__}",
-                          args=invocation.args)
+        request: dict = {
+            "method": f"{self.component_descriptor.name}:{service_name}:{invocation.method.__name__}"
+        }
+
+        if self.optimize_serialization:
+            request["args"] = self.serialize_args(invocation)
+        else:
+            request["args"] = self.to_dict(invocation.args)
 
         try:
-            packed = msgpack.packb(self.to_dict(request), use_bin_type=True)
+            packed = msgpack.packb(request, use_bin_type=True)
 
             response = self.request("post",
                 f"{self.get_url()}/invoke",
@@ -304,11 +340,17 @@ class DispatchMSPackChannel(HTTPXChannel):
 
     async def invoke_async(self, invocation: DynamicProxy.Invocation):
         service_name = self.service_names[invocation.type]  # map type to registered service name
-        request = Request(method=f"{self.component_descriptor.name}:{service_name}:{invocation.method.__name__}",
-                          args=invocation.args)
+        request: dict = {
+            "method": f"{self.component_descriptor.name}:{service_name}:{invocation.method.__name__}"
+        }
+
+        if self.optimize_serialization:
+            request["args"] = self.serialize_args(invocation)
+        else:
+            request["args"] = self.to_dict(invocation.args)
 
         try:
-            packed = msgpack.packb(self.to_dict(request), use_bin_type=True)
+            packed = msgpack.packb(request, use_bin_type=True)
 
             response = await self.request_async("post",
                 f"{self.get_url()}/invoke",

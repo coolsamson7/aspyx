@@ -262,7 +262,6 @@ class TestDI(unittest.TestCase):
             no_feature_environment = prod_environment.get(RequiresBase)
             self.fail("should not return conditional class")
         except Exception as e:
-            print(e)
             pass
 
     def test_process_factory_instances(self):

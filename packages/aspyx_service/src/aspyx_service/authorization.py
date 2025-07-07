@@ -1,3 +1,6 @@
+"""
+authorization logic
+"""
 import inspect
 from abc import abstractmethod, ABC
 from typing import Optional, Callable

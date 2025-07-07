@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import unittest
 
-from aspyx.reflection import TypeDescriptor, Decorators
+from aspyx.reflection import Decorators
 
 def decorate_1(arg=""):
     def decorator(cls_or_func):

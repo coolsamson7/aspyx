@@ -7,8 +7,6 @@ import time
 import logging
 from typing import Callable, TypeVar, Type, Awaitable, Any, Dict
 
-from aspyx_service import ServiceManager
-
 logging.basicConfig(
     level=logging.DEBUG,
     format='[%(asctime)s] %(levelname)s in %(filename)s:%(lineno)d - %(message)s'
@@ -30,7 +28,7 @@ configure_logging({
 import pytest
 
 from .common import service_manager, TestService, TestRestService, Pydantic, Data, \
-   TestAsyncRestService, TestAsyncService, start_server
+   TestAsyncRestService, TestAsyncService
 
 T = TypeVar("T")
 

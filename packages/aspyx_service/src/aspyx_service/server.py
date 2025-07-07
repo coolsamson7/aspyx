@@ -4,14 +4,13 @@ FastAPI server implementation for the aspyx service framework.
 import atexit
 import inspect
 import threading
-from typing import Type, Optional, Callable
+from typing import Type, Optional, Callable, Any
 
 from fastapi.responses import JSONResponse
 import msgpack
 import uvicorn
 
 from fastapi import FastAPI, APIRouter, Request as HttpRequest, Response as HttpResponse
-from starlette.middleware.base import BaseHTTPMiddleware
 import contextvars
 
 from aspyx.di import Environment, injectable, on_init, inject_environment
@@ -183,8 +182,8 @@ class FastAPIServer(Server):
 
         return deserializers
 
-    def deserialize_args(self, request: Request, type: Type, method: Callable) -> list:
-        args = list(request.args)
+    def deserialize_args(self, args: list[Any], type: Type, method: Callable) -> list:
+        #args = list(request.args)
 
         deserializers = self.get_deserializers(type, method)
 
@@ -210,7 +209,7 @@ class FastAPIServer(Server):
                 media_type="text/plain"
             )
 
-        request = Request(**data)
+        request = data#Request(**data)
 
         if content == "json":
             return await self.dispatch(http_request, request)
@@ -220,12 +219,12 @@ class FastAPIServer(Server):
                 media_type="application/msgpack"
             )
 
-    async def dispatch(self, http_request: HttpRequest, request: Request) :
-        ServiceManager.logger.debug("dispatch request %s", request.method)
+    async def dispatch(self, http_request: HttpRequest, request: dict) :
+        ServiceManager.logger.debug("dispatch request %s", request["method"])
 
         # <comp>:<service>:<method>
 
-        parts = request.method.split(":")
+        parts = request["method"].split(":")
 
         #component = parts[0]
         service_name = parts[1]
@@ -236,7 +235,7 @@ class FastAPIServer(Server):
 
         method = getattr(service, method_name)
 
-        args = self.deserialize_args(request, service_descriptor.type, method)
+        args = self.deserialize_args(request["args"], service_descriptor.type, method)
         try:
             if inspect.iscoroutinefunction(method):
                 result = await method(*args)

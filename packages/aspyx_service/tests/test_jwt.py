@@ -5,10 +5,12 @@ import faulthandler
 
 faulthandler.enable()
 
+from typing import Optional, Dict, Callable
+
 import logging
 from abc import abstractmethod
 import jwt
-from typing import Optional, Dict, Callable
+
 from fastapi import Request as HttpRequest, HTTPException
 
 from datetime import datetime, timezone, timedelta
@@ -66,17 +68,8 @@ class TokenManager:
 
         return token
 
-    def verify_jwt(self, token: str):
-        try:
-            payload = jwt.decode(token, self.secret, algorithms=[self.algorithm])
-
-            return payload  # token is valid
-        except jwt.ExpiredSignatureError:
-            print("Token expired")
-        except jwt.InvalidTokenError:
-            print("Invalid token")
-
-        return None
+    def decode_jwt(self, token: str):
+        return jwt.decode(token, self.secret, algorithms=[self.algorithm])
 
 token_manager = TokenManager(SECRET_KEY, ALGORITHM)
 
@@ -162,7 +155,7 @@ class AuthenticationAndAuthorizationAdvice:
         return auth_header.split(" ")[1]
 
     def verify_token(self, token: str) -> dict:
-        payload = token_manager.verify_jwt(token)
+        payload = token_manager.decode_jwt(token)
         if payload is None:
             raise HTTPException(status_code=401, detail="Invalid token")
 
@@ -213,7 +206,8 @@ class AuthenticationAndAuthorizationAdvice:
         finally:
             SessionManager.delete_session()
 
-    @around(methods().that_are_sync().decorated_with(secure), methods().that_are_sync().declared_by(classes().decorated_with(secure)))
+    @around(methods().that_are_sync().decorated_with(secure),
+            methods().that_are_sync().declared_by(classes().decorated_with(secure)))
     def check_authentication(self, invocation: Invocation):
         self.check_session(invocation.func)
 
