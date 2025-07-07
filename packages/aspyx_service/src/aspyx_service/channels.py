@@ -88,7 +88,7 @@ class HTTPXChannel(Channel):
         self.service_names: dict[Type, str] = {}
         self.serializers: dict[Callable, list[Callable]] = {}
         self.deserializers: dict[Callable, Callable] = {}
-        self.optimize_serialization = False
+        self.optimize_serialization = True
 
     # inject
 
