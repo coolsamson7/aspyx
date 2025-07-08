@@ -2,6 +2,9 @@ server:
   port: 8000
 http:
   timeout: 1000.0
+channel:
+  backoff_base: 0.2
+  max_attempts: 3
 consul:
   watchdog:
     interval: 5

@@ -5,8 +5,9 @@ import inspect
 from abc import abstractmethod, ABC
 from typing import Optional, Callable
 
-from aspyx.di import injectable, inject
-from aspyx.reflection import TypeDescriptor
+from aspyx.di import injectable, inject, order
+from aspyx.di.aop import Invocation
+from aspyx.reflection import TypeDescriptor, Decorators
 
 
 class AuthorizationException(Exception):
@@ -37,7 +38,7 @@ class AuthorizationManager:
         """
         Base class for authorization checks
         """
-        def check(self):
+        def check(self, invocation: Invocation):
             """
             execute the authorization check. Throws an exception in case of violations,
             """
@@ -47,6 +48,10 @@ class AuthorizationManager:
         """
         An authorization factory is used to create possible authorization checks given a method descriptor
         """
+
+        def __init__(self, order = 0):
+            self.order = order
+
         @abstractmethod
         def compute_authorization(self, method_descriptor: TypeDescriptor.MethodDescriptor) -> Optional['AuthorizationManager.Authorization']:
             """
@@ -70,6 +75,8 @@ class AuthorizationManager:
     def register_factory(self, factory: 'AuthorizationManager.AuthorizationFactory'):
         self.factories.append(factory)
 
+        self.factories.sort(key=lambda factory: factory.order)
+
     # internal
 
     def compute_checks(self, func: Callable) -> list[Authorization]:
@@ -86,9 +93,6 @@ class AuthorizationManager:
 
         return checks
 
-
-    # public
-
     def get_checks(self, func: Callable) -> list[Authorization]:
         """
         return a list of authorization checks given a function.
@@ -103,8 +107,13 @@ class AuthorizationManager:
         if checks is None:
             checks = self.compute_checks(func)
             self.checks[func] = checks
+            print(checks)
 
         return checks
+
+    def check(self, invocation: Invocation) -> Optional[Authorization]:
+        for check in self.get_checks(invocation.func):
+            check.check(invocation)
 
 class AbstractAuthorizationFactory(AuthorizationManager.AuthorizationFactory):
     """
@@ -114,7 +123,10 @@ class AbstractAuthorizationFactory(AuthorizationManager.AuthorizationFactory):
     # constructor
 
     def __init__(self):
-        pass
+        super().__init__(0)
+
+        if Decorators.has_decorator(type(self), order):
+            self.order = Decorators.get_decorator(type(self), order).args[0]
 
     # inject
 
