@@ -2,6 +2,9 @@
 jwt sample test
 """
 import faulthandler
+import time
+
+from jwt import ExpiredSignatureError, InvalidTokenError
 
 from aspyx.util import ConfigureLogger
 
@@ -25,8 +28,9 @@ ConfigureLogger(default_level=logging.DEBUG, levels={
 })
 
 from aspyx_service import Service, service, component, implementation, AbstractComponent, \
-     Component, ChannelAddress, Server, health, RequestContext, HTTPXChannel, \
-    AbstractAuthorizationFactory, AuthorizationManager, SessionManager, AuthorizationException, Session
+    Component, ChannelAddress, Server, health, RequestContext, HTTPXChannel, \
+    AbstractAuthorizationFactory, AuthorizationManager, SessionManager, AuthorizationException, Session, \
+    ServiceCommunicationException, TokenExpiredException
 
 from aspyx.reflection import Decorators, TypeDescriptor
 
@@ -60,8 +64,20 @@ class TokenManager:
 
         return token
 
-    def decode_jwt(self, token: str):
-        return jwt.decode(token, self.secret, algorithms=[self.algorithm])
+    def decode_jwt(self, token: str) -> dict:
+        try:
+            return jwt.decode(token, self.secret, algorithms=[self.algorithm])
+        except ExpiredSignatureError:
+            raise HTTPException(status_code=401,
+                                detail="Token has expired",
+                                headers={"WWW-Authenticate": 'Bearer error="invalid_token", error_description="The token has expired"'}
+                                )
+        except InvalidTokenError:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid token",
+                headers={"WWW-Authenticate": 'Bearer error="invalid_token", error_description="The token is invalid"'}
+            )
 
 token_manager = TokenManager(SECRET_KEY, ALGORITHM)
 
@@ -126,6 +142,59 @@ class RoleAuthorizationFactory(AbstractAuthorizationFactory):
 
 @advice
 @injectable()
+class RetryAdvice:
+    # constructor
+
+    def __init__(self):
+        self.max_attempts = 3
+        self.backoff_base = 0.2
+
+
+    # sending side
+
+    @around(methods().of_type(HTTPXChannel).named("request"))
+    def retry_request(self, invocation: Invocation):
+        for attempt in range(1, self.max_attempts + 1):
+            try:
+                return invocation.proceed()
+
+            except AuthorizationException as e:
+                raise
+
+            except TokenExpiredException as e:
+                raise# TODO
+
+            except ServiceCommunicationException:
+                #logger.warning(f"Request failed ({type(e).__name__}), attempt {attempt}/{max_attempts}")
+
+                if attempt == self.max_attempts:
+                    raise
+
+                time.sleep(self.backoff_base * (2 ** (attempt - 1)))
+
+        return None
+
+    @around(methods().of_type(HTTPXChannel).named("request_async"))
+    async def retry_async_request(self, invocation: Invocation):
+        for attempt in range(1, self.max_attempts + 1):
+            try:
+                return await invocation.proceed_async()
+
+            except TokenExpiredException as e:
+                raise  # TODO
+
+            except ServiceCommunicationException:
+                # logger.warning(f"Request failed ({type(e).__name__}), attempt {attempt}/{max_attempts}")
+
+                if attempt == self.max_attempts:
+                    raise
+
+                time.sleep(self.backoff_base * (2 ** (attempt - 1)))
+
+        return None
+
+@advice
+@injectable()
 class AuthenticationAndAuthorizationAdvice:
     # constructor
 
@@ -135,21 +204,24 @@ class AuthenticationAndAuthorizationAdvice:
         self.session_manager.set_session_factory(lambda token:
                                              UserSession(user=token.get("sub"), roles=token.get("roles")))
 
+        # sender
+        self.max_attempts = 3
+        self.backoff_base = 0.2
+
     # internal
 
     def extract_token_from_request(self, request: HttpRequest) -> str:
         auth_header = request.headers.get("Authorization")
         if not auth_header or not auth_header.startswith("Bearer "):
-            raise HTTPException(status_code=401, detail="Missing or invalid token")
+            raise HTTPException(status_code=401, detail="Missing token",
+                                headers={
+                                    "WWW-Authenticate": 'Bearer error="invalid_token", error_description="missing token"'}
+                                )
 
         return auth_header.split(" ")[1]
 
     def verify_token(self, token: str) -> dict:
-        payload = token_manager.decode_jwt(token)
-        if payload is None:
-            raise HTTPException(status_code=401, detail="Invalid token")
-
-        return payload
+        return token_manager.decode_jwt(token)
 
     def check_session(self, func: Callable):
         http_request = RequestContext.get_request()
@@ -292,6 +364,11 @@ class TestLocalService():
         login_service = service_manager.get_service(LoginService, preferred_channel="dispatch-json")
 
         secure_service = service_manager.get_service(SecureService, preferred_channel="dispatch-json")
+
+        try:
+            secure_service.secured()
+        except Exception as e:
+            print(e)
 
         token = login_service.login("hugo", "secret")
 
