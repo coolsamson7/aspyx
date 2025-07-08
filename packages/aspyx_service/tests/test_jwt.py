@@ -4,8 +4,6 @@ jwt sample test
 import faulthandler
 import time
 
-from jwt import ExpiredSignatureError, InvalidTokenError
-
 from aspyx.util import ConfigureLogger
 
 faulthandler.enable()
@@ -14,7 +12,6 @@ from typing import Optional, Dict, Callable
 
 import logging
 from abc import abstractmethod
-import jwt
 
 from fastapi import Request as HttpRequest, HTTPException
 
@@ -38,48 +35,8 @@ from aspyx.di import injectable
 from aspyx.di.aop import advice, around, Invocation, methods, classes
 
 
-from .common import service_manager
+from .common import service_manager, TokenManager
 
-SECRET_KEY = "your-secret-key"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-
-class TokenManager:
-    # constructor
-
-    def __init__(self, secret: str, algorithm: str):
-        self.secret = secret
-        self.algorithm = algorithm
-
-    # methods
-
-    def create_jwt(self, user_id: str, roles: list[str]) -> str:
-        payload = {
-            "sub": user_id,
-            "exp": datetime.utcnow() + timedelta(hours=1),
-            "iat": datetime.utcnow(),
-            "roles": roles
-        }
-        token = jwt.encode(payload, self.secret, algorithm=self.algorithm)
-
-        return token
-
-    def decode_jwt(self, token: str) -> dict:
-        try:
-            return jwt.decode(token, self.secret, algorithms=[self.algorithm])
-        except ExpiredSignatureError:
-            raise HTTPException(status_code=401,
-                                detail="Token has expired",
-                                headers={"WWW-Authenticate": 'Bearer error="invalid_token", error_description="The token has expired"'}
-                                )
-        except InvalidTokenError:
-            raise HTTPException(
-                status_code=401,
-                detail="Invalid token",
-                headers={"WWW-Authenticate": 'Bearer error="invalid_token", error_description="The token is invalid"'}
-            )
-
-token_manager = TokenManager(SECRET_KEY, ALGORITHM)
 
 # decorator
 
@@ -149,7 +106,6 @@ class RetryAdvice:
         self.max_attempts = 3
         self.backoff_base = 0.2
 
-
     # sending side
 
     @around(methods().of_type(HTTPXChannel).named("request"))
@@ -198,8 +154,9 @@ class RetryAdvice:
 class AuthenticationAndAuthorizationAdvice:
     # constructor
 
-    def __init__(self, authorization_manager: AuthorizationManager, session_manager: SessionManager):
+    def __init__(self, authorization_manager: AuthorizationManager, session_manager: SessionManager, token_manager: TokenManager):
         self.session_manager = session_manager
+        self.token_manager = token_manager
         self.authorization_manager = authorization_manager
         self.session_manager.set_session_factory(lambda token:
                                              UserSession(user=token.get("sub"), roles=token.get("roles")))
@@ -220,9 +177,6 @@ class AuthenticationAndAuthorizationAdvice:
 
         return auth_header.split(" ")[1]
 
-    def verify_token(self, token: str) -> dict:
-        return token_manager.decode_jwt(token)
-
     def check_session(self, func: Callable):
         http_request = RequestContext.get_request()
 
@@ -233,7 +187,7 @@ class AuthenticationAndAuthorizationAdvice:
             if session is None:
                 # verify token
 
-                payload = self.verify_token(token)
+                payload = self.token_manager.decode_jwt(token)
 
                 # create session object
 
@@ -305,7 +259,8 @@ class JWTComponent(Component): # pylint: disable=abstract-method
 
 @implementation()
 class LoginServiceImpl(LoginService):
-    def __init__(self):
+    def __init__(self, token_manager: TokenManager):
+        self.token_manager = token_manager
         self.users = {
             "hugo": {
                 "username": "hugo",
@@ -322,7 +277,7 @@ class LoginServiceImpl(LoginService):
     def login(self, user: str, password: str) -> Optional[str]:
         profile = self.users.get(user, None)
         if profile is not None and profile.get("password") == password:
-            return token_manager.create_jwt(user, profile.get("roles"))
+            return self.token_manager.create_jwt(user, profile.get("roles"))
 
         return None
 

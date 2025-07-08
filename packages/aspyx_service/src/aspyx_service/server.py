@@ -228,7 +228,7 @@ class FastAPIServer(Server):
                 media_type="text/plain"
             )
 
-        request = data#Request(**data)
+        request = data
 
         if content == "json":
             return await self.dispatch(http_request, request)

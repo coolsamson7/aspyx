@@ -3,7 +3,11 @@ Common test stuff
 """
 import logging
 import time
+from datetime import datetime, timedelta
 
+import jwt
+from fastapi import HTTPException
+from jwt import ExpiredSignatureError, InvalidTokenError
 from abc import abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
@@ -53,6 +57,49 @@ class PydanticAndData(BaseModel):
 @dataclass
 class DataAndPydantic:
     d: Data
+
+# jwt
+
+
+SECRET_KEY = "your-secret-key"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+class TokenManager:
+    # constructor
+
+    def __init__(self, secret: str, algorithm: str):
+        self.secret = secret
+        self.algorithm = algorithm
+
+    # methods
+
+    def create_jwt(self, user_id: str, roles: list[str]) -> str:
+        payload = {
+            "sub": user_id,
+            "exp": datetime.utcnow() + timedelta(hours=1),
+            "iat": datetime.utcnow(),
+            "roles": roles
+        }
+        token = jwt.encode(payload, self.secret, algorithm=self.algorithm)
+
+        return token
+
+    def decode_jwt(self, token: str) -> dict:
+        try:
+            return jwt.decode(token, self.secret, algorithms=[self.algorithm])
+        except ExpiredSignatureError:
+            raise HTTPException(status_code=401,
+                                detail="Token has expired",
+                                headers={"WWW-Authenticate": 'Bearer error="invalid_token", error_description="The token has expired"'}
+                                )
+        except InvalidTokenError:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid token",
+                headers={"WWW-Authenticate": 'Bearer error="invalid_token", error_description="The token is invalid"'}
+            )
+
 
 # service
 
@@ -282,6 +329,10 @@ class Foo:
 class Module:
     def __init__(self):
         pass
+
+    @create()
+    def create_token_manager(self) -> TokenManager:
+        return TokenManager(SECRET_KEY, ALGORITHM)
 
     @create()
     def create_yaml_source(self) -> YamlConfigurationSource:
