@@ -401,6 +401,22 @@ class RemoteServiceException(ServiceException):
     base class for service exceptions occurring on the server side
     """
 
+
+class AuthorizationException(ServiceException):
+    pass
+
+class TokenException(AuthorizationException):
+    pass
+
+class InvalidTokenException(TokenException):
+    pass
+
+class MissingTokenException(TokenException):
+    pass
+
+class TokenExpiredException(TokenException):
+    pass
+
 class Channel(DynamicProxy.InvocationHandler, ABC):
     """
     A channel is a dynamic proxy invocation handler and transparently takes care of remoting.

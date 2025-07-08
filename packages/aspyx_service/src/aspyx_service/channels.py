@@ -15,7 +15,8 @@ from pydantic import BaseModel
 from aspyx.di.configuration import inject_value
 from aspyx.reflection import DynamicProxy, TypeDescriptor
 from aspyx.threading import ThreadLocal
-from .service import ServiceManager, ServiceCommunicationException
+from .service import ServiceManager, ServiceCommunicationException, TokenExpiredException, InvalidTokenException, \
+    AuthorizationException, MissingTokenException
 
 from .service import ComponentDescriptor, ChannelInstances, ServiceException, channel, Channel, RemoteServiceException
 from .serialization import get_deserializer, TypeDeserializer, TypeSerializer, get_serializer
@@ -35,7 +36,7 @@ class HTTPXChannel(Channel):
 
     @classmethod
     def remember_token(cls, service: Any, token: str):
-        if isinstance(service.invocation_handler, HTTPXChannel):
+        if isinstance(service.invocation_handler, HTTPXChannel): # TODO refresh
             channel: HTTPXChannel = service.invocation_handler
 
             channel.token = token
@@ -84,6 +85,7 @@ class HTTPXChannel(Channel):
         super().__init__()
 
         self.token = None
+        self.refresh_token = None
         self.timeout = 1000.0
         self.service_names: dict[Type, str] = {}
         self.serializers: dict[Callable, list[Callable]] = {}
@@ -177,9 +179,30 @@ class HTTPXChannel(Channel):
 
             headers["Authorization"] = f"Bearer {self.token}"
 
-        return self.get_client().request(http_method, url, params=params, json=json, headers=headers, timeout=timeout, content=content)
+        try:
+            response = self.get_client().request(http_method, url, params=params, json=json, headers=headers, timeout=timeout, content=content)
+            response.raise_for_status()
+        except httpx.RequestError as e:
+            raise ServiceCommunicationException(str(e)) from e
 
-    async def request_async (self, http_method: str, url: str, json: Optional[typing.Any] = None,
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 401:
+                www_auth = e.response.headers.get("www-authenticate", "")
+                if "invalid_token" in www_auth:
+                    if 'expired' in www_auth:
+                        raise TokenExpiredException() from e
+                    elif 'missing' in www_auth:
+                        raise MissingTokenException() from e
+                    else:
+                        raise InvalidTokenException() from e
+
+            raise AuthorizationException(str(e)) from e
+        except httpx.HTTPError as e:
+            raise RemoteServiceException(str(e)) from e
+
+        return response
+
+    async def request_async(self, http_method: str, url: str, json: Optional[typing.Any] = None,
                 params: Optional[Any] = None, headers: Optional[Any] = None,
                 timeout: Any = USE_CLIENT_DEFAULT, content: Optional[Any] = None) -> httpx.Response:
 
@@ -191,7 +214,29 @@ class HTTPXChannel(Channel):
 
             headers["Authorization"] = f"Bearer {self.token}"
 
-        return await self.get_async_client().request(http_method, url, params=params, json=json, headers=headers, timeout=timeout, content=content)
+        try:
+            response = await self.get_async_client().request(http_method, url, params=params, json=json, headers=headers,
+                                                 timeout=timeout, content=content)
+            response.raise_for_status()
+        except httpx.RequestError as e:
+            raise ServiceCommunicationException(str(e)) from e
+
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 401:
+                www_auth = e.response.headers.get("www-authenticate", "")
+                if "invalid_token" in www_auth:
+                    if 'expired' in www_auth:
+                        raise TokenExpiredException() from e
+                    elif 'missing' in www_auth:
+                        raise MissingTokenException() from e
+                    else:
+                        raise InvalidTokenException() from e
+
+            raise RemoteServiceException(str(e)) from e
+        except httpx.HTTPError as e:
+            raise RemoteServiceException(str(e)) from e
+
+        return response
 
 class Request(BaseModel):
     method: str  # component:service:method
@@ -244,10 +289,7 @@ class DispatchJSONChannel(HTTPXChannel):
                 raise RemoteServiceException(f"server side exception {result['exception']}")
 
             return self.get_deserializer(invocation.type, invocation.method)(result["result"])
-        except ServiceCommunicationException:
-            raise
-
-        except RemoteServiceException:
+        except (ServiceCommunicationException, AuthorizationException, RemoteServiceException) as e:
             raise
 
         except Exception as e:
@@ -274,10 +316,7 @@ class DispatchJSONChannel(HTTPXChannel):
 
             return self.get_deserializer(invocation.type, invocation.method)(result["result"])
 
-        except ServiceCommunicationException:
-            raise
-
-        except RemoteServiceException:
+        except (ServiceCommunicationException, AuthorizationException, RemoteServiceException) as e:
             raise
 
         except Exception as e:
@@ -329,6 +368,25 @@ class DispatchMSPackChannel(HTTPXChannel):
 
             return self.get_deserializer(invocation.type, invocation.method)(result["result"])
 
+
+        except httpx.RequestError as e:
+            raise ServiceCommunicationException(str(e)) from e
+
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 401:
+                www_auth = e.response.headers.get("www-authenticate", "")
+                if "invalid_token" in www_auth:
+                    if 'expired' in www_auth:
+                        raise TokenExpiredException() from e
+                    elif 'missing' in www_auth:
+                        raise MissingTokenException() from e
+                    else:
+                        raise InvalidTokenException() from e
+
+            raise RemoteServiceException(str(e)) from e
+        except httpx.HTTPError as e:
+            raise RemoteServiceException(str(e)) from e
+
         except ServiceCommunicationException:
             raise
 
@@ -365,6 +423,25 @@ class DispatchMSPackChannel(HTTPXChannel):
                 raise RemoteServiceException(f"server-side: {result['exception']}")
 
             return self.get_deserializer(invocation.type, invocation.method)(result["result"])
+
+        except httpx.RequestError as e:
+            raise ServiceCommunicationException(str(e)) from e
+
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 401:
+                www_auth = e.response.headers.get("www-authenticate", "")
+                if "invalid_token" in www_auth:
+                    if 'expired' in www_auth:
+                        raise TokenExpiredException() from e
+                    elif 'missing' in www_auth:
+                        raise MissingTokenException() from e
+                    else:
+                        raise InvalidTokenException() from e
+
+            raise RemoteServiceException(str(e)) from e
+
+        except httpx.HTTPError as e:
+            raise RemoteServiceException(str(e)) from e
 
         except ServiceCommunicationException:
             raise

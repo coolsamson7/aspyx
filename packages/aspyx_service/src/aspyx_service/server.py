@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 import msgpack
 import uvicorn
 
-from fastapi import FastAPI, APIRouter, Request as HttpRequest, Response as HttpResponse
+from fastapi import FastAPI, APIRouter, Request as HttpRequest, Response as HttpResponse, HTTPException
 import contextvars
 
 from aspyx.di import Environment, injectable, on_init, inject_environment
@@ -262,6 +262,10 @@ class FastAPIServer(Server):
                 result = method(*args)
 
             return Response(result=result, exception=None).model_dump()
+
+        except HTTPException as e:
+            raise
+
         except Exception as e:
             return Response(result=None, exception=str(e)).model_dump()
 

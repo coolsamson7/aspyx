@@ -4,7 +4,7 @@ This module provides the core Aspyx service management framework allowing for se
 
 from aspyx.di import module
 
-from .service import component_services, ServiceException, Server, Channel, ComponentDescriptor, inject_service, ChannelAddress, ChannelInstances, ServiceManager, Component, Service, AbstractComponent, ComponentStatus, ComponentRegistry, implementation, health, component, service
+from .service import AuthorizationException, MissingTokenException, RemoteServiceException, ServiceCommunicationException, TokenException, TokenExpiredException, InvalidTokenException, component_services, ServiceException, Server, Channel, ComponentDescriptor, inject_service, ChannelAddress, ChannelInstances, ServiceManager, Component, Service, AbstractComponent, ComponentStatus, ComponentRegistry, implementation, health, component, service
 from .channels import HTTPXChannel, DispatchJSONChannel
 from .registries import ConsulComponentRegistry
 from .server import FastAPIServer, RequestContext
@@ -41,6 +41,13 @@ __all__ = [
     "implementation",
     "inject_service",
     "component_services",
+    "RemoteServiceException",
+    "ServiceCommunicationException",
+    "TokenException",
+    "TokenExpiredException",
+    "InvalidTokenException",
+    "MissingTokenException",
+    "AuthorizationException",
 
     # authorization
 
