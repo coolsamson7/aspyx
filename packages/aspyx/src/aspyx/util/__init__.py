@@ -2,9 +2,9 @@
 This module provides utility functions.
 """
 from .stringbuilder import StringBuilder
-from .logger import ConfigureLogger
+from .logger import Logger
 
 __all__ = [
     "StringBuilder",
-    "ConfigureLogger"
+    "Logger"
 ]

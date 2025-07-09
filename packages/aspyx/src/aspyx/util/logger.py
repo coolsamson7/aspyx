@@ -1,11 +1,11 @@
 import logging
 from typing import Optional, Dict
 
-class ConfigureLogger:
+class Logger:
     """just syntactic sugar"""
-    # constructor
 
-    def __init__(self,
+    @classmethod
+    def configure(cls,
                  default_level: int = logging.INFO,
                  format: str = "[%(asctime)s] %(levelname)s in %(filename)s:%(lineno)d - %(message)s",
                  levels: Optional[Dict[str, int]] = None):
