@@ -15,7 +15,7 @@ from pydantic import BaseModel
 
 from aspyx.di.configuration import inject_value
 from aspyx.reflection import DynamicProxy, TypeDescriptor
-from aspyx.threading import ThreadLocal, ContextLocal
+from aspyx.threading import ThreadLocal#, ContextLocal
 from .service import ServiceManager, ServiceCommunicationException, TokenExpiredException, InvalidTokenException, \
     AuthorizationException, MissingTokenException
 
@@ -23,8 +23,11 @@ from .service import ComponentDescriptor, ChannelInstances, ServiceException, ch
 from .serialization import get_deserializer, TypeDeserializer, TypeSerializer, get_serializer
 
 class TokenContext:
-    access_token = ContextLocal[str]("access_token", default=None)
-    refresh_token = ContextLocal[str]("refresh_token", default=None)
+    """
+    TokeContext covers two context locals for both the access and - optional - refresh topen
+    """
+    access_token = ThreadLocal[str]("access_token")#, default=None)#ContextLocal
+    refresh_token = ThreadLocal[str]("refresh_token")#, default=None)
 
     @classmethod
     def get_access_token(cls) -> Optional[str]:
@@ -54,8 +57,9 @@ class TokenContext:
         try:
             yield
         finally:
-            cls.access_token.reset(access_token)
-            cls.refresh_token.reset(refresh_token)
+            pass
+            #cls.access_token.reset(access_token) #TODO
+            #cls.refresh_token.reset(refresh_token)
 
 class HTTPXChannel(Channel):
     __slots__ = [

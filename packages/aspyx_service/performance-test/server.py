@@ -6,11 +6,11 @@ from typing import Optional
 
 from consul import Consul
 
-from aspyx.di import injectable, on_running, module, create
+from aspyx.di import on_running, module, create
 from aspyx.di.aop import Invocation, advice, error
 from aspyx.exception import handle, ExceptionManager
 from aspyx_service import HealthCheckManager, ServiceModule, ConsulComponentRegistry
-from aspyx_service.service import inject_service, ChannelAddress, Server, \
+from aspyx_service.service import ChannelAddress, Server, \
     component_services, AbstractComponent, implementation, health, ComponentRegistry
 
 from client import ClientModule, TestService, TestAsyncService, Data, Pydantic, TestRestService, TestAsyncRestService, TestComponent
