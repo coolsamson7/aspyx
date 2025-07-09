@@ -26,8 +26,8 @@ class TokenContext:
     """
     TokeContext covers two context locals for both the access and - optional - refresh topen
     """
-    access_token = ThreadLocal[str]("access_token")#, default=None)#ContextLocal
-    refresh_token = ThreadLocal[str]("refresh_token")#, default=None)
+    access_token = ThreadLocal[str]()#"access_token")#, default=None)#ContextLocal
+    refresh_token = ThreadLocal[str]()#("refresh_token")#, default=None)
 
     @classmethod
     def get_access_token(cls) -> Optional[str]:
