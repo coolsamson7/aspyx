@@ -2,14 +2,14 @@
 
 [project]
 name = "aspyx_service"
-version = "0.10.4"
+version = "0.10.5"
 description = "Aspyx Service framework"
 authors = [{ name = "Andreas Ernst", email = "andreas.ernst7@gmail.com" }]
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.9"
 dependencies = [
-    "aspyx>=1.5.2",
+    "aspyx>=1.5.3",
     "python-consul2~=0.1.5",
     "fastapi~=0.115.13",
     "httpx~=0.28.1",

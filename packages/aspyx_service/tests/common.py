@@ -3,7 +3,7 @@ Common test stuff
 """
 import logging
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import jwt
 from fastapi import HTTPException
@@ -11,25 +11,25 @@ from jwt import ExpiredSignatureError, InvalidTokenError
 from abc import abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 
 import pytest
 from pydantic import BaseModel
 
 from aspyx.di.aop import advice, error, Invocation
 from aspyx.exception import ExceptionManager, handle
-from aspyx.util import ConfigureLogger
+from aspyx.util import Logger
 from aspyx_service import service, Service, component, Component, \
     implementation, health, AbstractComponent, ChannelAddress, inject_service, \
     FastAPIServer, Server, ServiceModule, ServiceManager, \
     HealthCheckManager, get, post, rest, put, delete, Body
-from aspyx_service.service import LocalComponentRegistry, component_services
+from aspyx_service.service import LocalComponentRegistry, component_services, AuthorizationException
 from aspyx.di import module, create, injectable, on_running
 from aspyx.di.configuration import YamlConfigurationSource
 
 # configure logging
 
-ConfigureLogger(default_level=logging.DEBUG, levels={
+Logger.configure(default_level=logging.DEBUG, levels={
     "httpx": logging.ERROR,
     "aspyx.di": logging.INFO,
     "aspyx.di.aop": logging.ERROR,
@@ -68,24 +68,60 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 class TokenManager:
     # constructor
 
-    def __init__(self, secret: str, algorithm: str):
+    def __init__(self, secret: str, algorithm: str, access_token_expiry_minutes: int = 15, refresh_token_expiry_minutes: int = 60 * 24):
         self.secret = secret
         self.algorithm = algorithm
+        self.access_token_expiry_minutes = access_token_expiry_minutes
+        self.refresh_token_expiry_minutes = refresh_token_expiry_minutes
 
     # methods
 
-    def create_jwt(self, user_id: str, roles: list[str]) -> str:
+    def create_jwt(self, subject: str, roles: list[str]) -> str:
+        return self.create_access_token(subject, roles)
+
+    def create_access_token(self, subject: str, roles: list[str]) -> str:
+        now = datetime.now(tz=timezone.utc)
+        expiry = now + timedelta(minutes=self.access_token_expiry_minutes)
+
         payload = {
-            "sub": user_id,
-            "exp": datetime.utcnow() + timedelta(hours=1),
-            "iat": datetime.utcnow(),
-            "roles": roles
+            "sub": subject,
+            "roles": roles,
+            "exp": int(expiry.timestamp()),
+            "iat": int(now.timestamp()),
+            "type": "access"
         }
-        token = jwt.encode(payload, self.secret, algorithm=self.algorithm)
 
-        return token
+        return jwt.encode(payload, self.secret, algorithm=self.algorithm)
 
-    def decode_jwt(self, token: str) -> dict:
+    def create_refresh_token(self, subject: str, roles: list[str]) -> str:
+        now = datetime.now(tz=timezone.utc)
+        expiry = now + timedelta(minutes=self.refresh_token_expiry_minutes)
+
+        payload = {
+            "sub": subject,
+            "roles": roles,
+            "exp": int(expiry.timestamp()),
+            "iat": int(now.timestamp()),
+            "type": "refresh"
+        }
+
+        return jwt.encode(payload, self.secret, algorithm=self.algorithm)
+
+    def refresh_access_token(self, refresh_token: str) -> str:
+        payload = self.decode_jwt(refresh_token)
+
+        if payload.get("type") != "refresh":
+            raise AuthorizationException("Expected a refresh token")
+
+        subject = payload.get("sub")
+        if not subject:
+            raise AuthorizationException("Missing subject in refresh token")
+
+        roles = payload.get("roles")
+
+        return self.create_access_token(subject, roles)
+
+    def decode_jwt(self, token: str) -> dict[str, Any]:
         try:
             return jwt.decode(token, self.secret, algorithms=[self.algorithm])
         except ExpiredSignatureError:
@@ -332,7 +368,7 @@ class Module:
 
     @create()
     def create_token_manager(self) -> TokenManager:
-        return TokenManager(SECRET_KEY, ALGORITHM)
+        return TokenManager(SECRET_KEY, ALGORITHM, access_token_expiry_minutes = 15, refresh_token_expiry_minutes = 60 * 24)
 
     @create()
     def create_yaml_source(self) -> YamlConfigurationSource:

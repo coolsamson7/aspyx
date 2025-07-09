@@ -12,12 +12,12 @@ from consul import Consul
 
 from aspyx.di import module, Environment, create
 from aspyx.di.aop import advice, around, methods, Invocation
-from aspyx.util import ConfigureLogger
+from aspyx.util import Logger
 
 from aspyx_service import ConsulComponentRegistry
 from aspyx_service.service import ServiceManager, ComponentRegistry, Channel
 
-ConfigureLogger(default_level=logging.DEBUG, levels={
+Logger.configure(default_level=logging.DEBUG, levels={
     "httpx": logging.ERROR,
     "aspyx.di": logging.ERROR,
     "aspyx.di.aop": logging.ERROR,

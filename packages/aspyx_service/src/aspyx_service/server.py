@@ -13,6 +13,8 @@ import uvicorn
 from fastapi import FastAPI, APIRouter, Request as HttpRequest, Response as HttpResponse, HTTPException
 import contextvars
 
+from starlette.middleware.base import BaseHTTPMiddleware
+
 from aspyx.di import Environment, injectable, on_init, inject_environment
 from aspyx.reflection import TypeDescriptor, Decorators
 
@@ -22,7 +24,7 @@ from .healthcheck import HealthCheckManager
 from .serialization import get_deserializer
 
 from .service import Server, ServiceManager
-from .channels import Request, Response
+from .channels import Request, Response, TokenContext
 
 from .restchannel import get, post, put, delete, rest
 
@@ -59,10 +61,24 @@ class RequestContext:
         finally:
             self.request_var.reset(token)
 
+class TokenMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        access_token = request.cookies.get("access_token") or request.headers.get("Authorization")
+        #refresh_token = request.cookies.get("refresh_token")
+
+        if access_token:
+            TokenContext.set(access_token)#, refresh_token)
+
+        try:
+            return await call_next(request)
+        finally:
+            TokenContext.clear()
+
 def create_server() -> FastAPI:
     server = FastAPI()
 
     server.add_middleware(RequestContext)
+    server.add_middleware(TokenMiddleware)
 
     return server
 
@@ -150,11 +166,8 @@ class FastAPIServer(Server):
 
     def add_routes(self):
         """
-        add everything that looks like a http endpoint
+        add everything that looks like an http endpoint
         """
-
-        # go
-
         for descriptor in self.service_manager.descriptors.values():
             if not descriptor.is_component() and descriptor.is_local():
                 prefix = ""
@@ -189,7 +202,6 @@ class FastAPIServer(Server):
         thread.start()
 
         return thread
-
 
     def get_deserializers(self, service: Type, method):
         deserializers = self.deserializers.get(method, None)

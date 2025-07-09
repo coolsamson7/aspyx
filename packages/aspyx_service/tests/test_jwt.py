@@ -5,20 +5,20 @@ import faulthandler
 import time
 
 from aspyx.di.configuration import inject_value
-from aspyx.util import ConfigureLogger
+from aspyx.util import Logger
 
 faulthandler.enable()
 
-from typing import Optional, Dict, Callable
+from typing import Optional
 
 import logging
 from abc import abstractmethod
 
 from fastapi import Request as HttpRequest, HTTPException
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 
-ConfigureLogger(default_level=logging.DEBUG, levels={
+Logger.configure(default_level=logging.DEBUG, levels={
     "httpx": logging.ERROR,
     "aspyx.di": logging.ERROR,
     "aspyx.di.aop": logging.ERROR,
@@ -28,7 +28,7 @@ ConfigureLogger(default_level=logging.DEBUG, levels={
 from aspyx_service import Service, service, component, implementation, AbstractComponent, \
     Component, ChannelAddress, Server, health, RequestContext, HTTPXChannel, \
     AbstractAuthorizationFactory, AuthorizationManager, SessionManager, AuthorizationException, Session, \
-    ServiceCommunicationException, TokenExpiredException, ServiceManager
+    ServiceCommunicationException, TokenExpiredException, ServiceManager, TokenContext
 
 from aspyx.reflection import Decorators, TypeDescriptor
 
@@ -37,7 +37,6 @@ from aspyx.di.aop import advice, around, Invocation, methods, classes
 
 
 from .common import service_manager, TokenManager
-
 
 # decorator
 
@@ -165,9 +164,10 @@ class TokenAuthorizationFactory(AbstractAuthorizationFactory):
 class RetryAdvice:
     # constructor
 
-    def __init__(self):
+    def __init__(self, token_manager: TokenManager):
         self.max_attempts = 3
         self.backoff_base = 0.2
+        self.token_manager = token_manager
 
     # inject
 
@@ -181,6 +181,14 @@ class RetryAdvice:
 
     # sending side
 
+    def refresh_token_if_possible(self):
+        refresh_token = TokenContext.get_refresh_token()
+        if not refresh_token:
+            raise TokenExpiredException("No refresh token available")
+
+        new_access_token = self.token_manager.refresh_access_token(refresh_token)
+        TokenContext.set(new_access_token, refresh_token)
+
     @around(methods().of_type(HTTPXChannel).named("request"))
     def retry_request(self, invocation: Invocation):
         for attempt in range(1, self.max_attempts + 1):
@@ -191,7 +199,9 @@ class RetryAdvice:
                 raise
 
             except TokenExpiredException as e:
-                raise# TODO
+                if attempt == self.max_attempts:
+                    raise
+                self.refresh_token_if_possible()
 
             except ServiceCommunicationException:
                 ServiceManager.logger.warning(f"Request failed ({invocation.func.__name__}), attempt {attempt}/{self.max_attempts}")
@@ -212,7 +222,10 @@ class RetryAdvice:
                 return await invocation.proceed_async()
 
             except TokenExpiredException as e:
-                raise  # TODO
+                if attempt == self.max_attempts:
+                    raise
+
+                self.refresh_token_if_possible()
 
             except ServiceCommunicationException:
                 ServiceManager.logger.warning(f"Request failed ({invocation.func.__name__}), attempt {attempt}/{self.max_attempts}")
@@ -271,7 +284,7 @@ class AuthorizationAdvice:
 @service(description="login service")
 class LoginService(Service):
     @abstractmethod
-    def login(self, user: str, password: str) -> Optional[str]:
+    def login(self, user: str, password: str) -> Optional[dict]:
         pass
 
     @abstractmethod
@@ -310,10 +323,16 @@ class LoginServiceImpl(LoginService):
             }
         }
 
-    def login(self, user: str, password: str) -> Optional[str]:
+    def login(self, user: str, password: str) -> Optional[dict]:
         profile = self.users.get(user, None)
         if profile is not None and profile.get("password") == password:
-            return self.token_manager.create_jwt(user, profile.get("roles"))
+            access_token = self.token_manager.create_access_token(user, profile.get("roles"))
+            refresh_token = self.token_manager.create_refresh_token(user, profile.get("roles"))
+
+            return {
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+            }
 
         return None
 
@@ -361,25 +380,24 @@ class TestLocalService():
         except Exception as e:
             print(e)
 
-        token = login_service.login("hugo", "secret")
+        tokens = login_service.login("hugo", "secret")
 
-        HTTPXChannel.remember_token(login_service, token)
+        with TokenContext.use(tokens["access_token"], tokens["refresh_token"]):
+            secure_service.secured()
 
-        secure_service.secured()
+            try:
+                secure_service.secured_admin()
+            except Exception as e:
+                print(e)
 
-        try:
+            login_service.logout()
+
+            TokenContext.clear()
+
+            # now andi
+
+            tokens = login_service.login("andi", "secret")
+
+            TokenContext.set(tokens["access_token"], tokens["refresh_token"])
+
             secure_service.secured_admin()
-        except Exception as e:
-            print(e)
-
-        login_service.logout()
-
-        HTTPXChannel.clear_token(login_service, token)
-
-        # now andi
-
-        token = login_service.login("andi", "secret")
-
-        HTTPXChannel.remember_token(login_service, token)
-
-        secure_service.secured_admin()

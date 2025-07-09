@@ -4,6 +4,7 @@ Service management and dependency injection framework.
 from __future__ import annotations
 
 import typing
+from contextlib import contextmanager
 from dataclasses import is_dataclass, fields
 from typing import Type, Optional, Any, Callable
 
@@ -14,13 +15,47 @@ from pydantic import BaseModel
 
 from aspyx.di.configuration import inject_value
 from aspyx.reflection import DynamicProxy, TypeDescriptor
-from aspyx.threading import ThreadLocal
+from aspyx.threading import ThreadLocal, ContextLocal
 from .service import ServiceManager, ServiceCommunicationException, TokenExpiredException, InvalidTokenException, \
     AuthorizationException, MissingTokenException
 
 from .service import ComponentDescriptor, ChannelInstances, ServiceException, channel, Channel, RemoteServiceException
 from .serialization import get_deserializer, TypeDeserializer, TypeSerializer, get_serializer
 
+class TokenContext:
+    access_token = ContextLocal[str]("access_token", default=None)
+    refresh_token = ContextLocal[str]("refresh_token", default=None)
+
+    @classmethod
+    def get_access_token(cls) -> Optional[str]:
+        return cls.access_token.get()
+
+    @classmethod
+    def get_refresh_token(cls) -> Optional[str]:
+        return cls.refresh_token.get()
+
+
+    @classmethod
+    def set(cls, access_token: str, refresh_token: Optional[str] = None):
+        cls.access_token.set(access_token)
+        if refresh_token:
+            cls.refresh_token.set(refresh_token)
+
+    @classmethod
+    def clear(cls):
+        cls.access_token.set(None)
+        cls.refresh_token.set(None)
+
+    @classmethod
+    @contextmanager
+    def use(cls, access_token: str, refresh_token: Optional[str] = None):
+        access_token = cls.access_token.set(access_token)
+        refresh_token = cls.refresh_token.set(refresh_token)
+        try:
+            yield
+        finally:
+            cls.access_token.reset(access_token)
+            cls.refresh_token.reset(refresh_token)
 
 class HTTPXChannel(Channel):
     __slots__ = [
@@ -31,26 +66,6 @@ class HTTPXChannel(Channel):
         "timeout",
         "optimize_serialization"
     ]
-
-    # class methods
-
-    @classmethod
-    def remember_token(cls, service: Any, token: str):
-        if isinstance(service.invocation_handler, HTTPXChannel): # TODO refresh
-            channel: HTTPXChannel = service.invocation_handler
-
-            channel.token = token
-        else:
-            raise ServiceException("service channel {service.invocation_handler} is not a HTTPXChannel")
-
-    @classmethod
-    def clear_token(cls, service: Any, token: str):
-        if isinstance(service.invocation_handler, HTTPXChannel):
-            channel: HTTPXChannel = service.invocation_handler
-
-            channel.token = token
-        else:
-            raise ServiceException("service channel {service.invocation_handler} is not a HTTPXChannel")
 
     # class properties
 
@@ -84,8 +99,6 @@ class HTTPXChannel(Channel):
     def __init__(self):
         super().__init__()
 
-        self.token = None
-        self.refresh_token = None
         self.timeout = 1000.0
         self.service_names: dict[Type, str] = {}
         self.serializers: dict[Callable, list[Callable]] = {}
@@ -171,13 +184,14 @@ class HTTPXChannel(Channel):
                 params: Optional[Any] = None, headers: Optional[Any] = None,
                 timeout: Any = USE_CLIENT_DEFAULT, content: Optional[Any] = None) -> httpx.Response:
 
-        if self.token is not None:
+        token = TokenContext.get_access_token()
+        if token is not None:
             if headers is None:  # None is also valid!
                 headers = {}
 
             ## add bearer token
 
-            headers["Authorization"] = f"Bearer {self.token}"
+            headers["Authorization"] = f"Bearer {token}"
 
         try:
             response = self.get_client().request(http_method, url, params=params, json=json, headers=headers, timeout=timeout, content=content)
@@ -206,13 +220,14 @@ class HTTPXChannel(Channel):
                 params: Optional[Any] = None, headers: Optional[Any] = None,
                 timeout: Any = USE_CLIENT_DEFAULT, content: Optional[Any] = None) -> httpx.Response:
 
-        if self.token is not None:
+        token = TokenContext.get_access_token()
+        if token is not None:
             if headers is None:  # None is also valid!
                 headers = {}
 
             ## add bearer token
 
-            headers["Authorization"] = f"Bearer {self.token}"
+            headers["Authorization"] = f"Bearer {token}"
 
         try:
             response = await self.get_async_client().request(http_method, url, params=params, json=json, headers=headers,
