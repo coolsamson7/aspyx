@@ -5,7 +5,7 @@ import faulthandler
 import time
 
 from aspyx.di.configuration import inject_value
-#from aspyx.util import Logger
+from aspyx.util import Logger
 
 faulthandler.enable()
 
@@ -18,12 +18,12 @@ from fastapi import Request as HttpRequest, HTTPException
 
 from datetime import datetime, timezone
 
-#Logger.configure(default_level=logging.DEBUG, levels={
-#    "httpx": logging.ERROR,
-#    "aspyx.di": logging.ERROR,
-#    "aspyx.di.aop": logging.ERROR,
-#    "aspyx.service": logging.ERROR
-#})
+Logger.configure(default_level=logging.DEBUG, levels={
+    "httpx": logging.ERROR,
+    "aspyx.di": logging.ERROR,
+    "aspyx.di.aop": logging.ERROR,
+    "aspyx.service": logging.ERROR
+})
 
 from aspyx_service import Service, service, component, implementation, AbstractComponent, \
     Component, ChannelAddress, Server, health, RequestContext, HTTPXChannel, \

@@ -12,17 +12,17 @@ from consul import Consul
 
 from aspyx.di import module, Environment, create
 from aspyx.di.aop import advice, around, methods, Invocation
-#from aspyx.util import Logger
+from aspyx.util import Logger
 
 from aspyx_service import ConsulComponentRegistry
 from aspyx_service.service import ServiceManager, ComponentRegistry, Channel
 
-#Logger.configure(default_level=logging.DEBUG, levels={
-#    "httpx": logging.ERROR,
-#    "aspyx.di": logging.ERROR,
-#    "aspyx.di.aop": logging.ERROR,
-#    "aspyx.service": logging.ERROR
-#})
+Logger.configure(default_level=logging.DEBUG, levels={
+    "httpx": logging.ERROR,
+    "aspyx.di": logging.ERROR,
+    "aspyx.di.aop": logging.ERROR,
+    "aspyx.service": logging.ERROR
+})
 
 from client import TestService, TestRestService, Pydantic, Data, TestAsyncRestService, TestAsyncService, ClientModule
 

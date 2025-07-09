@@ -1,16 +1,16 @@
 import logging
 import os
 
-#from aspyx.util import Logger
+from aspyx.util import Logger
 from aspyx_service import FastAPIServer
 from server import  ServerModule
 
-#Logger.configure(default_level=logging.DEBUG, levels={
-#    "httpx": logging.ERROR,
-#    "aspyx.di": logging.ERROR,
-#    "aspyx.di.aop": logging.ERROR,
-#    "aspyx.service": logging.ERROR
-#})
+Logger.configure(default_level=logging.DEBUG, levels={
+    "httpx": logging.ERROR,
+    "aspyx.di": logging.ERROR,
+    "aspyx.di.aop": logging.ERROR,
+    "aspyx.service": logging.ERROR
+})
 
 PORT = int(os.getenv("FAST_API_PORT", 8000))
 

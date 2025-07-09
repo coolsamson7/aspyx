@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from cachetools import TTLCache
 
 from aspyx.di import injectable
-#from aspyx.threading import ThreadLocal
+from aspyx.threading import ThreadLocal
 
 
 class Session:
