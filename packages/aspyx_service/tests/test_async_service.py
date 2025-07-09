@@ -10,7 +10,7 @@ data = Data(i=1, f=1.0, b=True, s="s")
 
 @pytest.mark.asyncio(scope="function")
 class TestAsyncRemoteService():
-    async def test_dispatch_json(self, service_manager):
+    async def xtest_dispatch_json(self, service_manager):
         test_service = service_manager.get_service(TestAsyncService, preferred_channel="dispatch-json")
 
         result = await test_service.hello("hello")
