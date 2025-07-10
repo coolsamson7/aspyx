@@ -19,11 +19,11 @@ from aspyx.util import Logger
 
 from aspyx_service.service import ServiceManager, ComponentRegistry, Channel
 
-Logger.configure(default_level=logging.DEBUG, levels={
-    "httpx": logging.ERROR,
-    "aspyx.di": logging.ERROR,
-    "aspyx.di.aop": logging.ERROR,
-    "aspyx.service": logging.ERROR
+Logger.configure(default_level=logging.INFO, levels={
+    "httpx": logging.CRITICAL,
+    "aspyx.di": logging.INFO,
+    "aspyx.di.aop": logging.INFO,
+    "aspyx.service": logging.INFO
 })
 
 from client import TestService, TestRestService, Pydantic, Data, TestAsyncRestService, TestAsyncService, ClientModule

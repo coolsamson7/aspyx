@@ -74,18 +74,15 @@ class TokenContextMiddleMiddleware(BaseHTTPMiddleware):
         finally:
             TokenContext.clear()
 
-@injectable()
 class FastAPIServer(Server):
     """
     A server utilizing fastapi framework.
     """
 
-    fast_api : Optional[FastAPI] = None
-
     # class methods
 
     @classmethod
-    def boot(cls, module: Type, fast_api: FastAPI, host="0.0.0.0", port=8000, start_thread = True) -> Environment:
+    def boot(cls, module: Type, host="0.0.0.0", port=8000, start_thread = True) -> Environment:
         """
         boot the DI infrastructure of the supplied module and optionally start a fastapi thread given the url
         Args:
@@ -97,7 +94,6 @@ class FastAPIServer(Server):
             the created environment
         """
 
-        cls.fast_api = fast_api
         cls.port = port
 
         environment = Environment(module)
@@ -111,7 +107,7 @@ class FastAPIServer(Server):
 
     # constructor
 
-    def __init__(self, service_manager: ServiceManager, component_registry: ComponentRegistry):
+    def __init__(self, fast_api: FastAPI, service_manager: ServiceManager, component_registry: ComponentRegistry):
         super().__init__()
 
         self.environment : Optional[Environment] = None
@@ -119,8 +115,7 @@ class FastAPIServer(Server):
         self.component_registry = component_registry
 
         self.host = "localhost"
-        self.port =  FastAPIServer.port
-        self.fast_api = FastAPIServer.fast_api
+        self.fast_api = fast_api
         self.server_thread = None
 
         self.router = APIRouter()
@@ -202,7 +197,7 @@ class FastAPIServer(Server):
         """
         self.host = host
 
-        config = uvicorn.Config(self.fast_api, host=self.host, port=self.port, access_log=False)
+        config = uvicorn.Config(self.fast_api, host=host, port=self.port, access_log=False)
 
         self.server = uvicorn.Server(config)
         self.thread = threading.Thread(target=self.server.run, daemon=True)

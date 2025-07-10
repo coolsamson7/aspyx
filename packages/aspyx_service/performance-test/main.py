@@ -23,9 +23,11 @@ PORT = int(os.getenv("FAST_API_PORT", "8000"))
 app = FastAPI()
 
 app.add_middleware(RequestContext)
-app.add_middleware(TokenContextMiddleMiddleware)
+#app.add_middleware(TokenContextMiddleMiddleware)
 
-FastAPIServer.boot(module=ServerModule, fast_api=app, host="0.0.0.0", port=PORT, start_thread= False)
+ServerModule.fastapi = app
+
+FastAPIServer.boot(ServerModule, host="0.0.0.0", port=PORT, start_thread= False)
 
 if __name__ == "__main__":
     import uvicorn

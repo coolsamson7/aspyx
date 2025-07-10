@@ -5,13 +5,14 @@ import os
 from typing import Optional
 
 from consul import Consul
+from fastapi import FastAPI
 
-from aspyx_service import HealthCheckManager, ServiceModule, ConsulComponentRegistry, SessionManager
+from aspyx_service import HealthCheckManager, ServiceModule, ConsulComponentRegistry, SessionManager, FastAPIServer
 
 from client import ClientModule, TestService, TestAsyncService, Data, Pydantic, TestRestService, TestAsyncRestService, TestComponent
 
 from aspyx_service.service import ChannelAddress, Server, \
-    component_services, AbstractComponent, implementation, health, ComponentRegistry
+    component_services, AbstractComponent, implementation, health, ComponentRegistry, ServiceManager
 from aspyx.di import on_running, module, create
 from aspyx.di.aop import Invocation, advice, error
 from aspyx.exception import handle, ExceptionManager
@@ -145,12 +146,18 @@ class TestComponentImpl(AbstractComponent, TestComponent):
 
 @module(imports=[ClientModule, ServiceModule])
 class ServerModule:
+    fastapi: Optional[FastAPI] = None
+
     def __init__(self):
         pass
 
     #@create()
     #def create_yaml_source(self) -> YamlConfigurationSource:
     #    return YamlConfigurationSource(f"{Path(__file__).parent}/config.yaml")
+
+    @create()
+    def create_server(self, service_manager: ServiceManager, component_registry: ComponentRegistry) -> FastAPIServer:
+        return FastAPIServer(self.fastapi, service_manager, component_registry)
 
     @create()
     def create_session_storage(self) -> SessionManager.Storage:

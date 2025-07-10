@@ -364,14 +364,19 @@ class Foo:
 
 # module
 
+fastapi = FastAPI()
+
+fastapi.add_middleware(RequestContext)
+fastapi.add_middleware(TokenContextMiddleMiddleware)
+
 @module(imports=[ServiceModule])
 class Module:
     def __init__(self):
         pass
 
-    #@create()
-    #def create_server(self,  service_manager: ServiceManager, component_registry: ComponentRegistry) -> FastAPIServer:
-    #    return FastAPIServer(service_manager, component_registry)
+    @create()
+    def create_server(self,  service_manager: ServiceManager, component_registry: ComponentRegistry) -> FastAPIServer:
+        return FastAPIServer(fastapi, service_manager, component_registry)
 
     @create()
     def create_session_storage(self) -> SessionManager.Storage:
@@ -391,13 +396,8 @@ class Module:
 
 # main
 
-fastapi = FastAPI()
-
-fastapi.add_middleware(RequestContext)
-fastapi.add_middleware(TokenContextMiddleMiddleware)
-
 def start_environment() -> Environment:
-    environment = FastAPIServer.boot(Module, fastapi, host="0.0.0.0", port=8000)
+    environment = FastAPIServer.boot(Module, host="0.0.0.0", port=8000)
 
     service_manager = environment.get(ServiceManager)
     descriptor = service_manager.get_descriptor(TestComponent).get_component_descriptor()
