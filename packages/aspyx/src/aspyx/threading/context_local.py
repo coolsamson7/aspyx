@@ -30,12 +30,18 @@ class ContextLocal(Generic[T]):
 
         Args:
             value: the value
+
+        Returns:
+            a token that can be used as an argument to `reset`
         """
         return self.var.set(value)
 
     def reset(self, token) -> None:
         """
         clear the value in the current thread
+
+        Args:
+            token: the token to clear
         """
         self.var.reset(token)
 

@@ -15,7 +15,7 @@ import contextvars
 
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from aspyx.di import Environment, injectable, on_init, inject_environment
+from aspyx.di import Environment, injectable, on_init, inject_environment, on_destroy
 from aspyx.reflection import TypeDescriptor, Decorators
 
 from .service import ComponentRegistry
@@ -61,7 +61,7 @@ class RequestContext:
         finally:
             self.request_var.reset(token)
 
-class TokenMiddleware(BaseHTTPMiddleware):
+class TokenContextMiddleMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         access_token = request.cookies.get("access_token") or request.headers.get("Authorization")
         #refresh_token = request.cookies.get("refresh_token")
@@ -74,26 +74,18 @@ class TokenMiddleware(BaseHTTPMiddleware):
         finally:
             TokenContext.clear()
 
-def create_server() -> FastAPI:
-    server = FastAPI()
-
-    server.add_middleware(RequestContext)
-    server.add_middleware(TokenMiddleware)
-
-    return server
-
 @injectable()
 class FastAPIServer(Server):
     """
     A server utilizing fastapi framework.
     """
 
-    fast_api = create_server()
+    fast_api : Optional[FastAPI] = None
 
     # class methods
 
     @classmethod
-    def boot(cls, module: Type, host="0.0.0.0", port=8000, start = True) -> 'FastAPIServer':
+    def boot(cls, module: Type, fast_api: FastAPI, host="0.0.0.0", port=8000, start_thread = True) -> Environment:
         """
         boot the DI infrastructure of the supplied module and optionally start a fastapi thread given the url
         Args:
@@ -102,32 +94,41 @@ class FastAPIServer(Server):
             port: the port
 
         Returns:
-            thr created server
+            the created environment
         """
+
+        cls.fast_api = fast_api
         cls.port = port
 
         environment = Environment(module)
 
         server = environment.get(FastAPIServer)
 
-        if start:
-            server.start_fastapi(host)
+        if start_thread:
+            server.start_server(host)
 
-        return server
+        return environment
 
     # constructor
 
     def __init__(self, service_manager: ServiceManager, component_registry: ComponentRegistry):
         super().__init__()
 
+        print("### START_SERVER")
+
         self.environment : Optional[Environment] = None
         self.service_manager = service_manager
         self.component_registry = component_registry
 
         self.host = "localhost"
+        self.port =  FastAPIServer.port
+        self.fast_api = FastAPIServer.fast_api
         self.server_thread = None
 
         self.router = APIRouter()
+
+        self.server : Optional[uvicorn.Server] = None
+        self.thread : Optional[threading.Thread] = None
 
         # cache
 
@@ -142,6 +143,8 @@ class FastAPIServer(Server):
     @inject_environment()
     def set_environment(self, environment: Environment):
         self.environment = environment
+
+    # lifecycle
 
     @on_init()
     def on_init(self):
@@ -161,6 +164,14 @@ class FastAPIServer(Server):
             self.service_manager.shutdown()
 
         atexit.register(cleanup)
+
+    @on_destroy()
+    def on_destroy(self):
+        if self.server is not None:
+            print("### STOP_SERVER")
+
+            self.server.should_exit = True
+            self.thread.join()
 
     # private
 
@@ -189,19 +200,17 @@ class FastAPIServer(Server):
                             response_model=method.return_type,
                         )
 
-    def start_fastapi(self, host: str):
+    def start_server(self, host: str):
         """
         start the fastapi server in a thread
         """
         self.host = host
 
         config = uvicorn.Config(self.fast_api, host=self.host, port=self.port, access_log=False)
-        server = uvicorn.Server(config)
 
-        thread = threading.Thread(target=server.run, daemon=True)
-        thread.start()
-
-        return thread
+        self.server = uvicorn.Server(config)
+        self.thread = threading.Thread(target=self.server.run, daemon=True)
+        self.thread.start()
 
     def get_deserializers(self, service: Type, method):
         deserializers = self.deserializers.get(method, None)

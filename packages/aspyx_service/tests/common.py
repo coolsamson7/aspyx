@@ -6,7 +6,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 import jwt
-from fastapi import HTTPException
+from fastapi import HTTPException, FastAPI
 from jwt import ExpiredSignatureError, InvalidTokenError
 from abc import abstractmethod
 from dataclasses import dataclass
@@ -18,23 +18,24 @@ from pydantic import BaseModel
 
 from aspyx.di.aop import advice, error, Invocation
 from aspyx.exception import ExceptionManager, handle
-#from aspyx.util import Logger
+from aspyx.util import Logger
 from aspyx_service import service, Service, component, Component, \
     implementation, health, AbstractComponent, ChannelAddress, inject_service, \
     FastAPIServer, Server, ServiceModule, ServiceManager, \
-    HealthCheckManager, get, post, rest, put, delete, Body
+    HealthCheckManager, get, post, rest, put, delete, Body, SessionManager, RequestContext, TokenContext, \
+    TokenContextMiddleMiddleware
 from aspyx_service.service import LocalComponentRegistry, component_services, AuthorizationException
-from aspyx.di import module, create, injectable, on_running
+from aspyx.di import module, create, injectable, on_running, Environment
 from aspyx.di.configuration import YamlConfigurationSource
 
 # configure logging
 
-#Logger.configure(default_level=logging.DEBUG, levels={
-#    "httpx": logging.ERROR,
-#    "aspyx.di": logging.INFO,
-#    "aspyx.di.aop": logging.ERROR,
-#    "aspyx.service": logging.ERROR
-#})
+Logger.configure(default_level=logging.DEBUG, levels={
+    "httpx": logging.ERROR,
+    "aspyx.di": logging.INFO,
+    "aspyx.di.aop": logging.ERROR,
+    "aspyx.service": logging.ERROR
+})
 
 # classes
 
@@ -367,6 +368,10 @@ class Module:
         pass
 
     @create()
+    def create_session_storage(self) -> SessionManager.Storage:
+        return SessionManager.InMemoryStorage(max_size=1000, ttl=3600)
+
+    @create()
     def create_token_manager(self) -> TokenManager:
         return TokenManager(SECRET_KEY, ALGORITHM, access_token_expiry_minutes = 15, refresh_token_expiry_minutes = 60 * 24)
 
@@ -380,10 +385,15 @@ class Module:
 
 # main
 
-def start_server() -> ServiceManager:
-    server = FastAPIServer.boot(module=Module, host="0.0.0.0", port=8000)
+fastapi = FastAPI()
 
-    service_manager = server.service_manager
+fastapi.add_middleware(RequestContext)
+fastapi.add_middleware(TokenContextMiddleMiddleware)
+
+def start_environment() -> Environment:
+    environment = FastAPIServer.boot(Module, fastapi, host="0.0.0.0", port=8000)
+
+    service_manager = environment.get(ServiceManager)
     descriptor = service_manager.get_descriptor(TestComponent).get_component_descriptor()
 
     # Give the server a second to start
@@ -399,15 +409,13 @@ def start_server() -> ServiceManager:
 
     print("server running")
 
-    return service_manager
+    return environment
 
-manager : Optional[ServiceManager] = None
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def service_manager():
-    global manager
+    environment = start_environment()
 
-    if  manager is None:
-        manager = start_server()  # start server
+    yield environment.get(ServiceManager)
 
-    yield manager
+    environment.destroy()

@@ -14,7 +14,7 @@ Logger.configure(default_level=logging.DEBUG, levels={
 
 PORT = int(os.getenv("FAST_API_PORT", 8000))
 
-FastAPIServer.boot(module=ServerModule, host="0.0.0.0", port=PORT, start = False)
+FastAPIServer.boot(module=ServerModule, host="0.0.0.0", port=PORT, start_thread= False)
 
 app = FastAPIServer.fast_api
 

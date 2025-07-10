@@ -41,6 +41,9 @@ from .common import service_manager, TokenManager
 # decorator
 
 def secure():
+    """
+    services decorated with `@secure` will add an authentication / authorization aspect
+    """
     def decorator(cls):
         Decorators.add(cls, secure)
 
@@ -51,6 +54,9 @@ def secure():
 # session
 
 class UserSession(Session):
+    """
+    A simple session class covering th user and roles.
+    """
     # constructor
 
     def __init__(self, user: str, roles: list[str]):
@@ -76,6 +82,9 @@ def requires_role(role=""):
 @injectable()
 @order(1)
 class RoleAuthorizationFactory(AbstractAuthorizationFactory):
+    """
+    An `AuthorizationFactory` that will look for `@requires_role` and will add the appropriate check
+    """
     # local class
 
     class RoleAuthorization(AuthorizationManager.Authorization):
@@ -86,9 +95,10 @@ class RoleAuthorizationFactory(AbstractAuthorizationFactory):
 
         # implement
 
-        def check(self, invocation: Invocation):
+        def authorize(self, invocation: Invocation):
             if not self.role in SessionManager.current(UserSession).roles:
                 raise AuthorizationException(f"expected role {self.role}")
+
     # implement
 
     def compute_authorization(self, method_descriptor: TypeDescriptor.MethodDescriptor) -> Optional[AuthorizationManager.Authorization]:
@@ -101,6 +111,9 @@ class RoleAuthorizationFactory(AbstractAuthorizationFactory):
 @injectable()
 @order(0)
 class TokenAuthorizationFactory(AbstractAuthorizationFactory):
+    """
+    An `AuthorizationFactory` that will add the logic to verify jwt tokens
+    """
     # local class
 
     class TokenAuthorization(AuthorizationManager.Authorization):
@@ -124,7 +137,7 @@ class TokenAuthorizationFactory(AbstractAuthorizationFactory):
 
         # implement
 
-        def check(self, invocation: Invocation):
+        def authorize(self, invocation: Invocation):
             http_request = RequestContext.get_request()
 
             if http_request is not None:
@@ -145,6 +158,7 @@ class TokenAuthorizationFactory(AbstractAuthorizationFactory):
 
                 # set thread local
 
+                TokenContext.set(token)
                 SessionManager.set_session(session)
 
     # constructor
@@ -162,6 +176,9 @@ class TokenAuthorizationFactory(AbstractAuthorizationFactory):
 @advice
 @injectable()
 class RetryAdvice:
+    """
+    Add aspects that implement a  retry logic, also covering token refresh
+    """
     # constructor
 
     def __init__(self, token_manager: TokenManager):
@@ -240,6 +257,9 @@ class RetryAdvice:
 @advice
 @injectable()
 class AuthorizationAdvice:
+    """
+    This advice adds the appropriate aspects for services annotated with `@secure`
+    """
     # constructor
 
     def __init__(self, authorization_manager: AuthorizationManager, session_manager: SessionManager):
@@ -251,7 +271,7 @@ class AuthorizationAdvice:
 
     def authorize(self, invocation: Invocation):
         try:
-            self.authorization_manager.check(invocation)
+            self.authorization_manager.authorize(invocation)
         except AuthorizationException as e:
             ServiceManager.logger.warning(f"Authorization failed ({invocation.func.__name__}): {str(e)}")
 
@@ -268,6 +288,7 @@ class AuthorizationAdvice:
             return await invocation.proceed_async()
         finally:
             SessionManager.delete_session()
+            TokenContext.clear()
 
     @around(methods().that_are_sync().decorated_with(secure),
             methods().that_are_sync().declared_by(classes().decorated_with(secure)))
@@ -278,6 +299,7 @@ class AuthorizationAdvice:
             return invocation.proceed()
         finally:
             SessionManager.delete_session()
+            TokenContext.clear()
 
 # some services
 

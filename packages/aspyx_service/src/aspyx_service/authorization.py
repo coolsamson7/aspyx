@@ -38,9 +38,9 @@ class AuthorizationManager:
         """
         Base class for authorization checks
         """
-        def check(self, invocation: Invocation):
+        def authorize(self, invocation: Invocation):
             """
-            execute the authorization check. Throws an exception in case of violations,
+            execute the authorization check. Throws an exception in case of violations
             """
             pass
 
@@ -111,9 +111,9 @@ class AuthorizationManager:
 
         return checks
 
-    def check(self, invocation: Invocation) -> Optional[Authorization]:
+    def authorize(self, invocation: Invocation):
         for check in self.get_checks(invocation.func):
-            check.check(invocation)
+            check.authorize(invocation)
 
 class AbstractAuthorizationFactory(AuthorizationManager.AuthorizationFactory):
     """

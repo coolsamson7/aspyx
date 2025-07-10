@@ -3,8 +3,8 @@
 
 It is possible to inject configuration values, by decorating methods with `@inject-value(<name>)` given a configuration key.
 
-```python
-@injectable()
+```python[session.md](session.md)
+@injectable()[session.md](session.md)
 class Foo:
     def __init__(self):
         pass

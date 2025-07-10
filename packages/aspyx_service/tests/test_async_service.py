@@ -10,7 +10,10 @@ data = Data(i=1, f=1.0, b=True, s="s")
 
 @pytest.mark.asyncio(scope="function")
 class TestAsyncRemoteService():
-    async def xtest_dispatch_json(self, service_manager):
+    async def test(self, service_manager):
+
+        # dispatch json
+
         test_service = service_manager.get_service(TestAsyncService, preferred_channel="dispatch-json")
 
         result = await test_service.hello("hello")
@@ -22,7 +25,8 @@ class TestAsyncRemoteService():
         result_pydantic = await test_service.pydantic(pydantic)
         assert result_pydantic == pydantic
 
-    async def xtest_dispatch_msgpack(self, service_manager):
+        # msgpack
+
         test_service = service_manager.get_service(TestAsyncService, preferred_channel="dispatch-msgpack")
 
         result = await test_service.hello("hello")
@@ -34,7 +38,8 @@ class TestAsyncRemoteService():
         result_pydantic = await test_service.pydantic(pydantic)
         assert result_pydantic == pydantic
 
-    async def xtest_rest(self, service_manager):
+        # rest
+
         test_service = service_manager.get_service(TestAsyncRestService, preferred_channel="rest")
 
         result = await test_service.get("hello")
