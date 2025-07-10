@@ -5,14 +5,14 @@ import atexit
 import inspect
 import threading
 from typing import Type, Optional, Callable, Any
-
-from fastapi.responses import JSONResponse
+import contextvars
 import msgpack
 import uvicorn
 
 from fastapi import FastAPI, APIRouter, Request as HttpRequest, Response as HttpResponse, HTTPException
-import contextvars
 
+
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from aspyx.di import Environment, injectable, on_init, inject_environment, on_destroy
@@ -114,8 +114,6 @@ class FastAPIServer(Server):
     def __init__(self, service_manager: ServiceManager, component_registry: ComponentRegistry):
         super().__init__()
 
-        print("### START_SERVER")
-
         self.environment : Optional[Environment] = None
         self.service_manager = service_manager
         self.component_registry = component_registry
@@ -168,8 +166,6 @@ class FastAPIServer(Server):
     @on_destroy()
     def on_destroy(self):
         if self.server is not None:
-            print("### STOP_SERVER")
-
             self.server.should_exit = True
             self.thread.join()
 

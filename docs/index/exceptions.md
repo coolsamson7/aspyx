@@ -6,10 +6,12 @@ The class `ExceptionManager` is used to collect dynamic handlers for specific ex
 The handlers are declared by decorating a class with `@exception_handler` and decorating specific methods with `@handle`
 
 **Example**:
+
 ```python
 class DerivedException(Exception):
     def __init__(self):
         pass
+
 
 @module()
 class SampleModule:
@@ -21,6 +23,7 @@ class SampleModule:
     @create()
     def create_exception_manager(self) -> ExceptionManager:
         return ExceptionManager()
+
 
 @injectable()
 @exception_handler()
@@ -50,9 +53,10 @@ class ExceptionAdvice:
     def handle_error(self, invocation: Invocation):
         self.exceptionManager.handle(invocation.exception)
 
-environment =  Environment(SampleModule)
 
-environment.get(ExceptionManager).handle(DerivedException())
+environment = Environment(SampleModule)
+
+environment.read(ExceptionManager).handle(DerivedException())
 ```
 
 The exception maanger will first call the most appropriate method. 

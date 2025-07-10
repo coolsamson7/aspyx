@@ -19,21 +19,55 @@ class Session:
 
 T = TypeVar("T")
 
+class SessionContext:
+    # class properties
+
+    # current_session = ThreadLocal[Session]()
+    current_session = contextvars.ContextVar("session")
+
+    @classmethod
+    def get(cls, type: Type[T]) -> T:
+        """
+        return the current session associated with the context
+        Args:
+            type:  the session type
+
+        Returns:
+            the current session
+        """
+        return cls.current_session.get()
+
+    @classmethod
+    def set(cls, session: Session) -> None:
+        """
+        set the current session in the context
+        Args:
+            session: the session
+        """
+        cls.current_session.set(session)
+
+    @classmethod
+    def clear(cls) -> None:
+        """
+        delete the current session
+        """
+        cls.current_session.set(None)  # clear()
+
 @injectable()
-class SessionManager:
+class SessionManager(SessionContext):
     """
-    A SessionManager controls the lifecycle of sessions and is responsible to establish a session thread local.
+    A SessionManager controls the lifecycle of sessions and is responsible to establish a session context local.
     """
 
     # local classes
 
     class Storage(ABC):
         @abstractmethod
-        def put(self, token: str, session: Session, ttl_seconds: int):
+        def store(self, token: str, session: Session, ttl_seconds: int):
             pass
 
         @abstractmethod
-        def get(self, token: str) -> Optional[Session]:
+        def read(self, token: str) -> Optional[Session]:
             pass
 
     class InMemoryStorage(Storage):
@@ -48,11 +82,11 @@ class SessionManager:
 
         # implement
 
-        def put(self, token: str, session: 'Session', ttl_seconds: int):
+        def store(self, token: str, session: 'Session', ttl_seconds: int):
             expiry_time = datetime.now(timezone.utc) + timedelta(seconds=ttl_seconds)
             self.cache[token] = (session, expiry_time)
 
-        def get(self, token: str) -> Optional['Session']:
+        def read(self, token: str) -> Optional['Session']:
             value = self.cache.get(token)
             if value is None:
                 return None
@@ -64,39 +98,6 @@ class SessionManager:
 
             return session
 
-    # class properties
-
-    #current_session = ThreadLocal[Session]()
-    current_session  = contextvars.ContextVar("session")
-
-    @classmethod
-    def current(cls, type: Type[T]) -> T:
-        """
-        return the current session associated with the thread
-        Args:
-            type:  the session type
-
-        Returns:
-            the current session
-        """
-        return cls.current_session.get()
-
-    @classmethod
-    def set_session(cls, session: Session) -> None:
-        """
-        set the current session in the thread context
-        Args:
-            session: the session
-        """
-        cls.current_session.set(session)
-
-    @classmethod
-    def delete_session(cls) -> None:
-        """
-        delete the current session
-        """
-        cls.current_session.set(None)#clear()
-
     # constructor
 
     def __init__(self, storage: 'SessionManager.Storage'):
@@ -105,7 +106,7 @@ class SessionManager:
 
     # public
 
-    def set_session_factory(self, factory: Callable[..., Session]) -> None:
+    def set_factory(self, factory: Callable[..., Session]) -> None:
         """
         set a factory function that will be used to create a concrete session
         Args:
@@ -115,7 +116,7 @@ class SessionManager:
 
     def create_session(self, *args, **kwargs) -> Session:
         """
-        create a session given the argument s(usually a token, etc.)
+        create a session given the arguments (usually a token, etc.)
         Args:
             args: rest args
             kwargs: keyword args
@@ -129,7 +130,7 @@ class SessionManager:
         now = datetime.now(timezone.utc)
         ttl_seconds = max(int((expiry - now).total_seconds()), 0)
 
-        self.storage.put(token, session, ttl_seconds)
+        self.storage.store(token, session, ttl_seconds)
 
-    def get_session(self, token: str) -> Optional[Session]:
-        return self.storage.get(token)
+    def read_session(self, token: str) -> Optional[Session]:
+        return self.storage.read(token)

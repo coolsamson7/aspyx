@@ -6,14 +6,17 @@ from typing import Optional
 
 from consul import Consul
 
+from aspyx_service import HealthCheckManager, ServiceModule, ConsulComponentRegistry, SessionManager
+
+from client import ClientModule, TestService, TestAsyncService, Data, Pydantic, TestRestService, TestAsyncRestService, TestComponent
+
+from aspyx_service.service import ChannelAddress, Server, \
+    component_services, AbstractComponent, implementation, health, ComponentRegistry
 from aspyx.di import on_running, module, create
 from aspyx.di.aop import Invocation, advice, error
 from aspyx.exception import handle, ExceptionManager
-from aspyx_service import HealthCheckManager, ServiceModule, ConsulComponentRegistry
-from aspyx_service.service import ChannelAddress, Server, \
-    component_services, AbstractComponent, implementation, health, ComponentRegistry
 
-from client import ClientModule, TestService, TestAsyncService, Data, Pydantic, TestRestService, TestAsyncRestService, TestComponent
+
 
 
 # implementation classes
@@ -150,5 +153,9 @@ class ServerModule:
     #    return YamlConfigurationSource(f"{Path(__file__).parent}/config.yaml")
 
     @create()
+    def create_session_storage(self) -> SessionManager.Storage:
+        return SessionManager.InMemoryStorage(max_size=1000, ttl=3600)
+
+    @create()
     def create_registry(self) -> ComponentRegistry:
-        return ConsulComponentRegistry(port=int(os.getenv("FAST_API_PORT", 8000)), consul=Consul(host="localhost", port=8500))
+        return ConsulComponentRegistry(port=int(os.getenv("FAST_API_PORT", "8000")), consul=Consul(host="localhost", port=8500))

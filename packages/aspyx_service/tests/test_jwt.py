@@ -3,13 +3,12 @@ jwt sample test
 """
 import faulthandler
 import time
+from typing import Optional
 
 from aspyx.di.configuration import inject_value
 from aspyx.util import Logger
 
 faulthandler.enable()
-
-from typing import Optional
 
 import logging
 from abc import abstractmethod
@@ -28,7 +27,7 @@ Logger.configure(default_level=logging.DEBUG, levels={
 from aspyx_service import Service, service, component, implementation, AbstractComponent, \
     Component, ChannelAddress, Server, health, RequestContext, HTTPXChannel, \
     AbstractAuthorizationFactory, AuthorizationManager, SessionManager, AuthorizationException, Session, \
-    ServiceCommunicationException, TokenExpiredException, ServiceManager, TokenContext
+    ServiceCommunicationException, TokenExpiredException, ServiceManager, TokenContext, SessionContext
 
 from aspyx.reflection import Decorators, TypeDescriptor
 
@@ -96,7 +95,7 @@ class RoleAuthorizationFactory(AbstractAuthorizationFactory):
         # implement
 
         def authorize(self, invocation: Invocation):
-            if not self.role in SessionManager.current(UserSession).roles:
+            if not self.role in SessionContext.get(UserSession).roles:
                 raise AuthorizationException(f"expected role {self.role}")
 
     # implement
@@ -143,7 +142,7 @@ class TokenAuthorizationFactory(AbstractAuthorizationFactory):
             if http_request is not None:
                 token = self.extract_token_from_request(http_request)
 
-                session = self.session_manager.get_session(token)
+                session = self.session_manager.read_session(token)
                 if session is None:
                     # verify token
 
@@ -159,7 +158,7 @@ class TokenAuthorizationFactory(AbstractAuthorizationFactory):
                 # set thread local
 
                 TokenContext.set(token)
-                SessionManager.set_session(session)
+                SessionContext.set(session)
 
     # constructor
 
@@ -212,10 +211,7 @@ class RetryAdvice:
             try:
                 return invocation.proceed()
 
-            except AuthorizationException as e:
-                raise
-
-            except TokenExpiredException as e:
+            except TokenExpiredException:
                 if attempt == self.max_attempts:
                     raise
                 self.refresh_token_if_possible()
@@ -265,7 +261,7 @@ class AuthorizationAdvice:
     def __init__(self, authorization_manager: AuthorizationManager, session_manager: SessionManager):
         self.authorization_manager = authorization_manager
 
-        session_manager.set_session_factory(lambda token: UserSession(user=token.get("sub"), roles=token.get("roles")))
+        session_manager.set_factory(lambda token: UserSession(user=token.get("sub"), roles=token.get("roles")))
 
     # internal
 
@@ -287,7 +283,7 @@ class AuthorizationAdvice:
 
             return await invocation.proceed_async()
         finally:
-            SessionManager.delete_session()
+            SessionContext.clear()
             TokenContext.clear()
 
     @around(methods().that_are_sync().decorated_with(secure),
@@ -298,7 +294,7 @@ class AuthorizationAdvice:
 
             return invocation.proceed()
         finally:
-            SessionManager.delete_session()
+            SessionContext.clear()
             TokenContext.clear()
 
 # some services
@@ -368,11 +364,11 @@ class SecureServiceServiceImpl(SecureService):
         pass
 
     def secured(self):
-        session = SessionManager.current(UserSession)
+        session = SessionContext.get(UserSession)
 
     @requires_role("admin")
     def secured_admin(self):
-        session = SessionManager.current(UserSession)
+        session = SessionContext.get(UserSession)
 
 
 @implementation()

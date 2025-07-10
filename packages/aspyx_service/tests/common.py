@@ -7,24 +7,26 @@ from datetime import datetime, timedelta, timezone
 
 import jwt
 from fastapi import HTTPException, FastAPI
-from jwt import ExpiredSignatureError, InvalidTokenError
+
 from abc import abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Optional, Any
+from typing import Optional, Any
+
+from jwt import ExpiredSignatureError, InvalidTokenError
 
 import pytest
 from pydantic import BaseModel
 
-from aspyx.di.aop import advice, error, Invocation
-from aspyx.exception import ExceptionManager, handle
-from aspyx.util import Logger
 from aspyx_service import service, Service, component, Component, \
     implementation, health, AbstractComponent, ChannelAddress, inject_service, \
     FastAPIServer, Server, ServiceModule, ServiceManager, \
-    HealthCheckManager, get, post, rest, put, delete, Body, SessionManager, RequestContext, TokenContext, \
+    HealthCheckManager, get, post, rest, put, delete, Body, SessionManager, RequestContext, \
     TokenContextMiddleMiddleware
-from aspyx_service.service import LocalComponentRegistry, component_services, AuthorizationException
+from aspyx.di.aop import advice, error, Invocation
+from aspyx.exception import ExceptionManager, handle
+from aspyx.util import Logger
+from aspyx_service.service import LocalComponentRegistry, component_services, AuthorizationException, ComponentRegistry
 from aspyx.di import module, create, injectable, on_running, Environment
 from aspyx.di.configuration import YamlConfigurationSource
 
@@ -366,6 +368,10 @@ class Foo:
 class Module:
     def __init__(self):
         pass
+
+    #@create()
+    #def create_server(self,  service_manager: ServiceManager, component_registry: ComponentRegistry) -> FastAPIServer:
+    #    return FastAPIServer(service_manager, component_registry)
 
     @create()
     def create_session_storage(self) -> SessionManager.Storage:

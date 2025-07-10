@@ -114,7 +114,7 @@ environment = Environment(SampleModule)
 
 # fetch an instance
 
-bar = env.get(Bar)
+bar = env.read(Bar)
 
 bar.foo.hello("world")
 ```
@@ -702,10 +702,12 @@ given a specific exception.
 The handlers are declared by annoting a class with `@exception_handler` and decorating specific methods with `@handle`
 
 **Example**:
+
 ```python
 class DerivedException(Exception):
     def __init__(self):
         pass
+
 
 @module()
 class SampleModule:
@@ -717,6 +719,7 @@ class SampleModule:
     @create()
     def create_exception_manager(self) -> ExceptionManager:
         return ExceptionManager()
+
 
 @injectable()
 @exception_handler()
@@ -746,9 +749,10 @@ class ExceptionAdvice:
     def handle_error(self, invocation: Invocation):
         self.exceptionManager.handle(invocation.exception)
 
-environment =  Environment(SampleEnvironment)
 
-environment.get(ExceptionManager).handle(DerivedException())
+environment = Environment(SampleEnvironment)
+
+environment.read(ExceptionManager).handle(DerivedException())
 ```
 
 The exception maanger will first call the most appropriate method. 

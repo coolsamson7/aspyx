@@ -7,11 +7,11 @@ from aspyx.di import module
 from .service import AuthorizationException, MissingTokenException, RemoteServiceException, ServiceCommunicationException, TokenException, TokenExpiredException, InvalidTokenException, component_services, ServiceException, Server, Channel, ComponentDescriptor, inject_service, ChannelAddress, ChannelInstances, ServiceManager, Component, Service, AbstractComponent, ComponentStatus, ComponentRegistry, implementation, health, component, service
 from .channels import HTTPXChannel, DispatchJSONChannel, TokenContext
 from .registries import ConsulComponentRegistry
-from .server import FastAPIServer, RequestContext, TokenContext, TokenContextMiddleMiddleware
+from .server import FastAPIServer, RequestContext, TokenContextMiddleMiddleware
 from .healthcheck import health_checks, health_check, HealthCheckManager, HealthStatus
 from .restchannel import RestChannel, post, get, put, delete, QueryParam, Body, rest
-from .session import Session, SessionManager
-from .authorization import AuthorizationManager, AbstractAuthorizationFactory, AuthorizationException
+from .session import Session, SessionManager, SessionContext
+from .authorization import AuthorizationManager, AbstractAuthorizationFactory
 
 
 @module()
@@ -53,12 +53,12 @@ __all__ = [
 
     "AuthorizationManager",
     "AbstractAuthorizationFactory",
-    "AuthorizationException",
 
     # session
 
     "Session",
     "SessionManager",
+    "SessionContext",
 
     # healthcheck
 

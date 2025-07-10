@@ -7,10 +7,11 @@ from dataclasses import dataclass
 
 from pydantic import BaseModel
 
-from aspyx.di import module
-
 from aspyx_service import ServiceModule, delete, post, put, get, rest, Body
 from aspyx_service.service import  component, Component, Service, service
+
+from aspyx.di import module
+
 
 class Pydantic(BaseModel):
     i: int

@@ -6,18 +6,14 @@ import re
 from dataclasses import is_dataclass
 
 from typing import get_type_hints, TypeVar, Annotated, Callable, get_origin, get_args, Type
-
-
 from pydantic import BaseModel
 
-from .channels import HTTPXChannel
-
 from aspyx.reflection import DynamicProxy, Decorators
+
+from .channels import HTTPXChannel
 from .service import channel, ServiceCommunicationException
 
 T = TypeVar("T")
-
-
 
 class BodyMarker:
     pass

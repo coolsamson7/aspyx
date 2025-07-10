@@ -1,9 +1,15 @@
+"""
+the server hosting the test services
+"""
 import logging
 import os
 
-from aspyx.util import Logger
-from aspyx_service import FastAPIServer
+from fastapi import FastAPI
+
+from aspyx_service import FastAPIServer, RequestContext, TokenContextMiddleMiddleware
 from server import  ServerModule
+from aspyx.util import Logger
+
 
 Logger.configure(default_level=logging.DEBUG, levels={
     "httpx": logging.ERROR,
@@ -12,11 +18,14 @@ Logger.configure(default_level=logging.DEBUG, levels={
     "aspyx.service": logging.ERROR
 })
 
-PORT = int(os.getenv("FAST_API_PORT", 8000))
+PORT = int(os.getenv("FAST_API_PORT", "8000"))
 
-FastAPIServer.boot(module=ServerModule, host="0.0.0.0", port=PORT, start_thread= False)
+app = FastAPI()
 
-app = FastAPIServer.fast_api
+app.add_middleware(RequestContext)
+app.add_middleware(TokenContextMiddleMiddleware)
+
+FastAPIServer.boot(module=ServerModule, fast_api=app, host="0.0.0.0", port=PORT, start_thread= False)
 
 if __name__ == "__main__":
     import uvicorn

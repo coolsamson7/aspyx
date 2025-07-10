@@ -10,11 +10,13 @@ from typing import Callable, TypeVar, Type, Awaitable, Any, Dict, cast
 
 from consul import Consul
 
+from aspyx_service import ConsulComponentRegistry, SessionManager
+
 from aspyx.di import module, Environment, create
 from aspyx.di.aop import advice, around, methods, Invocation
 from aspyx.util import Logger
 
-from aspyx_service import ConsulComponentRegistry
+
 from aspyx_service.service import ServiceManager, ComponentRegistry, Channel
 
 Logger.configure(default_level=logging.DEBUG, levels={
@@ -45,6 +47,10 @@ class ChannelAdvice:
 class TestModule:
     def __init__(self):
         pass
+
+    @create()
+    def create_session_storage(self) -> SessionManager.Storage:
+        return SessionManager.InMemoryStorage(max_size=1000, ttl=3600)
 
     @create()
     def create_registry(self) -> ComponentRegistry:
@@ -207,7 +213,7 @@ async def main():
     # async
 
     await run_async_loops("async rest", loops, TestAsyncRestService, manager.get_service(TestAsyncRestService, preferred_channel="rest"),
-              lambda service: service.get("world"))
+                          lambda service: service.get("world"))
     await run_async_loops("async json", loops, TestAsyncService, manager.get_service(TestAsyncService, preferred_channel="dispatch-json"),
               lambda service: service.hello("world"))
     await run_async_loops("async msgpack", loops, TestAsyncService, manager.get_service(TestAsyncService, preferred_channel="dispatch-msgpack"),

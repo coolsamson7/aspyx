@@ -9,13 +9,6 @@ from aspyx.di import injectable, inject, order
 from aspyx.di.aop import Invocation
 from aspyx.reflection import TypeDescriptor, Decorators
 
-
-class AuthorizationException(Exception):
-    """
-    Any authorization exception
-    """
-    pass
-
 def get_method_class(method):
     if inspect.ismethod(method) or inspect.isfunction(method):
         qualname = method.__qualname__
@@ -42,7 +35,6 @@ class AuthorizationManager:
             """
             execute the authorization check. Throws an exception in case of violations
             """
-            pass
 
     class AuthorizationFactory(ABC):
         """
@@ -62,7 +54,6 @@ class AuthorizationManager:
             Returns:
                 an authorization check or None
             """
-            pass
 
     # constructor
 

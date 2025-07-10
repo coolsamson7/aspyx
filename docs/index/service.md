@@ -40,18 +40,20 @@ class TestComponent(Component):
 After booting the DI infrastructure with a main module we could already call a service:
 
 **Example**:
+
 ```python
 @module(imports=[ServiceModule])
 class Module:
     def __init__(self):
         pass
-    
+
     @create()
     def create_registry(self) -> ConsulComponentRegistry:
-        return ConsulComponentRegistry(Server.port, Consul(host="localhost", port=8500)) # a consul based registry!
+        return ConsulComponentRegistry(Server.port, Consul(host="localhost", port=8500))  # a consul based registry!
+
 
 environment = Environment(Module)
-service_manager = environment.get(ServiceManager)
+service_manager = environment.read(ServiceManager)
 
 service = service_manager.get_service(TestService)
 
