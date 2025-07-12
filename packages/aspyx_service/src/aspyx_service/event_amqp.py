@@ -29,14 +29,11 @@ class AMQPProvider(MessagingHandler, EventManager.Provider): # TODO messaging ha
     class AMQPEnvelope(EventManager.Envelope):
         # constructor
 
-        def __init__(self, headers=None):
-            self.body = ""
+        def __init__(self, body="", headers=None):
+            self.body = body
             self.headers = headers or {}
 
         # implement envelope
-
-        def set_body(self, body: str):
-            self.body = body
 
         def get_body(self) -> str:
             return self.body
@@ -91,27 +88,6 @@ class AMQPProvider(MessagingHandler, EventManager.Provider): # TODO messaging ha
     def on_connection_closed(self, event: Event):
         self._connection = None
 
-# TODO obsolete
-    def on_message(self, event: Event):
-        AMQPProvider.logger.info("on_message ")
-
-        body = event.message.body
-        address = getattr(event.receiver.source, "address", None)
-
-        queue = address
-
-        # extract queue
-
-        if "::" in address:
-            queue = address.split("::", 1)[0]
-
-        envelope = self.AMQPEnvelope()
-        envelope.set_body(body)
-
-        event_descriptor = EventManager.events_by_name.get(queue, None)
-
-        self.manager.pipeline.handle(envelope, event_descriptor)
-
     # internal
 
     def create_receiver(self, address: str, listener: EventManager.EventListenerDescriptor) -> Receiver:
@@ -140,20 +116,7 @@ class AMQPProvider(MessagingHandler, EventManager.Provider): # TODO messaging ha
     def dispatch(self, event: Event, listener: EventManager.EventListenerDescriptor):
         AMQPProvider.logger.info("on_message ")
 
-        body = event.message.body
-        address = getattr(event.receiver.source, "address", None)
-
-        queue = address
-
-        # extract queue
-
-        if "::" in address:
-            queue = address.split("::", 1)[0]
-
-        envelope = self.AMQPEnvelope()
-        envelope.set_body(body)
-
-        #event_descriptor = EventManager.events_by_name.get(queue, None)
+        envelope = self.AMQPEnvelope(body=event.message.body)
 
         self.manager.pipeline.handle(envelope, listener)
 
@@ -186,8 +149,8 @@ class AMQPProvider(MessagingHandler, EventManager.Provider): # TODO messaging ha
     def start(self):
         self.thread.start()
 
-    def create_envelope(self, headers = None) -> EventManager.Envelope:
-        return AMQPProvider.AMQPEnvelope(headers)
+    def create_envelope(self, body="", headers = None) -> EventManager.Envelope:
+        return AMQPProvider.AMQPEnvelope(body=body, headers=headers)
 
     def listen_to(self, listener: EventManager.EventListenerDescriptor) -> None:
         self._ready.wait(timeout=5)
@@ -214,6 +177,7 @@ class AMQPProvider(MessagingHandler, EventManager.Provider): # TODO messaging ha
     # implement EnvelopePipeline
 
     def send(self, envelope: EventManager.Envelope, event_descriptor: EventManager.EventDescriptor):
+        # local class
 
         class SendHandler(AMQPProvider.AMQHandler):
             def __init__(self, provider: AMQPProvider, envelope, address):
@@ -222,8 +186,10 @@ class AMQPProvider(MessagingHandler, EventManager.Provider): # TODO messaging ha
                 self.envelope = envelope
                 self.address = address
 
-            def on_timer_task(self, event):
+            def on_timer_task(self, event: Event):
                 self.provider.get_sender(self.address).send(Message(body=self.envelope.get_body()))
+
+        # go
 
         address = event_descriptor.name
 

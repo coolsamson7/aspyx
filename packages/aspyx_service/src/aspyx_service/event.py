@@ -56,10 +56,6 @@ class EventManager:
             pass
 
         @abstractmethod
-        def set_body(self, body: str):
-            pass
-
-        @abstractmethod
         def set(self, key: str, value: str):
             pass
 
@@ -91,7 +87,7 @@ class EventManager:
             pass
 
         @abstractmethod
-        def create_envelope(self, headers = None) -> EventManager.Envelope:
+        def create_envelope(self, body="", headers = None) -> EventManager.Envelope:
             pass
 
         @abstractmethod
@@ -206,9 +202,7 @@ class EventManager:
     def send_event(self, event: Any):
         descriptor = self.get_event_descriptor(type(event))
 
-        envelope = self.provider.create_envelope({})
-
-        envelope.set_body(self.to_json(event))
+        envelope = self.provider.create_envelope(body=self.to_json(event), headers={})
 
         self.pipeline.send(envelope, descriptor)
 
