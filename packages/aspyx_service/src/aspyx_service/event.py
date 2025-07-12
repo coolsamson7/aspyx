@@ -3,18 +3,16 @@ event management
 """
 from __future__ import annotations
 import json
+import logging
 
 from abc import ABC, abstractmethod
-from dataclasses import is_dataclass, asdict
 from typing import Type, TypeVar, Generic, Any, Optional
-
-from pydantic import BaseModel
 
 from aspyx.reflection import Decorators
 
-from aspyx.di import Environment, inject_environment, Providers, ClassInstanceProvider
+from aspyx.di import Environment, inject_environment, Providers, ClassInstanceProvider, on_destroy
 
-from aspyx_service.serialization import get_deserializer
+from aspyx_service.serialization import get_deserializer, get_serializer
 
 # abstraction
 
@@ -31,14 +29,26 @@ class EventManager:
         def __init__(self, type: Type):
             self.type = type
 
-            decorator = Decorators.get_decorator(type, event)
+            args = Decorators.get_decorator(type, event).args
 
-            self.name = type.__name__ # TODO
+            self.name = args[0]
+            if self.name == "":
+                self.name = type.__name__
+
+            self.broadcast : bool = args[1]
+            self.durable : bool   = args[2]
 
     class EventListenerDescriptor:
-        def __init__(self, type: Type, event_type: Type):
+        def __init__(self, type: Type, event_type: Type, name: str, group: str, per_process: bool):
+            if name == "":
+                name = type.__name__
+
             self.type : Type = type
+            self.name = name
             self.event = EventManager.EventDescriptor(event_type)
+
+            self.group = group
+            self.per_process = per_process
 
     class Envelope(ABC):
         @abstractmethod
@@ -63,7 +73,7 @@ class EventManager:
             pass
 
         @abstractmethod
-        def handle(self, envelope: EventManager.Envelope, event_descriptor: EventManager.EventDescriptor):
+        def handle(self, envelope: EventManager.Envelope, event_listener_descriptor: EventManager.EventListenerDescriptor):
             pass
 
     class Provider(EnvelopePipeline):
@@ -77,6 +87,9 @@ class EventManager:
         def start(self):
             pass
 
+        def stop(self):
+            pass
+
         @abstractmethod
         def create_envelope(self, headers = None) -> EventManager.Envelope:
             pass
@@ -86,6 +99,10 @@ class EventManager:
             pass
 
     # class properties
+
+    # class property
+
+    logger = logging.getLogger("aspyx.event")  # __name__ = module name
 
     pipelines: list[Type] = []
 
@@ -139,6 +156,10 @@ class EventManager:
 
     # lifecycle
 
+    @on_destroy()
+    def on_destroy(self):
+        self.provider.stop()
+
     # internal
 
     def get_event_descriptor(self, type: Type) -> EventManager.EventDescriptor:
@@ -169,24 +190,14 @@ class EventManager:
 
 
     def get_listener(self, type: Type) -> Optional[EventListener]:
-        descriptor = self.get_event_listener_descriptor(type)
-
-        return self.environment.get(descriptor.type)
+        return self.environment.get(type)
 
     def to_json(self, obj) -> str:
-        if is_dataclass(obj):
-            # dataclass: convert to dict first
-            return json.dumps(asdict(obj))
+        dict = get_serializer(type(obj))(obj)
+        return json.dumps(dict)
 
-        elif isinstance(obj, BaseModel):
-            # pydantic model: use its json() method
-            return obj.json()
-        else:
-            # fallback: try to serialize directly
-            return json.dumps(obj)
-
-    def dispatch_event(self, descriptor: EventManager.EventDescriptor, body: Any):
-        event = get_deserializer(descriptor.type)(json.loads(body))
+    def dispatch_event(self, descriptor: EventManager.EventListenerDescriptor, body: Any):
+        event = get_deserializer(descriptor.event.type)(json.loads(body))
 
         self.get_listener(descriptor.type).on(event)
 
@@ -201,9 +212,9 @@ class EventManager:
 
         self.pipeline.send(envelope, descriptor)
 
-def event(broadcast=False):
+def event(name="", broadcast=False, durable=False):
     def decorator(cls):
-        Decorators.add(cls, event, broadcast)
+        Decorators.add(cls, event, name, broadcast, durable)
 
         EventManager.register_event(EventManager.EventDescriptor(cls))
 
@@ -211,11 +222,11 @@ def event(broadcast=False):
 
     return decorator
 
-def event_listener(event: Type):
+def event_listener(event: Type, name="", group="", per_process = False):
     def decorator(cls):
-        Decorators.add(cls, event_listener, event)
+        Decorators.add(cls, event_listener, event, name, group, per_process)
 
-        EventManager.register_event_listener(EventManager.EventListenerDescriptor(cls, event))
+        EventManager.register_event_listener(EventManager.EventListenerDescriptor(cls, event, name, group, per_process))
         Providers.register(ClassInstanceProvider(cls, False, "singleton"))
 
         return cls
@@ -244,5 +255,5 @@ class AbstractEnvelopePipeline(EventManager.EnvelopePipeline):
     def proceed_send(self, envelope: EventManager.Envelope, event_descriptor: EventManager.EventDescriptor):
         self.next.send(envelope, event_descriptor)
 
-    def proceed_handle(self, envelope: EventManager.Envelope, descriptor: EventManager.EventDescriptor):
+    def proceed_handle(self, envelope: EventManager.Envelope, descriptor: EventManager.EventListenerDescriptor):
         self.next.handle(envelope, descriptor)

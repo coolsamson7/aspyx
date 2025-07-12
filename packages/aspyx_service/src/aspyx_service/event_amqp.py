@@ -3,57 +3,28 @@ stomp
 """
 from __future__ import annotations
 
-import time
+import logging
 
-from proton._reactor import Selector
 from proton.handlers import MessagingHandler
 
 from aspyx_service import EventManager
 
 from aspyx.di import on_destroy
 
-from proton import Message, Event, Handler
+from proton import Message, Event, Handler, Sender, Receiver
 from proton.reactor import Container
 import threading
 
+class AMQPProvider(MessagingHandler, EventManager.Provider): # TODO messaging handler
+    logger = logging.getLogger("aspyx.event.amq")  # __name__ = module name
 
-class RegisterHandler(Handler):
-    def __init__(self, amqp_provider, address, queue_name):
-        super().__init__()
-
-        self.amqp_provider = amqp_provider
-        self.address = address
-        self.queue_name = queue_name
-
-    def on_timer_task(self, event):
-        if self.amqp_provider._conn:
-            receiver = event.container.create_receiver(
-                self.amqp_provider._conn,
-                self.queue_name
-            )
-            self.amqp_provider._receivers[self.queue_name] = receiver
-
-class SendHandler(Handler):
-    def __init__(self, amqp_provider, envelope, address):
-        super().__init__()
-
-        self.amqp_provider = amqp_provider
-        self.envelope = envelope
-        self.address = address
-
-    def on_timer_task(self, event):
-        sender = self.amqp_provider._senders.get(self.address)
-        if not sender:
-            sender = event.container.create_sender(
-                self.amqp_provider._conn,
-                self.address
-            )
-            self.amqp_provider._senders[self.address] = sender
-        msg = Message(body=self.envelope.get_body())
-        sender.send(msg)
-
-class AMQPProvider(MessagingHandler, EventManager.Provider):
     # local classes
+
+    class AMQHandler(Handler):
+        def __init__(self, provider: AMQPProvider):
+            super().__init__()
+
+            self.provider = provider
 
     class AMQPEnvelope(EventManager.Envelope):
         # constructor
@@ -78,39 +49,24 @@ class AMQPProvider(MessagingHandler, EventManager.Provider):
 
     # constructor
 
-    def __init__(self, host="localhost", port=61616, user = "", password = ""):
+    def __init__(self, server_name: str,  host="localhost", port=61616, user = "", password = ""):
         MessagingHandler.__init__(self)
         EventManager.Provider.__init__(self)
 
+        self.server_name = server_name
         self.host = host
         self.port = port
         self.user = user
         self.password = password
 
-        self.container = Container(self, debug=True)
-        self._conn = None
+        self.container = Container(self, debug=True) # TODO
+        self._connection = None
 
         self.thread= threading.Thread(target=self.container.run, daemon=True)
 
         self._ready = threading.Event()
-        self._senders = {}  # address -> sender
-        self._receivers = {}  # queue_name -> receiver
-
-    # internal
-
-    def bind_queue(self, address: str, queue_name: str, durable=False):
-        """
-        Binds a named queue to the given address and registers a message handler.
-
-        address: the target address (should be MULTICAST for fan-out)
-        queue_name: the unique queue bound to the address
-        handler: function to call when messages arrive
-        durable: whether the queue should be durable (default False)
-        """
-
-        self._ready.wait(timeout=5)
-
-        self.container.schedule(0, RegisterHandler(self, address, queue_name))
+        self._senders : dict[str,Sender] = {}  # queue -> sender
+        self._receivers : dict[str, Receiver] = {}  # address -> receiver
 
     # implement MessagingHandler
 
@@ -124,7 +80,7 @@ class AMQPProvider(MessagingHandler, EventManager.Provider):
         print(f"[AMQP] Connection error: {event.connection.condition}")
 
     def on_start(self, event: Event):
-        self._conn = event.container.connect(
+        self._connection = event.container.connect(
             f"{self.host}:{self.port}",
             user=self.user,
             password=self.password
@@ -133,27 +89,91 @@ class AMQPProvider(MessagingHandler, EventManager.Provider):
         self._ready.set()
 
     def on_connection_closed(self, event: Event):
-        self._conn = None
+        self._connection = None
 
+# TODO obsolete
     def on_message(self, event: Event):
+        AMQPProvider.logger.info("on_message ")
+
         body = event.message.body
         address = getattr(event.receiver.source, "address", None)
+
+        queue = address
+
+        # extract queue
+
+        if "::" in address:
+            queue = address.split("::", 1)[0]
 
         envelope = self.AMQPEnvelope()
         envelope.set_body(body)
 
-        event_descriptor = EventManager.events_by_name.get(address, None)
+        event_descriptor = EventManager.events_by_name.get(queue, None)
 
         self.manager.pipeline.handle(envelope, event_descriptor)
 
-    # ?
+    # internal
+
+    def create_receiver(self, address: str, listener: EventManager.EventListenerDescriptor) -> Receiver:
+        class DispatchMessageHandler(MessagingHandler):
+            # constructor
+
+            def __init__(self, provider: AMQPProvider, listener: EventManager.EventListenerDescriptor):
+                super().__init__()
+
+                #self.queue_name = queue_name
+                self.listener = listener
+                self.provider = provider
+
+            # override
+
+            def on_message(self, event: Event):
+                self.provider.dispatch(event, self.listener)
+
+        self.logger.info("create receiver %s", address)
+
+        receiver = self.container.create_receiver(self._connection, address, handler=DispatchMessageHandler(self, listener))
+        self._receivers[address] = receiver  # if it exists?
+
+        return receiver
+
+    def dispatch(self, event: Event, listener: EventManager.EventListenerDescriptor):
+        AMQPProvider.logger.info("on_message ")
+
+        body = event.message.body
+        address = getattr(event.receiver.source, "address", None)
+
+        queue = address
+
+        # extract queue
+
+        if "::" in address:
+            queue = address.split("::", 1)[0]
+
+        envelope = self.AMQPEnvelope()
+        envelope.set_body(body)
+
+        #event_descriptor = EventManager.events_by_name.get(queue, None)
+
+        self.manager.pipeline.handle(envelope, listener)
+
+    def get_sender(self, address: str) -> Sender:
+        sender = self._senders.get(address, None)
+        if not sender:
+            self.logger.info("create sender %s", address)
+
+            sender = self.container.create_sender(self._connection, address)
+
+            self._senders[address] = sender
+
+        return sender
 
     def stop(self):
         def close():
-            if self._conn:
-                self._conn.close()
+            if self._connection:
+                self._connection.close()
 
-        self.container.schedule(0, close)
+        #TODO self.container.schedule(0, close)
 
     # lifecycle
 
@@ -170,20 +190,45 @@ class AMQPProvider(MessagingHandler, EventManager.Provider):
         return AMQPProvider.AMQPEnvelope(headers)
 
     def listen_to(self, listener: EventManager.EventListenerDescriptor) -> None:
-        address = f"{listener.event.name}"
-        queue   = f"{listener.event.name}"
+        self._ready.wait(timeout=5)
 
-        durable = True
+        class CreateReceiverHandler(AMQPProvider.AMQHandler):
+            def __init__(self, provider: AMQPProvider, address: str, listener: EventManager.EventListenerDescriptor):
+                super().__init__(provider)
 
-        self.bind_queue(address, queue, durable)
+                self.address = address
+                self.listener = listener
+
+            def on_timer_task(self, event):
+                self.provider.create_receiver(address, self.listener)
+
+        # <event-name>::<listener-name>[-<server-name>]
+
+        address = listener.event.name + "::" + listener.name
+        if listener.per_process:
+            address = address + f"-{self.server_name}"
+
+        if  self._receivers.get(address, None) is None:
+            self.container.schedule(0, CreateReceiverHandler(self, address, listener))
 
     # implement EnvelopePipeline
 
     def send(self, envelope: EventManager.Envelope, event_descriptor: EventManager.EventDescriptor):
-        address = f"{event_descriptor.name}"
+
+        class SendHandler(AMQPProvider.AMQHandler):
+            def __init__(self, provider: AMQPProvider, envelope, address):
+                super().__init__(provider)
+
+                self.envelope = envelope
+                self.address = address
+
+            def on_timer_task(self, event):
+                self.provider.get_sender(self.address).send(Message(body=self.envelope.get_body()))
+
+        address = event_descriptor.name
 
         self._ready.wait(timeout=5)
         self.container.schedule(0, SendHandler(self, envelope, address))
 
-    def handle(self, envelope: EventManager.Envelope, event_descriptor: EventManager.EventDescriptor):
-       self.manager.dispatch_event(event_descriptor, envelope.get_body())
+    def handle(self, envelope: EventManager.Envelope, event_listener_descriptor: EventManager.EventListenerDescriptor):
+       self.manager.dispatch_event(event_listener_descriptor, envelope.get_body())
