@@ -12,7 +12,9 @@ from .healthcheck import health_checks, health_check, HealthCheckManager, Health
 from .restchannel import RestChannel, post, get, put, delete, QueryParam, Body, rest
 from .session import Session, SessionManager, SessionContext
 from .authorization import AuthorizationManager, AbstractAuthorizationFactory
-
+from .event import EventManager, EventListener, event, event_listener, envelope_pipeline, AbstractEnvelopePipeline
+from .event_stomp import StompProvider
+from .event_amqp import AMQPProvider
 
 @module()
 class ServiceModule:
@@ -48,6 +50,23 @@ __all__ = [
     "InvalidTokenException",
     "MissingTokenException",
     "AuthorizationException",
+
+    # event
+
+    "EventManager",
+    "EventListener",
+    "event",
+    "event_listener",
+    "envelope_pipeline",
+    "AbstractEnvelopePipeline",
+
+    # stomp
+
+    "StompProvider",
+
+    # amqp
+
+    "AMQPProvider",
 
     # authorization
 
