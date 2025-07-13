@@ -161,10 +161,6 @@ class EventManager:
     def get_event_descriptor(self, type: Type) -> EventManager.EventDescriptor:
         return self.events.get(type, None)
 
-    def get_event_listener_descriptor(self, type: Type) -> EventManager.EventListenerDescriptor:
-        return next((listener_descriptor for listener_descriptor in self.event_listeners.values() if listener_descriptor.event.type is type), None)
-        #return self.event_listeners.get(type, None)
-
     def listen_to(self, listener: EventManager.EventListenerDescriptor):
         self.provider.listen_to(listener)
 

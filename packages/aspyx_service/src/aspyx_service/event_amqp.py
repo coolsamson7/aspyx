@@ -15,7 +15,7 @@ from proton import Message, Event, Handler, Sender, Receiver
 from proton.reactor import Container
 import threading
 
-class AMQPProvider(MessagingHandler, EventManager.Provider): # TODO messaging handler
+class AMQPProvider(MessagingHandler, EventManager.Provider):
     logger = logging.getLogger("aspyx.event.amq")  # __name__ = module name
 
     # local classes
@@ -97,7 +97,6 @@ class AMQPProvider(MessagingHandler, EventManager.Provider): # TODO messaging ha
             def __init__(self, provider: AMQPProvider, listener: EventManager.EventListenerDescriptor):
                 super().__init__()
 
-                #self.queue_name = queue_name
                 self.listener = listener
                 self.provider = provider
 
@@ -109,6 +108,8 @@ class AMQPProvider(MessagingHandler, EventManager.Provider): # TODO messaging ha
         self.logger.info("create receiver %s", address)
 
         receiver = self.container.create_receiver(self._connection, address, handler=DispatchMessageHandler(self, listener))
+
+        #source = Source(address=address, durable=Terminus.DELIVERIES)
         self._receivers[address] = receiver  # if it exists?
 
         return receiver
@@ -116,9 +117,15 @@ class AMQPProvider(MessagingHandler, EventManager.Provider): # TODO messaging ha
     def dispatch(self, event: Event, listener: EventManager.EventListenerDescriptor):
         AMQPProvider.logger.info("on_message ")
 
-        envelope = self.AMQPEnvelope(body=event.message.body)
+        envelope = self.AMQPEnvelope(body=event.message.body, headers = event.message.properties)
 
-        self.manager.pipeline.handle(envelope, listener)
+        try:
+            self.manager.pipeline.handle(envelope, listener)
+
+            event.delivery.settle()
+        except Exception as e:
+            print(e) # TODO
+
 
     def get_sender(self, address: str) -> Sender:
         sender = self._senders.get(address, None)
@@ -131,12 +138,48 @@ class AMQPProvider(MessagingHandler, EventManager.Provider): # TODO messaging ha
 
         return sender
 
-    def stop(self):
-        def close():
-            if self._connection:
-                self._connection.close()
+    def close_container(self):
+        # close all senders
 
-        #TODO self.container.schedule(0, close)
+        for sender in self._senders.values():
+            try:
+                sender.close()
+            except Exception as e:
+                self.provider.logger.warning("Error closing sender: %s", e)
+
+        # close all receivers
+
+        for receiver in self._receivers.values():
+            try:
+                receiver.close()
+            except Exception as e:
+                self.provider.logger.warning("Error closing receiver: %s", e)
+
+        # close connection
+
+        if self._connection:
+            try:
+                self._connection.close()
+            except Exception as e:
+                self.provider.logger.warning("Error closing connection: %s", e)
+
+        self.provider.logger.info("AMQPProvider stopped.")
+
+        # stop the container
+
+        self.container.stop()
+
+    def stop(self):
+        # local class
+
+        class CloseHandler(AMQPProvider.AMQHandler):
+            def __init__(self, provider: AMQPProvider):
+                super().__init__(provider)
+
+            def on_timer_task(self, event):
+                self.provider.close_container()
+
+        self.container.schedule(0, CloseHandler(self))
 
     # lifecycle
 
@@ -171,6 +214,9 @@ class AMQPProvider(MessagingHandler, EventManager.Provider): # TODO messaging ha
         if listener.per_process:
             address = address + f"-{self.server_name}"
 
+        if listener.event.durable:
+            address = address + "?durable=true"
+
         if  self._receivers.get(address, None) is None:
             self.container.schedule(0, CreateReceiverHandler(self, address, listener))
 
@@ -180,14 +226,18 @@ class AMQPProvider(MessagingHandler, EventManager.Provider): # TODO messaging ha
         # local class
 
         class SendHandler(AMQPProvider.AMQHandler):
-            def __init__(self, provider: AMQPProvider, envelope, address):
+            def __init__(self, provider: AMQPProvider, envelope: AMQPProvider.AMQPEnvelope, address):
                 super().__init__(provider)
 
                 self.envelope = envelope
                 self.address = address
 
             def on_timer_task(self, event: Event):
-                self.provider.get_sender(self.address).send(Message(body=self.envelope.get_body()))
+                message = Message(body=self.envelope.get_body(), properties=self.envelope.headers)
+
+                # TODO message.delivery_mode = Message.DeliveryMode.AT_LEAST_ONCE
+
+                self.provider.get_sender(self.address).send(message)
 
         # go
 
