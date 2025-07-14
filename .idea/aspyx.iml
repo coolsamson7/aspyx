@@ -5,6 +5,7 @@
       <sourceFolder url="file://$MODULE_DIR$/tests" isTestSource="true" />
       <sourceFolder url="file://$MODULE_DIR$/packages/aspyx/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/packages/aspyx_service/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/packages/aspyx_event/src" isTestSource="false" />
     </content>
     <orderEntry type="jdk" jdkName="Python 3.9" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />

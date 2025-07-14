@@ -2,6 +2,9 @@
 event management
 """
 from __future__ import annotations
+
+import asyncio
+import inspect
 import json
 import logging
 
@@ -130,6 +133,8 @@ class EventManager:
 
         provider.manager = self
 
+        self.loop = asyncio.get_event_loop()
+
         self.setup()
 
     # inject
@@ -190,7 +195,20 @@ class EventManager:
     def dispatch_event(self, descriptor: EventManager.EventListenerDescriptor, body: Any):
         event = get_deserializer(descriptor.event.type)(json.loads(body))
 
-        self.get_listener(descriptor.type).on(event)
+        listener = self.get_listener(descriptor.type)
+
+        listener.on(event)
+
+        #async def call_handler(listener, event):
+        #    if inspect.iscoroutinefunction(listener.on):
+        #        await listener.on(event)
+        #    else:
+        #        listener.on(event)
+
+        # schedule handler in main loop
+
+        #self.loop.call_soon(asyncio.create_task, call_handler(listener, event))
+        #asyncio.create_task(call_handler(listener, event))
 
     # public
 

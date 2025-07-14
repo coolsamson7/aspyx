@@ -58,7 +58,7 @@ class AMQPProvider(MessagingHandler, EventManager.Provider):
         self.user = user
         self.password = password
 
-        self.container = Container(self, debug=True) # TODO
+        self.container = Container(self)#, debug=True) # TODO
         self._connection = None
 
         self.thread= threading.Thread(target=self.container.run, daemon=True)

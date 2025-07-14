@@ -43,4 +43,4 @@ allow-direct-references = true
 all-extras = true
 
 [tool.hatch.envs.default.env-vars]
-PYTHONPATH = "packages/aspyx/src:packages/aspyx_service/src:packages/aspyx_event/src"
+PYTHONPATH = "packages/aspyx/src:packages/aspyx_service/src:packages/aspyx_event/src:packages/aspyx_event/performance"
