@@ -31,6 +31,14 @@ jobs:
           pip install dist/*.whl
           hatch run pytest
 
+      - name: Build aspyx_event package
+        working-directory: packages/aspyx_event
+        run: |
+          pip install pytest pytest-asyncio anyio pyjwt
+          hatch build
+          pip install dist/*.whl
+          hatch run pytest
+
       - name: Build aspyx_service package
         working-directory: packages/aspyx_service
         run: |
@@ -39,10 +47,4 @@ jobs:
           pip install dist/*.whl
           hatch run pytest
 
-      - name: Build aspyx_event package
-        working-directory: packages/aspyx_event
-        run: |
-          pip install pytest pytest-asyncio anyio pyjwt
-          hatch build
-          pip install dist/*.whl
-          hatch run pytest
+      
