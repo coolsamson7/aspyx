@@ -21,13 +21,28 @@ from aspyx_service.serialization import get_deserializer, get_serializer
 T = TypeVar("T")
 
 class EventListener(Generic[T]):
-    def on(self, event: T):
+    """
+    An `EventListener` listens to a single event.
+    """
+    def on(self, event: T) -> None:
+        """
+        Callback when an event occurs.
+
+        Args:
+            event: the event
+        """
         pass
 
 class EventManager:
+    """
+    Central class that manages sending and receiving/dispatching events.
+    """
     # local classes
 
     class EventDescriptor:
+        """
+        Covers the meta-data of an event.
+        """
         def __init__(self, type: Type):
             self.type = type
 
@@ -41,6 +56,9 @@ class EventManager:
             self.durable : bool   = args[2]
 
     class EventListenerDescriptor:
+        """
+       Covers the meta-data of an event listener.
+       """
         def __init__(self, type: Type, event_type: Type, name: str, group: str, per_process: bool):
             if name == "":
                 name = type.__name__
@@ -53,8 +71,18 @@ class EventManager:
             self.per_process = per_process
 
     class Envelope(ABC):
+        """
+        Wrapper around an event while being received or sent.
+        """
+
         @abstractmethod
         def get_body(self) -> str:
+            """
+            return the body as a str
+
+            Returns:
+                str: the body
+            """
             pass
 
         @abstractmethod
@@ -66,6 +94,9 @@ class EventManager:
             pass
 
     class EnvelopePipeline(ABC):
+        """
+        An interceptor for sending and receiving events
+        """
         @abstractmethod
         def send(self, envelope: EventManager.Envelope, event_descriptor: EventManager.EventDescriptor):
             pass
@@ -75,6 +106,9 @@ class EventManager:
             pass
 
     class Provider(EnvelopePipeline):
+        """
+        The bridge to a low-level queuing library.
+        """
         # constructor
 
         def __init__(self):
@@ -126,6 +160,12 @@ class EventManager:
     # constructor
 
     def __init__(self, provider: EventManager.Provider):
+        """
+        create a new `EventManager`
+
+        Args:
+            provider: an `EventManager.Provider`
+        """
         self.environment : Optional[Environment] = None
         self.provider = provider
         self.pipeline = self.provider
@@ -211,7 +251,13 @@ class EventManager:
 
     # public
 
-    def send_event(self, event: Any):
+    def send_event(self, event: Any) -> None:
+        """
+        send an event.
+
+        Args:
+            event: the event
+        """
         descriptor = self.get_event_descriptor(type(event))
 
         envelope = self.provider.create_envelope(body=self.to_json(event), headers={})
@@ -219,6 +265,16 @@ class EventManager:
         self.pipeline.send(envelope, descriptor)
 
 def event(name="", broadcast=False, durable=False):
+    """
+    decorates event classes
+
+    Args:
+        name: the event name
+        durable: if `True`, the corresponding queue is persistent
+
+    Returns:
+
+    """
     def decorator(cls):
         Decorators.add(cls, event, name, broadcast, durable)
 
@@ -229,6 +285,17 @@ def event(name="", broadcast=False, durable=False):
     return decorator
 
 def event_listener(event: Type, name="", group="", per_process = False):
+    """
+    decorates event listeners.
+
+    Args:
+        event: the event type
+        name: the listener name
+        per_process: if `True`, listeners will process events on different processes
+
+    Returns:
+
+    """
     def decorator(cls):
         Decorators.add(cls, event_listener, event, name, group, per_process)
 
@@ -240,6 +307,9 @@ def event_listener(event: Type, name="", group="", per_process = False):
     return decorator
 
 def envelope_pipeline():
+    """
+    decorates an envelope pipeline
+    """
     def decorator(cls):
         Decorators.add(cls, envelope_pipeline)
 
