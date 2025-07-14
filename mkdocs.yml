@@ -64,6 +64,7 @@ nav:
       - Exceptions: index/exceptions.md
       - Threading: index/threading.md
       - Service: index/service.md
+      - Event: index/event.md
       - Version History: index/versions.md
 
   - API Reference:
@@ -83,6 +84,7 @@ nav:
         - Health Checks: api/healthcheck.md
         - Session: api/session.md
         - Authorization: api/authorization.md
+      - Event: api/event.md
 
 
 markdown_extensions:

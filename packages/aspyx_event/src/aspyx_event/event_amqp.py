@@ -16,6 +16,8 @@ from proton.reactor import Container
 import threading
 
 class AMQPProvider(MessagingHandler, EventManager.Provider):
+    # class property
+
     logger = logging.getLogger("aspyx.event.amq")  # __name__ = module name
 
     # local classes
@@ -66,9 +68,6 @@ class AMQPProvider(MessagingHandler, EventManager.Provider):
         self._receivers : dict[str, Receiver] = {}  # address -> receiver
 
     # implement MessagingHandler
-
-    #def on_unhandled(self, method: str, *args):
-    #    print(f"[AMQP] Unhandled event: {method}")
 
     def on_transport_error(self, event: Event):
         print(f"[AMQP] Transport error: {event.transport.condition}")

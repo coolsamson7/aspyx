@@ -12,6 +12,7 @@ build-backend = "hatchling.build"
 projects = [
     "packages/aspyx",
     "packages/aspyx_service",
+    "packages/aspyx_event",
 ]
 
 [tool.hatch.envs.default]
@@ -32,6 +33,7 @@ build-all = "bash scripts/build-all.sh"
 [tool.hatch.envs.test.scripts]
 aspyx = "pytest packages/aspyx/tests"
 service = "pytest packages/aspyx_service/tests"
+event = "pytest packages/aspyx_event/tests"
 all = "pytest packages"
 
 [tool.hatch.metadata]
@@ -41,4 +43,4 @@ allow-direct-references = true
 all-extras = true
 
 [tool.hatch.envs.default.env-vars]
-PYTHONPATH = "packages/aspyx/src:packages/aspyx_service/src"
+PYTHONPATH = "packages/aspyx/src:packages/aspyx_service/src:packages/aspyx_event/src"

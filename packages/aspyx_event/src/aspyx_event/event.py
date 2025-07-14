@@ -96,8 +96,6 @@ class EventManager:
 
     # class properties
 
-    # class property
-
     logger = logging.getLogger("aspyx.event")  # __name__ = module name
 
     pipelines: list[Type] = []
@@ -140,7 +138,7 @@ class EventManager:
     def set_environment(self, environment: Environment):
         self.environment = environment
 
-        # chain pipelines
+        # create & chain pipelines
 
         for type in self.pipelines:
             pipeline = environment.get(type)
@@ -186,6 +184,7 @@ class EventManager:
 
     def to_json(self, obj) -> str:
         dict = get_serializer(type(obj))(obj)
+
         return json.dumps(dict)
 
     def dispatch_event(self, descriptor: EventManager.EventListenerDescriptor, body: Any):

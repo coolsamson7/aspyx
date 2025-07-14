@@ -32,11 +32,12 @@ from aspyx.di.configuration import YamlConfigurationSource
 
 # configure logging
 
-Logger.configure(default_level=logging.DEBUG, levels={
+Logger.configure(default_level=logging.INFO, levels={
     "httpx": logging.ERROR,
     "aspyx.di": logging.INFO,
     "aspyx.di.aop": logging.ERROR,
-    "aspyx.service": logging.ERROR
+    "aspyx.service": logging.DEBUG,
+    "aspyx.event": logging.INFO
 })
 
 # classes

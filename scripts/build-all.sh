@@ -6,6 +6,9 @@ cd packages/aspyx
 hatch build
 
 echo "### build aspyx_service"
-ls ../aspyx_service
 cd ../aspyx_service
+hatch build
+
+echo "### build aspyx_event"
+cd ../aspyx_event
 hatch build

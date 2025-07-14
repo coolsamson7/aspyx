@@ -21,7 +21,7 @@ jobs:
           python -m pip install --upgrade pip hatch pytest
 
       - name: Setup environment
-        run: echo "PYTHONPATH=packages/aspyx/src:packages/aspyx_service/src" >> $GITHUB_ENV
+        run: echo "PYTHONPATH=packages/aspyx/src:packages/aspyx_service/src:packages/aspyx_event/src:" >> $GITHUB_ENV
 
       - name: Build aspyx package
         working-directory: packages/aspyx
@@ -33,6 +33,14 @@ jobs:
 
       - name: Build aspyx_service package
         working-directory: packages/aspyx_service
+        run: |
+          pip install pytest pytest-asyncio anyio pyjwt
+          hatch build
+          pip install dist/*.whl
+          hatch run pytest
+
+      - name: Build aspyx_event package
+        working-directory: packages/aspyx_event
         run: |
           pip install pytest pytest-asyncio anyio pyjwt
           hatch build

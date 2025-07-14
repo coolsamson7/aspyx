@@ -5,6 +5,7 @@ on:
     tags:
       - 'aspyx-v*'           # e.g., aspyx-v1.4.2
       - 'aspyx_service-v*'   # e.g., aspyx_service-v0.9.1
+      - 'aspyx_event-v*'   # e.g., aspyx_service-v0.9.1
 
 permissions:
   contents: read
@@ -41,6 +42,13 @@ jobs:
       - name: Build & Publish aspyx_service
         if: startsWith(github.ref, 'refs/tags/aspyx_service-v')
         working-directory: packages/aspyx_service
+        run: |
+          hatch build
+          twine upload dist/*
+
+      - name: Build & Publish aspyx_event
+        if: startsWith(github.ref, 'refs/tags/aspyx_event-v')
+        working-directory: packages/aspyx_event
         run: |
           hatch build
           twine upload dist/*
