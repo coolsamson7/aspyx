@@ -1,11 +1,10 @@
 """
-test for health checks
+test for events
 """
 from __future__ import annotations
+
 import logging
 import threading
-
-from sqlalchemy.ext.asyncio import async_scoped_session
 
 from aspyx.util import Logger
 
