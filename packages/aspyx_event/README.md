@@ -150,6 +150,38 @@ def send_event(self, event: Any)-> None
 
 The constructor expects an argument `provider: EnvironmentManager.Provider` that contains the technical queuing implementation.
 
+The second argument `exception_manager` is an `ExceptionManager` thet wil be used to handle all internal exceptions.
+
+**Example**:
+
+```python
+@module(imports=[EventModule])
+class Module:
+    # constructor
+
+    def __init__(self):
+        pass
+
+    # handlers
+
+    @catch()
+    def handle(self, exception: Exception):
+        ... # log at least...
+
+    # internal
+
+    def create_exception_manager(self):
+        exception_manager = ExceptionManager()
+
+        exception_manager.collect_handlers(self)
+
+        return exception_manager
+
+    @create()
+    def create_event_manager(self) -> EventManager:
+        return EventManager(LocalProvider(), exception_manager=self.create_exception_manager())
+```
+
 ## Providers
 
 A provider encapsulates the technical queuing details based on existing 3rd party libs.
@@ -173,6 +205,9 @@ If we think of an Artemis address model, this is how it is applied:
 - a queue name is defined as `<event-name>::<listener-name>[-<server-name>]`
 
 The server name is appended, if `per_process` is `True`, guaranteeing the even in clusters every server receives the corresponding events!
+
+The implementation has been tested with Artemis. Other server such as RabbitMQ, Azure Service Bus, Red Hat AMQ and Amazon MQ could work as well.
+Always make sure, that the serves are configured to auto-create queues!
 
 # Version History
 

@@ -10,13 +10,15 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Type, TypeVar, Generic, Any, Optional
 
+from aspyx.exception import ExceptionManager
 from aspyx.reflection import Decorators
 
 from aspyx.di import Environment, inject_environment, Providers, ClassInstanceProvider, on_destroy
 
 from aspyx_service.serialization import get_deserializer, get_serializer
 
-# abstraction
+class EventException(Exception):
+    pass
 
 T = TypeVar("T")
 
@@ -74,7 +76,6 @@ class EventManager:
         """
         Wrapper around an event while being received or sent.
         """
-
         @abstractmethod
         def get_body(self) -> str:
             """
@@ -86,12 +87,26 @@ class EventManager:
             pass
 
         @abstractmethod
-        def set(self, key: str, value: str):
-            pass
+        def set(self, key: str, value: str) -> None:
+            """
+            set a header value
+
+            Args:
+                key: a key
+                value: the value
+            """
 
         @abstractmethod
         def get(self, key: str) -> str:
-            pass
+            """
+            retrieve a header value
+
+            Args:
+                key: a key
+
+            Returns:
+                str: the value
+           """
 
     class EnvelopePipeline(ABC):
         """
@@ -99,11 +114,21 @@ class EventManager:
         """
         @abstractmethod
         def send(self, envelope: EventManager.Envelope, event_descriptor: EventManager.EventDescriptor):
-            pass
+            """
+            interceptor on the sending side
+            Args:
+                envelope: the envelope
+                event_descriptor: the event descriptor
+            """
 
         @abstractmethod
         def handle(self, envelope: EventManager.Envelope, event_listener_descriptor: EventManager.EventListenerDescriptor):
-            pass
+            """
+            interceptor on the handling side
+            Args:
+                envelope: the envelope
+                event_listener_descriptor: the listener descriptor
+            """
 
     class Provider(EnvelopePipeline):
         """
@@ -137,7 +162,7 @@ class EventManager:
     pipelines: list[Type] = []
 
     events: dict[Type, EventDescriptor] = {}
-    event_listeners: dict[Type, EventManager.EventListenerDescriptor] = {}
+    event_listeners: list[EventManager.EventListenerDescriptor] = []
 
     events_by_name: dict[str, EventDescriptor] = {}
 
@@ -155,11 +180,11 @@ class EventManager:
 
     @classmethod
     def register_event_listener(cls, descriptor: EventManager.EventListenerDescriptor):
-        cls.event_listeners[descriptor.type] = descriptor
+        cls.event_listeners.append(descriptor)
 
     # constructor
 
-    def __init__(self, provider: EventManager.Provider):
+    def __init__(self, provider: EventManager.Provider, exception_manager: Optional[ExceptionManager] = None):
         """
         create a new `EventManager`
 
@@ -169,6 +194,7 @@ class EventManager:
         self.environment : Optional[Environment] = None
         self.provider = provider
         self.pipeline = self.provider
+        self.exception_manager = exception_manager
 
         provider.manager = self
 
@@ -201,7 +227,12 @@ class EventManager:
     # internal
 
     def get_event_descriptor(self, type: Type) -> EventManager.EventDescriptor:
-        return self.events.get(type, None)
+        descriptor =  self.events.get(type, None)
+
+        if descriptor is None:
+            raise EventException(f"{type.__name__} is not an event")
+
+        return descriptor
 
     def listen_to(self, listener: EventManager.EventListenerDescriptor):
         self.provider.listen_to(listener)
@@ -213,7 +244,7 @@ class EventManager:
 
         # listeners
 
-        for listener in self.event_listeners.values():
+        for listener in self.event_listeners:
             # replace initial object
 
             listener.event = self.get_event_descriptor(listener.event.type)
@@ -236,7 +267,14 @@ class EventManager:
 
         listener = self.get_listener(descriptor.type)
 
-        listener.on(event)
+        try:
+            listener.on(event)
+        except Exception as e:
+            if self.exception_manager is not None:
+                raise self.exception_manager.handle(e)
+            else:
+                self.logger.error(f"caught an exception: {e} while dispatching event {descriptor.event.name}")
+                raise e
 
         #async def call_handler(listener, event):
         #    if inspect.iscoroutinefunction(listener.on):
@@ -300,7 +338,7 @@ def event_listener(event: Type, name="", group="", per_process = False):
         Decorators.add(cls, event_listener, event, name, group, per_process)
 
         EventManager.register_event_listener(EventManager.EventListenerDescriptor(cls, event, name, group, per_process))
-        Providers.register(ClassInstanceProvider(cls, False, "singleton"))
+        Providers.register(ClassInstanceProvider(cls, False))
 
         return cls
 
@@ -321,6 +359,9 @@ def envelope_pipeline():
     return decorator
 
 class AbstractEnvelopePipeline(EventManager.EnvelopePipeline):
+    """
+    abstract base-class for envelope pipelines
+    """
     # constructor
 
     def __init__(self, envelope_handler: Optional[EventManager.EnvelopePipeline] = None):

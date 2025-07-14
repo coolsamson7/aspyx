@@ -122,7 +122,7 @@ class AMQPProvider(MessagingHandler, EventManager.Provider):
 
             event.delivery.settle()
         except Exception as e:
-            print(e) # TODO
+            pass # already handled
 
 
     def get_sender(self, address: str) -> Sender:

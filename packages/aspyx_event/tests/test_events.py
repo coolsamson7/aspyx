@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 import threading
 
+from aspyx.exception import ExceptionManager, handle
 from aspyx.util import Logger
 
 from .provider import LocalProvider
@@ -99,12 +100,29 @@ class AsyncListener(EventListener[HelloEvent]):
 
 @module(imports=[EventModule])
 class Module:
+    # constructor
+
     def __init__(self):
         pass
 
+    # handlers
+
+    @handle()
+    def handle_exception(self, exception: Exception):
+        print(exception)
+
+    # internal
+
+    def create_exception_manager(self):
+        exception_manager = ExceptionManager()
+
+        exception_manager.collect_handlers(self)
+
+        return exception_manager
+
     @create()
     def create_event_manager(self) -> EventManager:
-        return EventManager(LocalProvider())
+        return EventManager(LocalProvider(), exception_manager=self.create_exception_manager())
         # EventManager(StompProvider(host="localhost", port=61616, user="artemis", password="artemis"))
         # EventManager(AMQPProvider("server-id", host="localhost", port=5672, user="artemis", password="artemis"))
 

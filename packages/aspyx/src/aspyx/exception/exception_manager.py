@@ -32,6 +32,16 @@ def handle():
 
     return decorator
 
+def catch():
+    """
+    Any method annotated with @catch will be registered as an exception handler method.
+    """
+    def decorator(func):
+        Decorators.add(func, handle)
+        return func
+
+    return decorator
+
 class Handler:
     # constructor
 
@@ -174,7 +184,7 @@ class ExceptionManager:
             exception (BaseException): the exception
 
         Returns:
-            BaseException: the resulting exception
+            BaseException: the resulting - possible transformed - exception
         """
         chain = self.get_handlers(type(exception))
         if chain is not None:
