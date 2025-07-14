@@ -7,7 +7,7 @@ import logging
 
 from proton.handlers import MessagingHandler
 
-from aspyx_service import EventManager
+from .event import EventManager
 
 from aspyx.di import on_destroy
 

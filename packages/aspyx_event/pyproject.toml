@@ -24,6 +24,9 @@ source = "src"
 [tool.hatch.build.targets.wheel]
 packages = ["src/aspyx_event"]
 
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+
 [tool.hatch.envs.test]
 dependencies = [
   ".",

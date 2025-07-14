@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from aspyx_service import EventManager
+from .event import EventManager
 
 from aspyx.di import on_destroy
 
