@@ -5,6 +5,8 @@ from __future__ import annotations
 import logging
 import threading
 
+from sqlalchemy.ext.asyncio import async_scoped_session
+
 from aspyx.util import Logger
 
 from .provider import LocalProvider
@@ -59,10 +61,13 @@ class SessionPipeline(AbstractEnvelopePipeline):
         self.proceed_handle(envelope, event_listener_descriptor)
 
 
-event_received = threading.Event()
+sync_event_received = threading.Event()
+async_event_received = threading.Event()
 
 @event_listener(HelloEvent, per_process=True)
-class HelloEventListener(EventListener[HelloEvent]):
+class SyncListener(EventListener[HelloEvent]):
+    received = None
+
     # constructor
 
     def __init__(self):
@@ -71,13 +76,14 @@ class HelloEventListener(EventListener[HelloEvent]):
     # implement
 
     def on(self, event: HelloEvent):
-        #print("### hello " + event.hello, flush=True)
-        logger.info("listen to hello " + event.hello)
-        event_received.set()
+        SyncListener.received = event
 
+        sync_event_received.set()
 
 @event_listener(HelloEvent, per_process=True)
-class OtherHelloEventListener(EventListener[HelloEvent]):
+class AsyncListener(EventListener[HelloEvent]):
+    received = None
+
     # constructor
 
     def __init__(self):
@@ -86,9 +92,9 @@ class OtherHelloEventListener(EventListener[HelloEvent]):
     # implement
 
     def on(self, event: HelloEvent):
-        #print("### other hello " + event.hello)
-        logger.info("other listen to hello " + event.hello)
-        #event_received.set()
+        AsyncListener.received = event
+
+        async_event_received.set()
 
 # test module
 
@@ -115,6 +121,12 @@ class TestLocalService():
     def test_events(self, environment):
         event_manager = environment.get(EventManager)
 
-        event_manager.send_event(HelloEvent("world1"))
+        event = HelloEvent("world")
 
-        assert event_received.wait(timeout=100), "ouch"
+        event_manager.send_event(event)
+
+        assert sync_event_received.wait(timeout=1), "sync event not received"
+        assert async_event_received.wait(timeout=1), "async event not received"
+
+        assert event == SyncListener.received, "events not =="
+        assert event == AsyncListener.received, "events not =="
