@@ -24,7 +24,7 @@ jobs:
           pip install mkdocs-material mkdocstrings[python]
 
       - name: Setup environment
-        run: echo "PYTHONPATH=packages/aspyx/src:packages/aspyx_service/src" >> $GITHUB_ENV
+        run: echo "PYTHONPATH=packages/aspyx/src:packages/aspyx_service/src::packages/aspyx_event/src" >> $GITHUB_ENV
 
       - name: Build docs
         run: mkdocs build
