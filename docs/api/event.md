@@ -1,3 +1,3 @@
 # Event
 
-::: aspyx_event.event
+::: aspyx_event
