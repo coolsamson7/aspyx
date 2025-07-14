@@ -6,7 +6,7 @@ import os
 
 from fastapi import FastAPI
 
-from aspyx_service import FastAPIServer, RequestContext, TokenContextMiddleware
+from aspyx_service import FastAPIServer, RequestContext
 from server import  ServerModule
 from aspyx.util import Logger
 

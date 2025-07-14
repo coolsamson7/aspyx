@@ -1,15 +1,14 @@
 """
-stomp
+stomp provider
 """
 from __future__ import annotations
 
 from typing import Optional
-
-from .event import EventManager
+import stomp
 
 from aspyx.di import on_destroy
 
-import stomp
+from .event import EventManager
 
 
 class StompProvider(EventManager.Provider, stomp.ConnectionListener):
@@ -106,5 +105,5 @@ class StompProvider(EventManager.Provider, stomp.ConnectionListener):
     def send(self, envelope: EventManager.Envelope, event_descriptor: EventManager.EventDescriptor):
         self.connection.send(body=envelope.get_body(), destination=f"/queue/{event_descriptor.name}")
 
-    def handle(self, envelope: EventManager.Envelope, event_descriptor: EventManager.EventDescriptor):
-       self.manager.dispatch_event(event_descriptor, envelope.get_body())
+    def handle(self, envelope: EventManager.Envelope, event_listener_descriptor: EventManager.EventListenerDescriptor):
+        self.manager.dispatch_event(event_listener_descriptor, envelope.get_body())

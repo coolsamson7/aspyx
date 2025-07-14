@@ -3,12 +3,9 @@ test for health checks
 """
 from __future__ import annotations
 
-import asyncio
 import logging
 
 from aspyx.util import Logger
-
-from .provider import LocalProvider
 
 Logger.configure(default_level=logging.INFO, levels={
     "httpx": logging.ERROR,
@@ -24,13 +21,10 @@ logger.setLevel(logging.INFO)
 
 from dataclasses import dataclass
 
-import pytest
-
 from aspyx_event import EventManager, event, envelope_pipeline, AbstractEnvelopePipeline, \
-    event_listener, EventListener, EventModule
-#StompProvider, AMQPProvider
+    event_listener, EventListener, EventModule, AMQPProvider
 
-from aspyx.di import module, Environment, create
+from aspyx.di import module, create
 
 
 # test classes
@@ -55,7 +49,7 @@ class SessionPipeline(AbstractEnvelopePipeline):
         self.proceed_send(envelope, event_descriptor)
 
     def handle(self, envelope: EventManager.Envelope, event_listener_descriptor: EventManager.EventListenerDescriptor):
-        session = envelope.get("session")
+        #session = envelope.get("session")
 
         self.proceed_handle(envelope, event_listener_descriptor)
 
@@ -85,7 +79,7 @@ class AsyncListener(EventListener[HelloEvent]):
 
     # implement
 
-    async def on(self, event: HelloEvent):
+    def on(self, event: HelloEvent):
         print(".")
 
 # test module
@@ -97,6 +91,6 @@ class Module:
 
     @create()
     def create_event_manager(self) -> EventManager:
-        return EventManager(LocalProvider())
+        #return EventManager(LocalProvider())
         # EventManager(StompProvider(host="localhost", port=61616, user="artemis", password="artemis"))
-        # EventManager(AMQPProvider("server-id", host="localhost", port=5672, user="artemis", password="artemis"))
+        return EventManager(AMQPProvider("server-id", host="localhost", port=5672, user="artemis", password="artemis"))

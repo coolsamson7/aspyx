@@ -38,8 +38,6 @@ logger.setLevel(logging.INFO)
 
 from dataclasses import dataclass
 
-import pytest
-
 from aspyx_event import EventManager, event, envelope_pipeline, AbstractEnvelopePipeline, \
     event_listener, EventListener, EventModule
 #StompProvider, AMQPProvider

@@ -167,6 +167,14 @@ The library offers:
 As well as the DI and AOP core, all mechanisms are heavily optimized.
 A simple benchmark resulted in message roundtrips in significanlty under a ms per call.
 
+## Installation
+
+Just install from PyPI with 
+
+`pip install aspyx-service`
+
+The library is tested with all Python version >= 3.9
+
 Let's see some details
 
 ## Service and Component declaration 

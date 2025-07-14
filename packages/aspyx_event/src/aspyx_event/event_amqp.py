@@ -4,16 +4,15 @@ stomp
 from __future__ import annotations
 
 import logging
+import threading
 
+from proton import Message, Event, Handler, Sender, Receiver
 from proton.handlers import MessagingHandler
-
-from .event import EventManager
+from proton.reactor import Container
 
 from aspyx.di import on_destroy
 
-from proton import Message, Event, Handler, Sender, Receiver
-from proton.reactor import Container
-import threading
+from .event import EventManager
 
 class AMQPProvider(MessagingHandler, EventManager.Provider):
     # class property
@@ -144,7 +143,7 @@ class AMQPProvider(MessagingHandler, EventManager.Provider):
             try:
                 sender.close()
             except Exception as e:
-                self.provider.logger.warning("Error closing sender: %s", e)
+                self.logger.warning("Error closing sender: %s", e)
 
         # close all receivers
 
@@ -152,7 +151,7 @@ class AMQPProvider(MessagingHandler, EventManager.Provider):
             try:
                 receiver.close()
             except Exception as e:
-                self.provider.logger.warning("Error closing receiver: %s", e)
+                self.logger.warning("Error closing receiver: %s", e)
 
         # close connection
 
@@ -160,9 +159,9 @@ class AMQPProvider(MessagingHandler, EventManager.Provider):
             try:
                 self._connection.close()
             except Exception as e:
-                self.provider.logger.warning("Error closing connection: %s", e)
+                self.logger.warning("Error closing connection: %s", e)
 
-        self.provider.logger.info("AMQPProvider stopped.")
+        self.logger.info("AMQPProvider stopped.")
 
         # stop the container
 
