@@ -272,9 +272,9 @@ class EventManager:
         except Exception as e:
             if self.exception_manager is not None:
                 raise self.exception_manager.handle(e)
-            else:
-                self.logger.error(f"caught an exception: {e} while dispatching event {descriptor.event.name}")
-                raise e
+
+            self.logger.error(f"caught an exception: {e} while dispatching event {descriptor.event.name}")
+            raise e
 
         #async def call_handler(listener, event):
         #    if inspect.iscoroutinefunction(listener.on):

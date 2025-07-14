@@ -233,7 +233,7 @@ class Foo:
         pass
 
     @inject_environment()
-    def initEnvironment(self, env: Environment):
+    def set_environment(self, env: Environment):
         ...
 
     @inject()

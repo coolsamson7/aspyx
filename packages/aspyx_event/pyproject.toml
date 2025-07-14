@@ -2,7 +2,7 @@
 
 [project]
 name = "aspyx_event"
-version = "0.9.0"
+version = "0.9.1"
 description = "Aspyx event framework"
 authors = [{ name = "Andreas Ernst", email = "andreas.ernst7@gmail.com" }]
 readme = "README.md"
