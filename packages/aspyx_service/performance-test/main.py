@@ -6,7 +6,7 @@ import os
 
 from fastapi import FastAPI
 
-from aspyx_service import FastAPIServer, RequestContext, TokenContextMiddleMiddleware
+from aspyx_service import FastAPIServer, RequestContext, TokenContextMiddleware
 from server import  ServerModule
 from aspyx.util import Logger
 
@@ -23,7 +23,7 @@ PORT = int(os.getenv("FAST_API_PORT", "8000"))
 app = FastAPI()
 
 app.add_middleware(RequestContext)
-#app.add_middleware(TokenContextMiddleMiddleware)
+#app.add_middleware(TokenContextMiddleware)
 
 ServerModule.fastapi = app
 

@@ -61,7 +61,7 @@ class RequestContext:
         finally:
             self.request_var.reset(token)
 
-class TokenContextMiddleMiddleware(BaseHTTPMiddleware):
+class TokenContextMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         access_token = request.cookies.get("access_token") or request.headers.get("Authorization")
         #refresh_token = request.cookies.get("refresh_token")

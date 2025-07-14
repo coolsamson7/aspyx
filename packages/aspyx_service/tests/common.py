@@ -22,7 +22,7 @@ from aspyx_service import service, Service, component, Component, \
     implementation, health, AbstractComponent, ChannelAddress, inject_service, \
     FastAPIServer, Server, ServiceModule, ServiceManager, \
     HealthCheckManager, get, post, rest, put, delete, Body, SessionManager, RequestContext, \
-    TokenContextMiddleMiddleware
+    TokenContextMiddleware
 from aspyx.di.aop import advice, error, Invocation
 from aspyx.exception import ExceptionManager, handle
 from aspyx.util import Logger
@@ -368,7 +368,7 @@ class Foo:
 fastapi = FastAPI()
 
 fastapi.add_middleware(RequestContext)
-fastapi.add_middleware(TokenContextMiddleMiddleware)
+fastapi.add_middleware(TokenContextMiddleware)
 
 @module(imports=[ServiceModule])
 class Module:
