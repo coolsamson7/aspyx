@@ -9,7 +9,7 @@ readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.9"
 dependencies = [
-    "aspyx>=1.5.3",
+    "aspyx-service>=0.10.4",
     "python-qpid-proton >=0.40.0",
     "stomp.py>=8.2.0"
 ]
