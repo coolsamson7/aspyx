@@ -9,10 +9,11 @@
 
 ![image](https://github.com/user-attachments/assets/e808210a-b1a4-4fd0-93f1-b5f9845fa520)
 
-This is a mono repo hosting currently two python libraries related to DI & AOP and a microservice framework: 
+This is a mono repo hosting currently three python libraries related to DI & AOP, a microservice framework and an messaging abstraction: 
 
 - [Aspyx](https://github.com/coolsamson7/aspyx/tree/main/packages/aspyx)
 - [Aspyx Service](https://github.com/coolsamson7/aspyx/tree/main/packages/aspyx_service)
+- [Aspyx Event](https://github.com/coolsamson7/aspyx/tree/main/packages/aspyx_event)
 
 The overall documentation can be found [here](http://ernstandreas.de/aspyx/index/introduction/)
       
