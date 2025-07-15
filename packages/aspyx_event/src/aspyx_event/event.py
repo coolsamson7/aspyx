@@ -34,7 +34,6 @@ class EventListener(Generic[T]):
         Args:
             event: the event
         """
-        pass
 
 class EventManager:
     """
@@ -85,7 +84,6 @@ class EventManager:
             Returns:
                 str: the body
             """
-            pass
 
         @abstractmethod
         def set(self, key: str, value: str) -> None:
@@ -183,13 +181,20 @@ class EventManager:
     def register_event_listener(cls, descriptor: EventManager.EventListenerDescriptor):
         cls.event_listeners.append(descriptor)
 
+    _loop = None
+
     @property
     def loop(self):
+        if self._loop is not None:
+            return self._loop
+
         try:
-            return asyncio.get_running_loop()
+            self._loop = asyncio.get_running_loop()
         except RuntimeError:
             # fallback to default event loop policy
-            return asyncio.get_event_loop()
+            self._loop = asyncio.get_event_loop()
+
+        return self._loop
 
     # constructor
 

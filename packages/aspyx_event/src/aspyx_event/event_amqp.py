@@ -245,4 +245,4 @@ class AMQPProvider(MessagingHandler, EventManager.Provider):
         self.container.schedule(0, SendHandler(self, envelope, address))
 
     def handle(self, envelope: EventManager.Envelope, event_listener_descriptor: EventManager.EventListenerDescriptor):
-       self.manager.dispatch_event(event_listener_descriptor, envelope.get_body())
+        self.manager.dispatch_event(event_listener_descriptor, envelope.get_body())

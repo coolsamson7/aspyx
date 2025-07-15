@@ -5,6 +5,9 @@ from aspyx_event import EventManager
 
 
 class LocalProvider(EventManager.Provider):
+    """
+    A provider fot test purposes
+    """
     # local classes
 
     class TestEnvelope(EventManager.Envelope):
@@ -50,10 +53,9 @@ class LocalProvider(EventManager.Provider):
     # implement EnvelopePipeline
 
     def send(self, envelope: EventManager.Envelope, event_descriptor: EventManager.EventDescriptor):
-        #self.handle(envelope, event_descriptor)
-        self.manager.pipeline.handle(envelope, event_descriptor)
-
-    def handle(self, envelope: EventManager.Envelope, event_descriptor: EventManager.EventDescriptor):
         for listener in self.listeners:
             if listener.event is event_descriptor:
-                self.manager.dispatch_event(listener, envelope.get_body())
+                self.manager.pipeline.handle(envelope, listener)
+
+    def handle(self, envelope: EventManager.Envelope, event_listener_descriptor: EventManager.EventListenerDescriptor):
+        self.manager.dispatch_event(event_listener_descriptor, envelope.get_body())

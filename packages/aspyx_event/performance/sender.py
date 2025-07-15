@@ -24,7 +24,7 @@ from aspyx_event import EventManager
 
 from performance.common import HelloEvent, Module, SyncListener, AsyncListener
 
-from aspyx.di import module, Environment, create
+from aspyx.di import Environment
 
 
 async def main():

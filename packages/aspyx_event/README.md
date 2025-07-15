@@ -104,9 +104,7 @@ Parameters are:
 - `name=""` name of the listener, if not specified the class name is used.
 - `per_process=False` if `True`, the event will be dispatched all identical listeners, that run inside a cluster.
 
-Listeners are injectable objects.
-
-Currently, `on` is a sync method only.
+Listeners are injectable objects. The `on` method can be `sync` or `async`!
 
 ## EnvelopePipeline
 
