@@ -3,8 +3,8 @@ test for events
 """
 from __future__ import annotations
 
+import asyncio
 import logging
-import threading
 
 from aspyx.exception import ExceptionManager, handle
 from aspyx.util import Logger
@@ -61,12 +61,13 @@ class SessionPipeline(AbstractEnvelopePipeline):
         self.proceed_handle(envelope, event_listener_descriptor)
 
 
-sync_event_received = threading.Event()
-async_event_received = threading.Event()
+sync_event_received = asyncio.Event()
+async_event_received = asyncio.Event()
 
 @event_listener(HelloEvent, per_process=True)
 class SyncListener(EventListener[HelloEvent]):
     received = None
+    foo = None
 
     # constructor
 
@@ -91,7 +92,7 @@ class AsyncListener(EventListener[HelloEvent]):
 
     # implement
 
-    def on(self, event: HelloEvent):
+    async def on(self, event: HelloEvent):
         AsyncListener.received = event
 
         async_event_received.set()
@@ -134,16 +135,17 @@ def environment():
 
     environment.destroy()
 
+@pytest.mark.asyncio(scope="function")
 class TestLocalService():
-    def test_events(self, environment):
+    async def test_events(self, environment):
         event_manager = environment.get(EventManager)
 
         event = HelloEvent("world")
 
         event_manager.send_event(event)
 
-        assert sync_event_received.wait(timeout=1), "sync event not received"
-        assert async_event_received.wait(timeout=1), "async event not received"
+        await asyncio.wait_for(sync_event_received.wait(), timeout=1)
+        await asyncio.wait_for(async_event_received.wait(), timeout=1)
 
         assert event == SyncListener.received, "events not =="
         assert event == AsyncListener.received, "events not =="

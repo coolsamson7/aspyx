@@ -57,7 +57,7 @@ class AMQPProvider(MessagingHandler, EventManager.Provider):
         self.user = user
         self.password = password
 
-        self.container = Container(self)#, debug=True) # TODO
+        self.container = Container(self)#, debug=True)
         self._connection = None
 
         self.thread= threading.Thread(target=self.container.run, daemon=True)
@@ -113,7 +113,7 @@ class AMQPProvider(MessagingHandler, EventManager.Provider):
         return receiver
 
     def dispatch(self, event: Event, listener: EventManager.EventListenerDescriptor):
-        AMQPProvider.logger.info("on_message ")
+        AMQPProvider.logger.debug("on_message")
 
         envelope = self.AMQPEnvelope(body=event.message.body, headers = event.message.properties)
 

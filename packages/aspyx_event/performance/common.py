@@ -56,7 +56,7 @@ class SessionPipeline(AbstractEnvelopePipeline):
 
 @event_listener(HelloEvent, per_process=True)
 class SyncListener(EventListener[HelloEvent]):
-    received = None
+    received = 0
 
     # constructor
 
@@ -66,11 +66,11 @@ class SyncListener(EventListener[HelloEvent]):
     # implement
 
     def on(self, event: HelloEvent):
-        print(".")
+        SyncListener.received += 1
 
 @event_listener(HelloEvent, per_process=True)
 class AsyncListener(EventListener[HelloEvent]):
-    received = None
+    received = 0
 
     # constructor
 
@@ -79,8 +79,8 @@ class AsyncListener(EventListener[HelloEvent]):
 
     # implement
 
-    def on(self, event: HelloEvent):
-        print(".")
+    async def on(self, event: HelloEvent):
+        AsyncListener.received += 1
 
 # test module
 

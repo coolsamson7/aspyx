@@ -4,11 +4,12 @@ event management
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 import logging
 
 from abc import ABC, abstractmethod
-from typing import Type, TypeVar, Generic, Any, Optional
+from typing import Type, TypeVar, Generic, Any, Optional, Coroutine
 
 from aspyx.exception import ExceptionManager
 from aspyx.reflection import Decorators
@@ -182,6 +183,14 @@ class EventManager:
     def register_event_listener(cls, descriptor: EventManager.EventListenerDescriptor):
         cls.event_listeners.append(descriptor)
 
+    @property
+    def loop(self):
+        try:
+            return asyncio.get_running_loop()
+        except RuntimeError:
+            # fallback to default event loop policy
+            return asyncio.get_event_loop()
+
     # constructor
 
     def __init__(self, provider: EventManager.Provider, exception_manager: Optional[ExceptionManager] = None):
@@ -197,8 +206,6 @@ class EventManager:
         self.exception_manager = exception_manager
 
         provider.manager = self
-
-        self.loop = asyncio.get_event_loop()
 
         self.setup()
 
@@ -267,25 +274,33 @@ class EventManager:
 
         listener = self.get_listener(descriptor.type)
 
-        try:
-            listener.on(event)
-        except Exception as e:
-            if self.exception_manager is not None:
-                raise self.exception_manager.handle(e)
+        def safe_schedule(coro: Coroutine):
+            try:
+                loop = self.loop
+                running_loop = asyncio.get_running_loop()
+                if running_loop == loop:
+                    asyncio.create_task(coro)
+                else:
+                    loop.call_soon_threadsafe(asyncio.create_task, coro)
+            except RuntimeError:
+                asyncio.run(coro)
 
-            self.logger.error(f"caught an exception: {e} while dispatching event {descriptor.event.name}")
-            raise e
+        async def call_handler(listener, event):
+            try:
+                if inspect.iscoroutinefunction(listener.on):
+                    await listener.on(event)
+                else:
+                    listener.on(event)
+            except Exception as e:
+                if self.exception_manager is not None:
+                    raise self.exception_manager.handle(e)##
 
-        #async def call_handler(listener, event):
-        #    if inspect.iscoroutinefunction(listener.on):
-        #        await listener.on(event)
-        #    else:
-        #        listener.on(event)
+                self.logger.error(f"caught an exception: {e} while dispatching event {descriptor.event.name}")
+                raise e
 
-        # schedule handler in main loop
+        # schedule the async wrapper in main loop
 
-        #self.loop.call_soon(asyncio.create_task, call_handler(listener, event))
-        #asyncio.create_task(call_handler(listener, event))
+        safe_schedule(call_handler(listener, event))
 
     # public
 
