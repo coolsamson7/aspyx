@@ -1,7 +1,9 @@
 """
 FastAPI server implementation for the aspyx service framework.
 """
+from __future__ import annotations
 import atexit
+import functools
 import inspect
 import threading
 from typing import Type, Optional, Callable, Any
@@ -21,12 +23,39 @@ from aspyx.reflection import TypeDescriptor, Decorators
 from .service import ComponentRegistry
 from .healthcheck import HealthCheckManager
 
-from .serialization import get_deserializer
+from .serialization import get_deserializer, get_serializer
 
 from .service import Server, ServiceManager
 from .channels import Request, Response, TokenContext
 
 from .restchannel import get, post, put, delete, rest
+
+class ResponseContext:
+    response_var = contextvars.ContextVar[Optional['ResponseContext.Response']]("response", default=None)
+
+    class Response:
+        def __init__(self):
+            self.cookies = {}
+
+        def set_cookie(self, key, value):
+            self.cookies[key] = value
+
+    @classmethod
+    def get(cls) -> ResponseContext.Response:
+        response = ResponseContext.Response()
+
+        cls.response_var.set(response)
+
+        return response
+
+    @classmethod
+    def is_set(cls) -> Optional[ResponseContext.Response]:
+        return cls.response_var.get()
+
+    @classmethod
+    def reset(cls) -> None:
+        cls.response_var.set(None)
+
 
 class RequestContext:
     """
@@ -170,6 +199,40 @@ class FastAPIServer(Server):
         """
         add everything that looks like an http endpoint
         """
+
+        def wrap_service_method(handler, return_type):
+            sig = inspect.signature(handler)
+
+            @functools.wraps(handler)
+            async def wrapper(*args, **kwargs):
+                try:
+                    result = handler(*args, **kwargs)
+                    if inspect.iscoroutine(result):
+                        result = await result
+
+                except HTTPException as e:
+                    raise
+                except Exception as e:
+                    result = {"error": str(e)}
+
+                json_response = JSONResponse(get_serializer(return_type)(result))
+
+                local_response = ResponseContext.is_set()
+                if local_response is not None:
+                    for key, value in  local_response.cookies.items():
+                        json_response.set_cookie(key, value)
+
+                    ResponseContext.reset()
+
+                return json_response
+
+            # Optionally attach response_model info for docs
+
+            wrapper.__signature__ = sig
+            wrapper.__annotations__ = {"return": return_type}
+
+            return wrapper
+
         for descriptor in self.service_manager.descriptors.values():
             if not descriptor.is_component() and descriptor.is_local():
                 prefix = ""
@@ -185,7 +248,7 @@ class FastAPIServer(Server):
                     if decorator is not None:
                         self.router.add_api_route(
                             path=prefix + decorator.args[0],
-                            endpoint=getattr(instance, method.get_name()),
+                            endpoint=wrap_service_method(getattr(instance, method.get_name()), method.return_type),
                             methods=[decorator.decorator.__name__],
                             name=f"{descriptor.get_component_descriptor().name}.{descriptor.name}.{method.get_name()}",
                             response_model=method.return_type,

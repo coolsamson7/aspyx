@@ -457,18 +457,26 @@ class ChannelAdvice:
 
 ## FastAPI server
 
-In order to expose components via HTTP, the corresponding infrastructure in form of a FastAPI server needs to be setup. 
+The required - `FastAPI` - infrastructure to expose those services requires:
 
+- a `FastAPI` instance
+- an injectable `FastAPIServer`
+- and a final `boot` call with the root module, which will return an `Environment`
 
 ```python
-@module()
-class Module():
+fast_api = FastAPI() # so you can run it with uvivorn from command-line
+
+@module(imports=[ServiceModule])
+class Module:
     def __init__(self):
         pass
-    
- server = FastAPIServer(host="0.0.0.0", port=8000)
 
- environment = server.boot(Module) # will start the http server
+    @create()
+    def create_server(self,  service_manager: ServiceManager, component_registry: ComponentRegistry) -> FastAPIServer:
+        return FastAPIServer(fastapi, service_manager, component_registry)
+    
+
+environment = FastAPIServer.boot(Moudle, host="0.0.0.0", port=8000)
 ```
 
 This setup will also expose all service interfaces decorated with the corresponding http decorators!

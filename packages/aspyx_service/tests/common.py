@@ -18,16 +18,18 @@ from jwt import ExpiredSignatureError, InvalidTokenError
 import pytest
 from pydantic import BaseModel
 
+from aspyx.reflection import Decorators
 from aspyx_service import service, Service, component, Component, \
     implementation, health, AbstractComponent, ChannelAddress, inject_service, \
     FastAPIServer, Server, ServiceModule, ServiceManager, \
     HealthCheckManager, get, post, rest, put, delete, Body, SessionManager, RequestContext, \
     TokenContextMiddleware
-from aspyx.di.aop import advice, error, Invocation
+from aspyx.di.aop import advice, error, Invocation, methods, around
 from aspyx.exception import ExceptionManager, handle
 from aspyx.util import Logger
+from aspyx_service.server import ResponseContext
 from aspyx_service.service import LocalComponentRegistry, component_services, AuthorizationException, ComponentRegistry
-from aspyx.di import module, create, injectable, on_running, Environment
+from aspyx.di import module, create, injectable, on_running, Environment, order
 from aspyx.di.configuration import YamlConfigurationSource
 
 # configure logging
@@ -175,11 +177,23 @@ class TestAsyncService(Service):
     async def pydantic(self, data: Pydantic) -> Pydantic:
         pass
 
+def requires_response():
+    """
+    methods marked with `requires_response` will...
+    """
+    def decorator(cls):
+        Decorators.add(cls, requires_response)
+
+        return cls
+
+    return decorator
+
 @service(name="test-rest-service", description="cool")
 @rest("/api")
 class TestRestService(Service):
     @abstractmethod
     @get("/hello/{message}")
+    @requires_response()
     def get(self, message: str) -> str:
         pass
 
@@ -270,7 +284,12 @@ class TestRestServiceImpl(TestRestService):
     def __init__(self):
         pass
 
+    @requires_response()
     def get(self, message: str) -> str:
+        response = ResponseContext.get()
+
+        response.set_cookie("name", "value")
+
         return message
 
     def put(self, message: str) -> str:

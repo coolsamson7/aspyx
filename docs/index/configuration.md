@@ -37,7 +37,6 @@ Configuration variables are retrieved with the method
 def get(self, path: str, type: Type[T], default : Optional[T]=None) -> T
 ```
 
-
 - `path`  
   a '.' separated path
 - `type`  
@@ -48,6 +47,7 @@ def get(self, path: str, type: Type[T], default : Optional[T]=None) -> T
 Sources can be added dynamically by registering them.
 
 **Example**:
+
 ```python
 @injectable()
 class SampleConfigurationSource(ConfigurationSource):
