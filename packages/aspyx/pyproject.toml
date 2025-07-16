@@ -1,6 +1,6 @@
 [project]
 name = "aspyx"
-version = "1.5.3"
+version = "1.6.3"
 description = "A DI and AOP library for Python"
 authors = [{ name = "Andreas Ernst", email = "andreas.ernst7@gmail.com" }]
 readme = "README.md"
@@ -8,7 +8,8 @@ license = { file = "LICENSE" }
 requires-python = ">=3.9"
 dependencies = [
     "python-dotenv~=1.1.0",
-    "pyyaml~=6.0.2"
+    "pyyaml~=6.0.2",
+    "cachetools~= 5.5.2",
 ]
 
 [build-system]
