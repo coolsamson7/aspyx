@@ -90,12 +90,26 @@ The interesting part if the `get_addresses` method that return a list of channel
 In this case a channel is used that exposes a single http endpoint, that will dispatch to the correct service method.
 This information is registered with the appropriate component registry and is used by other processes. 
 
-The required - `FastAPI` - infrastructure to expose those services is started with the call:
+The required - `FastAPI` - infrastructure to expose those services requires:
+
+- a `FastAPI` instance
+- an injectable `FastAPIServer`
+- and a final `boot` call with the root module, which will return an `Environment`
 
 ```python
-server = FastAPIServer(host="0.0.0.0", port=8000)
+fast_api = FastAPI() # so you can run it with uvivorn from command-line
 
-environment = server.boot(Module)
+@module(imports=[ServiceModule])
+class Module:
+    def __init__(self):
+        pass
+
+    @create()
+    def create_server(self,  service_manager: ServiceManager, component_registry: ComponentRegistry) -> FastAPIServer:
+        return FastAPIServer(fastapi, service_manager, component_registry)
+    
+
+environment = FastAPIServer.boot(Moudle, host="0.0.0.0", port=8000)
 ```
 
 Of course, service can also be called locally. In case of multiple possible channels, a keyword argument is used to 
