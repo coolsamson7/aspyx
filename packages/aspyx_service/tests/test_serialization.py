@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from pydantic import BaseModel
 
-from aspyx_service.serialization import get_deserializer, get_serializer
+from aspyx.util import get_deserializer, get_serializer
 
 class Pydantic(BaseModel):
     i : int

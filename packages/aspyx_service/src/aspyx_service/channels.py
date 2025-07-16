@@ -16,11 +16,11 @@ from pydantic import BaseModel
 from aspyx.di.configuration import inject_value
 from aspyx.reflection import DynamicProxy, TypeDescriptor
 from aspyx.threading import ThreadLocal, ContextLocal
+from aspyx.util import get_deserializer, TypeDeserializer, TypeSerializer, get_serializer
 from .service import ServiceManager, ServiceCommunicationException, TokenExpiredException, InvalidTokenException, \
     AuthorizationException, MissingTokenException
 
 from .service import ComponentDescriptor, ChannelInstances, ServiceException, channel, Channel, RemoteServiceException
-from .serialization import get_deserializer, TypeDeserializer, TypeSerializer, get_serializer
 
 class TokenContext:
     """

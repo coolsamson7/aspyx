@@ -19,11 +19,10 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from aspyx.di import Environment, injectable, on_init, inject_environment, on_destroy
 from aspyx.reflection import TypeDescriptor, Decorators
+from aspyx.util import get_deserializer, get_serializer
 
 from .service import ComponentRegistry
 from .healthcheck import HealthCheckManager
-
-from .serialization import get_deserializer, get_serializer
 
 from .service import Server, ServiceManager
 from .channels import Request, Response, TokenContext
