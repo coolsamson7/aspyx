@@ -16,7 +16,7 @@ from aspyx.reflection import Decorators
 
 from aspyx.di import Environment, inject_environment, Providers, ClassInstanceProvider, on_destroy
 
-from aspyx_service.serialization import get_deserializer, get_serializer
+from aspyx.util import get_deserializer, get_serializer
 
 class EventException(Exception):
     pass
