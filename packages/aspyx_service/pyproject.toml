@@ -2,7 +2,7 @@
 
 [project]
 name = "aspyx_service"
-version = "0.10.5"
+version = "0.10.6"
 description = "Aspyx Service framework"
 authors = [{ name = "Andreas Ernst", email = "andreas.ernst7@gmail.com" }]
 readme = "README.md"

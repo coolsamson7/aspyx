@@ -6,6 +6,8 @@ import atexit
 import functools
 import inspect
 import threading
+import typing
+from datetime import datetime
 from typing import Type, Optional, Callable, Any
 import contextvars
 import msgpack
@@ -35,12 +37,47 @@ class ResponseContext:
     class Response:
         def __init__(self):
             self.cookies = {}
+            self.delete_cookies = {}
 
-        def set_cookie(self, key, value):
-            self.cookies[key] = value
+        def delete_cookie(self,
+                           key: str,
+                           path: str = "/",
+                           domain: str | None = None,
+                           secure: bool = False,
+                           httponly: bool = False,
+                           samesite: typing.Literal["lax", "strict", "none"] | None = "lax",
+                           ):
+            self.delete_cookies[key] = {
+                "path": path,
+                "domain": domain,
+                "secure": secure,
+                "httponly": httponly,
+                "samesite": samesite
+            }
+
+        def set_cookie(self,
+                key: str,
+                value: str = "",
+                max_age: int | None = None,
+                expires: datetime | str | int | None = None,
+                path: str | None = "/",
+                domain: str | None = None,
+                secure: bool = False,
+                httponly: bool = False,
+                samesite: typing.Literal["lax", "strict", "none"] | None = "lax"):
+            self.cookies[key] = {
+                "value": value,
+                "max_age": max_age,
+                "expires": expires,
+                "path": path,
+                "domain": domain,
+                "secure": secure,
+                "httponly": httponly,
+                "samesite": samesite
+            }
 
     @classmethod
-    def get(cls) -> ResponseContext.Response:
+    def create(cls) -> ResponseContext.Response:
         response = ResponseContext.Response()
 
         cls.response_var.set(response)
@@ -48,7 +85,7 @@ class ResponseContext:
         return response
 
     @classmethod
-    def is_set(cls) -> Optional[ResponseContext.Response]:
+    def get(cls) -> Optional[ResponseContext.Response]:
         return cls.response_var.get()
 
     @classmethod
@@ -216,10 +253,32 @@ class FastAPIServer(Server):
 
                 json_response = JSONResponse(get_serializer(return_type)(result))
 
-                local_response = ResponseContext.is_set()
+                local_response = ResponseContext.get()
                 if local_response is not None:
+                    # delete
+
+                    for key, value in  local_response.delete_cookies.items():
+                        json_response.delete_cookie(
+                            key,
+                            path=value.path,
+                            domain=value.domain,
+                            secure=value.secure,
+                            httponly=value.httponly
+                            )
+
+                    # create
+
                     for key, value in  local_response.cookies.items():
-                        json_response.set_cookie(key, value)
+                        json_response.set_cookie(
+                            key,
+                            value=value.value,
+                            max_age=value.max_age,
+                            expires=value.expires,
+                            path=value.path,
+                            domain=value.domain,
+                            secure=value.secure,
+                            httponly=value.httponly
+                            )
 
                     ResponseContext.reset()
 
