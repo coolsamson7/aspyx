@@ -72,7 +72,7 @@ Two specific source are already implemented:
 - `YamlConfigurationSource`  
    reads a specific yaml file
 
-Typically you create the required configuration sources in an environment class, e.g.
+Typically you create the required configuration sources in an module, e.g.
 
 ```python
 @module()
