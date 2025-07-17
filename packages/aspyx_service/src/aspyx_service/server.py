@@ -260,10 +260,10 @@ class FastAPIServer(Server):
                     for key, value in  local_response.delete_cookies.items():
                         json_response.delete_cookie(
                             key,
-                            path=value.path,
-                            domain=value.domain,
-                            secure=value.secure,
-                            httponly=value.httponly
+                            path=value["path"],
+                            domain=value["domain"],
+                            secure=value["secure"],
+                            httponly=value["httponly"]
                             )
 
                     # create
@@ -271,13 +271,13 @@ class FastAPIServer(Server):
                     for key, value in  local_response.cookies.items():
                         json_response.set_cookie(
                             key,
-                            value=value.value,
-                            max_age=value.max_age,
-                            expires=value.expires,
-                            path=value.path,
-                            domain=value.domain,
-                            secure=value.secure,
-                            httponly=value.httponly
+                            value=value["value"],
+                            max_age=value["max_age"],
+                            expires=value["expires"],
+                            path=value["path"],
+                            domain=value["domain"],
+                            secure=value["secure"],
+                            httponly=value["httponly"]
                             )
 
                     ResponseContext.reset()
