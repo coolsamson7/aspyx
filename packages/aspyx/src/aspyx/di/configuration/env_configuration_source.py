@@ -14,11 +14,6 @@ class EnvConfigurationSource(ConfigurationSource):
 
     __slots__ = []
 
-    # constructor
-
-    def __init__(self):
-        super().__init__()
-
     # implement
 
     def load(self) -> dict:

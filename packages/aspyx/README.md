@@ -83,9 +83,6 @@ from aspyx.di import injectable, on_init, on_destroy, module, Environment
 
 @injectable()
 class Foo:
-    def __init__(self):
-        pass
-
     def hello(self, msg: str):
         print(f"hello {msg}")
 
@@ -104,9 +101,7 @@ class Bar:
 
 @module()
 class SampleModule:
-    def __init__(self):
-        pass
-
+    pass
 
 # create environment
 
@@ -114,7 +109,7 @@ environment = Environment(SampleModule)
 
 # fetch an instance
 
-bar = env.read(Bar)
+bar = environment.get(Bar)
 
 bar.foo.hello("world")
 ```
@@ -172,10 +167,7 @@ class Foo:
     def __init__(self):
         pass
 ```
-⚠️ **Attention:** Please make sure, that the class defines a local constructor, as this is _required_ to determine injected instances. 
-All referenced types will be injected by the environment. 
-
-Only eligible types are allowed, of course!
+If the class defines a constructor, all parameters - which are expected to be registered as well - will be injected automatically.
 
 The decorator accepts the keyword arguments
 - `eager : boolean`  
@@ -201,9 +193,6 @@ Classes that implement the `Factory` base class and are annotated with `@factory
 ```python
 @factory()
 class TestFactory(Factory[Foo]):
-    def __init__(self):
-        pass
-
     def create(self) -> Foo:
         return Foo()
 ```
@@ -218,9 +207,6 @@ Any `injectable` can define methods decorated with `@create()`, that will create
 ```python
 @injectable()
 class Foo:
-    def __init__(self):
-        pass
-
     @create(scope="request")
     def create(self) -> Baz:
         return Baz()
@@ -256,8 +242,7 @@ constructor type argument called `module`.
 ```python
 @module()
 class SampleModule:
-    def __init__(self):
-        pass
+    pass
 ```
 
 A module is a regular injectable class decorated with `@module` that controls the discovery of injectable classes, by filtering classes according to their module location relative to this class. 
@@ -277,13 +262,11 @@ By adding the parameter `features: list[str]`, it is possible to filter injectab
 @injectable()
 @conditional(requires_feature("dev"))
 class DevOnly:
-     def __init__(self):
-        pass
+     pass
 
 @module()
 class SampleModule():
-    def __init__(self):
-        pass
+    pass
 
 environment = Environment(SampleModule, features=["dev"])
 ```
@@ -295,8 +278,7 @@ By adding an `imports: list[Type]` parameter, specifying other module types, it 
 ```python
 @module()
 class SampleModule(imports=[OtherModule]):
-    def __init__(self):
-        pass
+    pass
 ```
 
 Another possibility is to add a parent environment as an `Environment` constructor parameter
@@ -358,11 +340,8 @@ Different decorators are implemented, that call methods with computed values
 ```python
 @injectable()
 class Foo:
-    def __init__(self):
-        pass
-
     @inject_environment()
-    def initEnvironment(self, env: Environment):
+    def set_environment(self, env: Environment):
         ...
 
     @inject()
@@ -552,9 +531,6 @@ A handy decorator `@synchronized` in combination with the respective advice is i
 ```python
 @injectable()
 class Foo:
-    def __init__(self):
-        pass
-
     @synchronized()
     def execute_synchronized(self):
         ...
@@ -567,9 +543,6 @@ It is possible to inject configuration values, by decorating methods with `@inje
 ```python
 @injectable()
 class Foo:
-    def __init__(self):
-        pass
-
     @inject_value("HOME")
     def inject_home(self, os: str):
         ...
@@ -581,13 +554,13 @@ Configuration values are managed centrally using a `ConfigurationManager`, which
 
 ```python
 class ConfigurationSource(ABC):
-    def __init__(self):
-        pass
-
-   ...
+    @inject()
+    def set_manager(self, manager: ConfigurationManager):
+        manager._register(self)
 
     @abstractmethod
     def load(self) -> dict:
+       pass
 ```
 
 The `load` method is able to return a tree-like structure by returning a `dict`.
@@ -636,11 +609,6 @@ Typically you create the required configuration sources in an environment class,
 ```python
 @module()
 class SampleModule:
-    # constructor
-
-    def __init__(self):
-        pass
-
     @create()
     def create_env_source(self) -> EnvConfigurationSource:
         return EnvConfigurationSource()
@@ -699,7 +667,7 @@ def transactional(scope):
 The class `ExceptionManager` is used to collect dynamic handlers for specific exceptions and is able to dispatch to the concrete functions
 given a specific exception.
 
-The handlers are declared by annoting a class with `@exception_handler` and decorating specific methods with `@handle`
+The handlers are declared by annoting a class with `@exception_handler` and decorating specific methods with `@catch`
 
 **Example**:
 
@@ -711,11 +679,6 @@ class DerivedException(Exception):
 
 @module()
 class SampleModule:
-    # constructor
-
-    def __init__(self):
-        pass
-
     @create()
     def create_exception_manager(self) -> ExceptionManager:
         return ExceptionManager()
@@ -724,19 +687,16 @@ class SampleModule:
 @injectable()
 @exception_handler()
 class TestExceptionHandler:
-    def __init__(self):
-        pass
-
-    @handle()
-    def handle_derived_exception(self, exception: DerivedException):
+    @catch()
+    def catch_derived_exception(self, exception: DerivedException):
         ExceptionManager.proceed()
 
-    @handle()
-    def handle_exception(self, exception: Exception):
+    @catch()
+    def catch_exception(self, exception: Exception):
         pass
 
-    @handle()
-    def handle_base_exception(self, exception: BaseException):
+    @catch()
+    def catch_base_exception(self, exception: BaseException):
         pass
 
 
@@ -764,9 +724,6 @@ Together with a simple around advice we can now add exception handling to any me
 ```python
 @injectable()
 class Service:
-    def __init__(self):
-        pass
-
     def throw(self):
         raise DerivedException()
 
@@ -809,3 +766,7 @@ class ExceptionAdvice:
 **1.4.1**
 
 - mkdocs
+
+**1.6.1**
+
+- default constructors not requires anymore

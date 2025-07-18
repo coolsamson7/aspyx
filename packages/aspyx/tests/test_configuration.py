@@ -25,10 +25,6 @@ class SampleModule:
 
 @injectable()
 class SampleConfigurationSource1(ConfigurationSource):
-    # constructor
-
-    def __init__(self):
-        super().__init__()
 
     def load(self) -> dict:
         return {
@@ -38,11 +34,6 @@ class SampleConfigurationSource1(ConfigurationSource):
 
 @injectable()
 class SampleConfigurationSource2(ConfigurationSource):
-    # constructor
-
-    def __init__(self):
-        super().__init__()
-
     def load(self) -> dict:
         return {
             "b": {

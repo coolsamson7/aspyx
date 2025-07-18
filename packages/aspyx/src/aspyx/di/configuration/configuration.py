@@ -106,9 +106,6 @@ class ConfigurationSource(ABC):
 
     __slots__ = []
 
-    def __init__(self):
-        pass
-
     @inject()
     def set_manager(self, manager: ConfigurationManager):
         manager._register(self)
