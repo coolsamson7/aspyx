@@ -34,16 +34,12 @@ def transactional():
 
 @module()
 class SampleModule:
-    def __init__(self):
-        pass
+    pass
 
 
 @injectable()
 @transactional()
 class Bar:
-    def __init__(self):
-        pass
-
     async def say_async(self, message: str):
         await asyncio.sleep(0.01)
 

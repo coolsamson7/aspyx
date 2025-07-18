@@ -14,11 +14,6 @@ from aspyx.di import injectable, Environment, module, create
 
 @module()
 class SampleModule:
-    # constructor
-
-    def __init__(self):
-        pass
-
     @create()
     def create_env_source(self) -> EnvConfigurationSource:
         return EnvConfigurationSource()

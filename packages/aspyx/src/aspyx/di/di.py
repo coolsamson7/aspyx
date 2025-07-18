@@ -8,6 +8,7 @@ import logging
 import importlib
 import pkgutil
 import sys
+import time
 
 from abc import abstractmethod, ABC
 from enum import Enum
@@ -405,12 +406,10 @@ class ClassInstanceProvider(InstanceProvider):
         # check constructor
 
         init = TypeDescriptor.for_type(self.type).get_method("__init__")
-        if init is None:
-            raise DIRegistrationException(f"{self.type.__name__} does not implement __init__")
-
-        self.params = len(init.param_types)
-        for param in init.param_types:
-            types.append(param)
+        if init is not None:
+            self.params = len(init.param_types)
+            for param in init.param_types:
+                types.append(param)
 
         # check @inject
 
@@ -976,7 +975,7 @@ class Environment:
         """
 
         def add_provider(type: Type, provider: AbstractInstanceProvider):
-            Environment.logger.debug("\tadd provider %s for %s", provider, type)
+            Environment.logger.info("\tadd provider %s for %s", provider, type)
 
             self.providers[type] = provider
 
@@ -988,6 +987,8 @@ class Environment:
         self.parent = parent
         if self.parent is None and env is not Boot:
             self.parent = Boot.get_environment() # inherit environment including its manged instances!
+
+        start = time.perf_counter()
 
         self.features = features
         self.providers: Dict[Type, AbstractInstanceProvider] = {}
@@ -1137,6 +1138,13 @@ class Environment:
 
         for instance in self.instances:
             self.execute_processors(Lifecycle.ON_RUNNING, instance)
+
+        # done
+
+        end = time.perf_counter()
+
+        Environment.logger.info("created environment for class %s in %s ms, created %s instances", env.__qualname__, 1000 * (end - start),  len(self.instances))
+
 
     def is_registered_type(self, type: Type) -> bool:
         provider = self.providers.get(type, None)

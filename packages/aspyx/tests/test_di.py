@@ -69,8 +69,9 @@ class Baz:
 
 @injectable()
 class Bazong:
-    def __init__(self):
-        pass
+    pass
+    #def __init__(self):
+    #    pass
 
 class ConditionalBase:
     pass
