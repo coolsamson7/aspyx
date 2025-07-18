@@ -24,6 +24,10 @@
 
 - bugfixes
 - added `@ExceptionManager`
+- 
+**1.6.1**
+
+- default constructor for injectables not required anymore
 
 
       

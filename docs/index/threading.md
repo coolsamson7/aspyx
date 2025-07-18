@@ -25,9 +25,6 @@ A handy decorator `@synchronized` in combination with the respective advice is i
 ```python
 @injectable()
 class Foo:
-    def __init__(self):
-        pass
-
     @synchronized()
     def execute_synchronized(self):
         ...

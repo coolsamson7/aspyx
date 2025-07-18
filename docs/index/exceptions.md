@@ -15,11 +15,6 @@ class DerivedException(Exception):
 
 @module()
 class SampleModule:
-    # constructor
-
-    def __init__(self):
-        pass
-
     @create()
     def create_exception_manager(self) -> ExceptionManager:
         return ExceptionManager()
@@ -28,9 +23,6 @@ class SampleModule:
 @injectable()
 @exception_handler()
 class TestExceptionHandler:
-    def __init__(self):
-        pass
-
     @handle()
     def handle_derived_exception(self, exception: DerivedException):
         ExceptionManager.proceed()
@@ -73,9 +65,6 @@ Together with a simple around advice we can now add exception handling to any me
 ```python
 @injectable()
 class Service:
-    def __init__(self):
-        pass
-
     def throw(self):
         raise DerivedException()
 

@@ -15,10 +15,7 @@ class Foo:
     def __init__(self):
         pass
 ```
-⚠️ **Attention:** Please make sure, that the class defines a local constructor, as this is _required_ to determine injected instances. 
-All referenced types will be injected by the environment. 
-
-Only eligible types are allowed, of course!
+If the class defines a constructor, all parameters - which are expected to be registered as well - will be injected automatically.
 
 The decorator accepts the keyword arguments
 
@@ -46,9 +43,6 @@ Classes that implement the `Factory` base class and are annotated with `@factory
 ```python
 @factory()
 class TestFactory(Factory[Foo]):
-    def __init__(self):
-        pass
-
     def create(self) -> Foo:
         return Foo()
 ```
@@ -63,9 +57,6 @@ Any `injectable` can define methods decorated with `@create()`, that will create
 ```python
 @injectable()
 class Foo:
-    def __init__(self):
-        pass
-
     @create(scope="request")
     def create(self) -> Baz:
         return Baz()
@@ -80,9 +71,6 @@ This is handy, if the parameters are either required, or just to express a depen
 ```python
 @module(imports=[ServiceModule])
 class Module:
-    def __init__(self):
-        pass
-
     @create()
     def create_yaml_source(self) -> YamlConfigurationSource:
         return YamlConfigurationSource(f"{Path(__file__).parent}/config.yaml")
@@ -123,8 +111,7 @@ constructor type argument called `module`.
 ```python
 @module()
 class SampleModule:
-    def __init__(self):
-        pass
+    pass
 ```
 
 A module is a regular injectable class decorated with `@module` that controls the discovery of injectable classes, by filtering classes according to their module location relative to this class. 
@@ -147,13 +134,11 @@ By adding the parameter `features: list[str]`, it is possible to filter injectab
 @injectable()
 @conditional(requires_feature("dev"))
 class DevOnly:
-     def __init__(self):
-        pass
+     pass
 
 @module()
 class SampleModule():
-    def __init__(self):
-        pass
+    pass
 
 environment = Environment(SampleModule, features=["dev"])
 ```
@@ -229,9 +214,6 @@ Different decorators are implemented, that call methods with computed values
 ```python
 @injectable()
 class Foo:
-    def __init__(self):
-        pass
-
     @inject_environment()
     def set_environment(self, env: Environment):
         ...

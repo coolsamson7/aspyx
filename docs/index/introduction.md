@@ -49,9 +49,6 @@ from aspyx.di import injectable, on_init, on_destroy, module, Environment
 
 @injectable()
 class Foo:
-    def __init__(self):
-        pass
-
     def hello(self, msg: str):
         print(f"hello {msg}")
 
@@ -71,8 +68,7 @@ class Bar:
 
 @module()
 class SampleEnvironment:
-    def __init__(self):
-        pass
+    pass
 
 
 # create environment

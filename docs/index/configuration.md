@@ -6,9 +6,6 @@ It is possible to inject configuration values, by decorating methods with `@inje
 ```python
 @injectable()
 class Foo:
-    def __init__(self):
-        pass
-
     @inject_value("HOME")
     def inject_home(self, os: str):
         ...
@@ -20,13 +17,13 @@ Configuration values are managed centrally using a `ConfigurationManager`, which
 
 ```python
 class ConfigurationSource(ABC):
-    def __init__(self):
-        pass
-
-   ...
+    @inject()
+    def set_manager(self, manager: ConfigurationManager):
+        manager._register(self)
 
     @abstractmethod
     def load(self) -> dict:
+       pass
 ```
 
 The `load` method is able to return a tree-like structure by returning a `dict`.
@@ -51,9 +48,6 @@ Sources can be added dynamically by registering them.
 ```python
 @injectable()
 class SampleConfigurationSource(ConfigurationSource):
-    def __init__(self):
-        super().__init__()
-
     def load(self) -> dict:
         return {
             "a": 1, 
@@ -77,11 +71,6 @@ Typically you create the required configuration sources in an module, e.g.
 ```python
 @module()
 class SampleModule:
-    # constructor
-
-    def __init__(self):
-        pass
-
     @create()
     def create_env_source(self) -> EnvConfigurationSource:
         return EnvConfigurationSource()
