@@ -12,6 +12,7 @@ from .healthcheck import health_checks, health_check, HealthCheckManager, Health
 from .restchannel import RestChannel, post, get, put, delete, QueryParam, Body, rest
 from .session import Session, SessionManager, SessionContext
 from .authorization import AuthorizationManager, AbstractAuthorizationFactory
+from .protobuf import ProtobufManager
 
 @module()
 class ServiceModule:
@@ -47,6 +48,10 @@ __all__ = [
     "InvalidTokenException",
     "MissingTokenException",
     "AuthorizationException",
+
+    # protobuf
+
+    "ProtobufManager",
 
     # authorization
 

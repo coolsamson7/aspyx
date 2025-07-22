@@ -557,7 +557,7 @@ class ComponentRegistry:
 
 
 @injectable()
-class ChannelManager:
+class ChannelFactory:
     """
     Internal factory for channels.
     """
@@ -567,7 +567,7 @@ class ChannelManager:
     def register_channel(cls, channel: str, type: Type):
         ServiceManager.logger.info("register channel %s", channel)
 
-        ChannelManager.factories[channel] = type
+        ChannelFactory.factories[channel] = type
 
     # constructor
 
@@ -603,7 +603,7 @@ def channel(name: str):
 
         Providers.register(ClassInstanceProvider(cls, False, "request"))
 
-        ChannelManager.register_channel(name, cls)
+        ChannelFactory.register_channel(name, cls)
 
         return cls
 
@@ -660,7 +660,7 @@ class ServiceManager:
 
     # constructor
 
-    def __init__(self, component_registry: ComponentRegistry, channel_manager: ChannelManager):
+    def __init__(self, component_registry: ComponentRegistry, channel_manager: ChannelFactory):
         self.component_registry = component_registry
         self.channel_manager = channel_manager
         self.environment : Optional[Environment] = None

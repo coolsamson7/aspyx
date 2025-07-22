@@ -19,11 +19,12 @@ from fastapi import FastAPI, APIRouter, Request as HttpRequest, Response as Http
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from aspyx.di import Environment, injectable, on_init, inject_environment, on_destroy
+from aspyx.di import Environment, on_init, inject_environment, on_destroy
 from aspyx.reflection import TypeDescriptor, Decorators
 from aspyx.util import get_deserializer, get_serializer
 
-from .service import ComponentRegistry
+from .protobuf import ProtobufManager
+from .service import ComponentRegistry, ServiceDescriptor
 from .healthcheck import HealthCheckManager
 
 from .service import Server, ServiceManager
@@ -172,10 +173,11 @@ class FastAPIServer(Server):
 
     # constructor
 
-    def __init__(self, fast_api: FastAPI, service_manager: ServiceManager, component_registry: ComponentRegistry):
+    def __init__(self, fast_api: FastAPI, service_manager: ServiceManager, component_registry: ComponentRegistry, protobuf_manager: ProtobufManager):
         super().__init__()
 
         self.environment : Optional[Environment] = None
+        self.protobuf_manager = protobuf_manager
         self.service_manager = service_manager
         self.component_registry = component_registry
 
@@ -344,16 +346,51 @@ class FastAPIServer(Server):
 
         return args
 
+    def get_descriptor_and_method(self, method_name: str) -> typing.Tuple[ServiceDescriptor, Callable]:
+        parts = method_name.split(":")
+
+        # component = parts[0]
+        service_name = parts[1]
+        method_name = parts[2]
+
+        service_descriptor : ServiceDescriptor = typing.cast(ServiceDescriptor, ServiceManager.descriptors_by_name[service_name])
+        service = self.service_manager.get_service(service_descriptor.type, preferred_channel="local")
+
+        return service_descriptor, getattr(service, method_name)
+
     async def invoke(self, http_request: HttpRequest):
         content_type = http_request.headers.get("content-type", "")
+        response_name = ""
+
+        service_descriptor : ServiceDescriptor
+        method : Callable
+        args : list[Any]
 
         content = "json"
         if "application/msgpack" in content_type:
             content = "msgpack"
-            raw_data = await http_request.body()
-            data = msgpack.unpackb(raw_data, raw=False)
+            data = msgpack.unpackb(await http_request.body(), raw=False)
+            service_descriptor, method = self.get_descriptor_and_method(data["method"])
+            args = self.deserialize_args(data["args"], service_descriptor.type, method)
+
         elif "application/json" in content_type:
             data = await http_request.json()
+            service_descriptor, method = self.get_descriptor_and_method(data["method"])
+            args = self.deserialize_args(data["args"], service_descriptor.type, method)
+
+        elif "application/x-protobuf" in content_type:
+            content = "protobuf"
+            service_descriptor, method = self.get_descriptor_and_method(http_request.headers.get("x-rpc-method") )
+
+            data = await http_request.body() # TODO -> name
+
+            request_name = ProtobufManager.get_message_name(service_descriptor.type, f"{method.__name__}Request")
+
+            request = self.protobuf_manager.get_message_type(request_name)()
+            request.ParseFromString(data)
+
+            args = self.protobuf_manager.create_deserializer(request.DESCRIPTOR, method).deserialize(request)
+
         else:
             return HttpResponse(
                 content="Unsupported Content-Type",
@@ -364,43 +401,48 @@ class FastAPIServer(Server):
         request = data
 
         if content == "json":
-            return await self.dispatch(http_request, request)
+            try:
+                result = await self.dispatch(service_descriptor, method, args)
+
+                return Response(result=result, exception=None).model_dump()
+            except Exception as e:
+                return Response(result=None, exception=str(e)).model_dump()
+
+        elif content == "protobuf":
+            try:
+                result = await self.dispatch(service_descriptor, method, args)
+
+                response_name = ProtobufManager.get_message_name(service_descriptor.type, f"{method.__name__}Response")
+                response_type = self.protobuf_manager.get_message_type(response_name)
+
+                result_message = self.protobuf_manager.create_result_serializer(response_type, method).serialize(result)
+
+                return HttpResponse(
+                    content=result_message.SerializeToString(),
+                    media_type="application/x-protobuf"
+                )
+
+            except Exception as e:
+                raise e #  TODO
+
         else:
+            try:
+                response = Response(result=await self.dispatch(service_descriptor, method, args), exception=None).model_dump()
+            except Exception as e:
+                response = Response(result=None, exception=str(e)).model_dump()
+
             return HttpResponse(
-                content=msgpack.packb(await self.dispatch(http_request, request), use_bin_type=True),
+                content=msgpack.packb(response, use_bin_type=True),
                 media_type="application/msgpack"
             )
 
-    async def dispatch(self, http_request: HttpRequest, request: dict) :
-        ServiceManager.logger.debug("dispatch request %s", request["method"])
+    async def dispatch(self, service_descriptor: ServiceDescriptor, method: Callable, args: list[Any]) :
+        ServiceManager.logger.debug("dispatch request %s.%s", service_descriptor, method.__name__)
 
-        # <comp>:<service>:<method>
-
-        parts = request["method"].split(":")
-
-        #component = parts[0]
-        service_name = parts[1]
-        method_name = parts[2]
-
-        service_descriptor = ServiceManager.descriptors_by_name[service_name]
-        service = self.service_manager.get_service(service_descriptor.type, preferred_channel="local")
-
-        method = getattr(service, method_name)
-
-        args = self.deserialize_args(request["args"], service_descriptor.type, method)
-        try:
-            if inspect.iscoroutinefunction(method):
-                result = await method(*args)
-            else:
-                result = method(*args)
-
-            return Response(result=result, exception=None).model_dump()
-
-        except HTTPException as e:
-            raise
-
-        except Exception as e:
-            return Response(result=None, exception=str(e)).model_dump()
+        if inspect.iscoroutinefunction(method):
+            return await method(*args)
+        else:
+            return method(*args)
 
     # override
 
