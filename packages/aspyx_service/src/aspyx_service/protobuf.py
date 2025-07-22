@@ -4,6 +4,7 @@ import inspect
 from dataclasses import is_dataclass, fields as dc_fields
 from typing import Type, get_type_hints, Callable, Tuple, get_origin, get_args, List, Dict, Any, Union
 from pydantic import BaseModel
+from sympy import public
 
 from .service import channel
 
@@ -35,16 +36,15 @@ def get_inner_type(typ: Type) -> Type:
 
     return typ
 
-@injectable()
-class ProtobufManager:
+class ProtobufBuilder:
     # class methods
 
     @classmethod
-    def get_message_name(cls, type: Type, suffix = "") -> str:
+    def get_message_name(cls, type: Type, suffix="") -> str:
         module = type.__module__.replace(".", "_")
         name = type.__name__
 
-        return  f"{module}.{name}{suffix}"
+        return f"{module}.{name}{suffix}"
 
     @classmethod
     def get_request_message_name(cls, type: Type, method: Callable) -> str:
@@ -53,25 +53,6 @@ class ProtobufManager:
     @classmethod
     def get_response_message_name(cls, type: Type, method: Callable) -> str:
         return cls.get_message_name(type, f"{method.__name__}Response")
-
-    # constructor
-
-    def __init__(self):
-        self.pool: DescriptorPool = descriptor_pool.Default()
-        self.factory = message_factory.MessageFactory(self.pool)
-        self.serializer_cache: Dict[Callable, ProtobufManager.MethodSerializer] = {}
-        self.deserializer_cache: Dict[Descriptor, ProtobufManager.MethodDeserializer] = {}
-
-        self.result_serializer_cache: Dict[Descriptor, ProtobufManager.MethodSerializer] = {}
-        self.result_deserializer_cache: Dict[Descriptor, ProtobufManager.MethodDeserializer] = {}
-
-        self.service_cache: Dict[Type, ProtobufManager.ServiceBuilder] = {}
-
-    # ...
-
-    def check_service(self, service_type: Type):
-        if self.service_cache.get(service_type, None) is None:
-            self.service_cache[service_type] = ProtobufManager.ServiceBuilder(self.pool, service_type)
 
     # inner classes
 
@@ -96,7 +77,7 @@ class ProtobufManager:
                 field_type, _, type_name = self._resolve_type(item_type)
                 return (
                     field_type,
-                    descriptor_pb2.FieldDescriptorProto.LABEL_REPEATED, # type: ignore
+                    descriptor_pb2.FieldDescriptorProto.LABEL_REPEATED,  # type: ignore
                     type_name,
                 )
 
@@ -108,38 +89,38 @@ class ProtobufManager:
             if is_dataclass(py_type) or (inspect.isclass(py_type) and issubclass(py_type, BaseModel)):
                 type_name = self.method_builder.service_builder.build_message_type(py_type)
                 return (
-                    descriptor_pb2.FieldDescriptorProto.TYPE_MESSAGE, # type: ignore
-                    descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL, # type: ignore
+                    descriptor_pb2.FieldDescriptorProto.TYPE_MESSAGE,  # type: ignore
+                    descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL,  # type: ignore
                     type_name,
                 )
 
             # Scalar mappings
 
             scalar = self._map_scalar_type(py_type)
-            return scalar, descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL, None # type: ignore
+            return scalar, descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL, None  # type: ignore
 
         def _map_scalar_type(self, py_type: Type) -> int:
             """Map Python scalar types to protobuf field types."""
             mapping = {
-                str: descriptor_pb2.FieldDescriptorProto.TYPE_STRING, # type: ignore
-                int: descriptor_pb2.FieldDescriptorProto.TYPE_INT32, # type: ignore
-                float: descriptor_pb2.FieldDescriptorProto.TYPE_FLOAT, # type: ignore
-                bool: descriptor_pb2.FieldDescriptorProto.TYPE_BOOL, # type: ignore
-                bytes: descriptor_pb2.FieldDescriptorProto.TYPE_BYTES, # type: ignore
+                str: descriptor_pb2.FieldDescriptorProto.TYPE_STRING,  # type: ignore
+                int: descriptor_pb2.FieldDescriptorProto.TYPE_INT32,  # type: ignore
+                float: descriptor_pb2.FieldDescriptorProto.TYPE_FLOAT,  # type: ignore
+                bool: descriptor_pb2.FieldDescriptorProto.TYPE_BOOL,  # type: ignore
+                bytes: descriptor_pb2.FieldDescriptorProto.TYPE_BYTES,  # type: ignore
             }
 
-            return mapping.get(py_type, descriptor_pb2.FieldDescriptorProto.TYPE_STRING) # type: ignore
+            return mapping.get(py_type, descriptor_pb2.FieldDescriptorProto.TYPE_STRING)  # type: ignore
 
     class RequestMessageBuilder(MessageBuilder):
         """Builds protobuf request message descriptor from method signature."""
 
-        def __init__(self, method_builder: ProtobufManager.MethodBuilder):
+        def __init__(self, method_builder: ProtobufBuilder.MethodBuilder):
             self.method_builder = method_builder
 
         def build(self, message_name: str, method: Callable):
             type_hints = get_type_hints(method)
 
-            request_msg = descriptor_pb2.DescriptorProto() # type: ignore
+            request_msg = descriptor_pb2.DescriptorProto()  # type: ignore
             request_msg.name = message_name.split(".")[-1]
 
             # loop over parameters
@@ -170,13 +151,13 @@ class ProtobufManager:
     class ResponseMessageBuilder(MessageBuilder):
         """Builds protobuf response message descriptor from method return type."""
 
-        def __init__(self, method_builder: ProtobufManager.MethodBuilder):
+        def __init__(self, method_builder: ProtobufBuilder.MethodBuilder):
             self.method_builder = method_builder
 
         def build(self, message_name: str, method: Callable):
             type_hints = get_type_hints(method)
 
-            response_msg = descriptor_pb2.DescriptorProto() # type: ignore
+            response_msg = descriptor_pb2.DescriptorProto()  # type: ignore
             response_msg.name = message_name.split(".")[-1]
 
             return_type = type_hints.get("return", str)
@@ -196,9 +177,9 @@ class ProtobufManager:
     class MethodBuilder:
         """Builds protobuf MethodDescriptorProto for a service method."""
 
-        def __init__(self, service_builder: ProtobufManager.ServiceBuilder):
+        def __init__(self, service_builder: ProtobufBuilder.ServiceBuilder):
             self.service_builder = service_builder
-            self.method_desc = descriptor_pb2.MethodDescriptorProto() # type: ignore
+            self.method_desc = descriptor_pb2.MethodDescriptorProto()  # type: ignore
 
         def method(self, service_type: Type, callable: Callable):
             name = f"{service_type.__name__}{callable.__name__}"
@@ -213,8 +194,8 @@ class ProtobufManager:
 
             # Build request and response message types
 
-            ProtobufManager.RequestMessageBuilder(self).build(request_name, callable)
-            ProtobufManager.ResponseMessageBuilder(self).build(response_name, callable)
+            ProtobufBuilder.RequestMessageBuilder(self).build(request_name, callable)
+            ProtobufBuilder.ResponseMessageBuilder(self).build(response_name, callable)
 
             # Add method to service descriptor
 
@@ -226,26 +207,26 @@ class ProtobufManager:
 
             # create a new FileDescriptorProto
 
-            self.file_desc_proto = descriptor_pb2.FileDescriptorProto() # type: ignore
+            self.file_desc_proto = descriptor_pb2.FileDescriptorProto()  # type: ignore
             self.file_desc_proto.name = f"{service_type.__name__.lower()}.proto"
             self.file_desc_proto.package = service_type.__module__.replace(".", "_")
 
             # create ServiceDescriptorProto
 
-            self.service_desc = descriptor_pb2.ServiceDescriptorProto()# type: ignore
+            self.service_desc = descriptor_pb2.ServiceDescriptorProto()  # type: ignore
             self.service_desc.name = service_type.__name__
 
             # check methods
 
             for method in TypeDescriptor.for_type(service_type).get_methods():
-                ProtobufManager.MethodBuilder(self).method(service_type, method.method)
+                ProtobufBuilder.MethodBuilder(self).method(service_type, method.method)
 
             # done
 
             self.file_desc_proto.service.add().CopyFrom(self.service_desc)
             self.pool.Add(self.file_desc_proto)
 
-            print(text_format.MessageToString(self.file_desc_proto)) # TODO
+            print(text_format.MessageToString(self.file_desc_proto))  # TODO
 
         def get_fields_and_types(self, type: Type) -> List[Tuple[str, Type]]:
             hints = get_type_hints(type)
@@ -268,7 +249,7 @@ class ProtobufManager:
             if any(m.name == name for m in self.file_desc_proto.message_type):
                 return f".{full_name}"
 
-            desc = descriptor_pb2.DescriptorProto() # type: ignore
+            desc = descriptor_pb2.DescriptorProto()  # type: ignore
             desc.name = name
 
             # Extract fields from dataclass or pydantic model
@@ -277,7 +258,7 @@ class ProtobufManager:
                 index = 1
                 for field_name, field_type in self.get_fields_and_types(cls):
                     # Use MessageBuilder to get proto field info TODO!
-                    mb = ProtobufManager.MessageBuilder()
+                    mb = ProtobufBuilder.MessageBuilder()
 
                     mb.method_builder = type("dummy", (),
                                              {"service_builder": self})()  # Hack to allow calling to_proto_type
@@ -300,6 +281,41 @@ class ProtobufManager:
             self.file_desc_proto.message_type.add().CopyFrom(desc)
 
             return f".{full_name}"
+
+    # slots
+
+    __slots__ = [
+        "pool",
+        "factory",
+        "service_cache"
+    ]
+
+    # constructor
+
+    def __init__(self):
+        self.pool: DescriptorPool = descriptor_pool.Default()
+        self.factory = message_factory.MessageFactory(self.pool)
+        self.service_cache: Dict[Type, ProtobufManager.ServiceBuilder] = {}
+
+    # public
+
+    def check_service(self, service_type: Type):
+        if self.service_cache.get(service_type, None) is None:
+            self.service_cache[service_type] = ProtobufManager.ServiceBuilder(self.pool, service_type)
+
+    def get_message_type(self, full_name: str):
+        return self.factory.GetPrototype(self.pool.FindMessageTypeByName(full_name))
+
+    def get_request_message(self, invocation: DynamicProxy.Invocation):
+        return self.get_message_type(self.get_request_message_name(invocation.type, invocation.method))
+
+    def get_response_message(self, invocation: DynamicProxy.Invocation):
+        return self.get_message_type(self.get_response_message_name(invocation.type, invocation.method))
+
+
+@injectable()
+class ProtobufManager(ProtobufBuilder):
+    # local classes
 
     class MethodDeserializer:
         __slots__ = [
@@ -475,7 +491,7 @@ class ProtobufManager:
 
             self.setters = []
 
-        def result(self, method: Callable) -> 'ProtobufManager.MethodSerializer':
+        def result(self, method: Callable) -> ProtobufManager.MethodSerializer:
             msg_descriptor = self.message_type.DESCRIPTOR
             type_hints = get_type_hints(method)
 
@@ -487,7 +503,7 @@ class ProtobufManager:
 
             return self
 
-        def args(self, method: Callable)-> 'ProtobufManager.MethodSerializer':
+        def args(self, method: Callable)-> ProtobufManager.MethodSerializer:
             msg_descriptor = self.message_type.DESCRIPTOR
             type_hints = get_type_hints(method)
 
@@ -603,20 +619,34 @@ class ProtobufManager:
 
             return message
 
-    def get_message_type(self, full_name: str):
-        return self.factory.GetPrototype(self.pool.FindMessageTypeByName(full_name))
+    # slots
 
-    def get_request_message(self, invocation: DynamicProxy.Invocation):
-        return self.get_message_type(self.get_request_message_name(invocation.type, invocation.method))
+    __slots__ = [
+        "serializer_cache",
+        "deserializer_cache",
+        "result_serializer_cache",
+        "result_deserializer_cache"
+    ]
 
-    def get_response_message(self, invocation: DynamicProxy.Invocation):
-        return self.get_message_type(self.get_response_message_name(invocation.type, invocation.method))
+    # constructor
+
+    def __init__(self):
+        super().__init__()
+
+        self.serializer_cache: Dict[Callable, ProtobufManager.MethodSerializer] = {}
+        self.deserializer_cache: Dict[Descriptor, ProtobufManager.MethodDeserializer] = {}
+
+        self.result_serializer_cache: Dict[Descriptor, ProtobufManager.MethodSerializer] = {}
+        self.result_deserializer_cache: Dict[Descriptor, ProtobufManager.MethodDeserializer] = {}
+
+    # public
 
     def create_serializer(self, invocation: DynamicProxy.Invocation) -> ProtobufManager.MethodSerializer:
         # is it cached?
 
-        if invocation.method in self.serializer_cache:
-            return self.serializer_cache[invocation.method]
+        serializer = self.serializer_cache.get(invocation.method, None)
+        if serializer is not None:
+            return serializer
 
         # construct
 
@@ -631,8 +661,9 @@ class ProtobufManager:
     def create_deserializer(self, descriptor: Descriptor, method: Callable) -> ProtobufManager.MethodDeserializer:
         # is it cached?
 
-        if descriptor in self.deserializer_cache:
-            return self.deserializer_cache[descriptor]
+        deserializer = self.deserializer_cache.get(descriptor, None)
+        if deserializer is not None:
+            return deserializer
 
         # construct
 
@@ -645,8 +676,9 @@ class ProtobufManager:
     def create_result_serializer(self, descriptor: Descriptor, method: Callable) -> ProtobufManager.MethodSerializer:
         # is it cached?
 
-        if descriptor in self.result_serializer_cache:
-            return self.result_serializer_cache[descriptor]
+        serializer = self.result_serializer_cache.get(descriptor, None)
+        if serializer is not None:
+            return serializer
 
         # construct
 
@@ -659,8 +691,9 @@ class ProtobufManager:
     def create_result_deserializer(self, descriptor: Descriptor, method: Callable) -> ProtobufManager.MethodDeserializer:
         # is it cached?
 
-        if descriptor in self.result_deserializer_cache:
-            return self.result_deserializer_cache[descriptor]
+        deserializer = self.result_deserializer_cache.get(descriptor, None)
+        if deserializer is not None:
+            return deserializer
 
         # construct
 
@@ -695,7 +728,7 @@ class ProtobufChannel(HTTPXChannel):
 
             http_result = self.request("post", f"{self.get_url()}/invoke", content=request_message.SerializeToString(), timeout=self.timeout,  headers={
                     "Content-Type": "application/x-protobuf",  # Protobuf MIME type
-                    "Accept": "application/x-protobuf",
+                    #"Accept": "application/x-protobuf",
                     "x-rpc-method": method_name
             })
 

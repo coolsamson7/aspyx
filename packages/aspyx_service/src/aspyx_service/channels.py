@@ -196,6 +196,32 @@ class HTTPXChannel(Channel):
 
             headers["Authorization"] = f"Bearer {token}"
 
+        ### TEST
+
+        print_size = False
+        if print_size:
+            request = self.get_client().build_request(http_method, url, params=params, json=json, headers=headers, timeout=timeout, content=content)
+            # Measure body
+            body_size = len(request.content or b"")
+
+            # Measure headers (as raw bytes)
+            headers_size = sum(
+                len(k.encode()) + len(v.encode()) + 4  # ": " + "\r\n"
+                for k, v in request.headers.items()
+            ) + 2  # final \r\n
+
+            # Optional: estimate request line
+            request_line = f"{request.method} {request.url.raw_path.decode()} HTTP/1.1\r\n".encode()
+            request_line_size = len(request_line)
+
+            # Total estimated size
+            total_size = request_line_size + headers_size + body_size
+
+            print(f"Request line: {request_line_size} bytes")
+            print(f"Headers: {headers_size} bytes")
+            print(f"Body: {body_size} bytes")
+            print(f"Total request size: {total_size} bytes")
+
         try:
             response = self.get_client().request(http_method, url, params=params, json=json, headers=headers, timeout=timeout, content=content)
             response.raise_for_status()
