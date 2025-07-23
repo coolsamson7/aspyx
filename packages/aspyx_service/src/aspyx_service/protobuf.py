@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import inspect
 from dataclasses import is_dataclass, fields as dc_fields
-from typing import Type, get_type_hints, Callable, Tuple, get_origin, get_args, List, Dict, Any, Union
+from typing import Type, get_type_hints, Callable, Tuple, get_origin, get_args, List, Dict, Any, Union, Sequence
+
+import httpx
 from pydantic import BaseModel
-from sympy import public
 
 from .service import channel
 
@@ -117,26 +118,20 @@ class ProtobufBuilder:
         def __init__(self, method_builder: ProtobufBuilder.MethodBuilder):
             self.method_builder = method_builder
 
-        def build(self, message_name: str, method: Callable):
-            type_hints = get_type_hints(method)
-
+        def build(self, message_name: str, method: TypeDescriptor.MethodDescriptor):
             request_msg = descriptor_pb2.DescriptorProto()  # type: ignore
             request_msg.name = message_name.split(".")[-1]
 
             # loop over parameters
 
             field_index = 1
-            for param_name, param in inspect.signature(method).parameters.items():
-                if param_name == "self":
-                    continue
-
-                param_type = type_hints.get(param_name, str)
+            for param in method.params:
                 field = request_msg.field.add()
 
-                field.name = param_name
+                field.name = param.name
                 field.number = field_index
 
-                field_type, label, type_name = self.to_proto_type(param_type)
+                field_type, label, type_name = self.to_proto_type(param.type)
                 field.type = field_type
                 field.label = label
                 if type_name:
@@ -154,13 +149,11 @@ class ProtobufBuilder:
         def __init__(self, method_builder: ProtobufBuilder.MethodBuilder):
             self.method_builder = method_builder
 
-        def build(self, message_name: str, method: Callable):
-            type_hints = get_type_hints(method)
-
+        def build(self, message_name: str, method: TypeDescriptor.MethodDescriptor):
             response_msg = descriptor_pb2.DescriptorProto()  # type: ignore
             response_msg.name = message_name.split(".")[-1]
 
-            return_type = type_hints.get("return", str)
+            return_type = method.return_type
             response_field = response_msg.field.add()
             response_field.name = "result"
             response_field.number = 1
@@ -181,8 +174,8 @@ class ProtobufBuilder:
             self.service_builder = service_builder
             self.method_desc = descriptor_pb2.MethodDescriptorProto()  # type: ignore
 
-        def method(self, service_type: Type, callable: Callable):
-            name = f"{service_type.__name__}{callable.__name__}"
+        def method(self, service_type: Type, method: TypeDescriptor.MethodDescriptor):
+            name = f"{service_type.__name__}{method.get_name()}"
             package = self.service_builder.file_desc_proto.package
 
             request_name = f".{package}.{name}Request"
@@ -194,8 +187,8 @@ class ProtobufBuilder:
 
             # Build request and response message types
 
-            ProtobufBuilder.RequestMessageBuilder(self).build(request_name, callable)
-            ProtobufBuilder.ResponseMessageBuilder(self).build(response_name, callable)
+            ProtobufBuilder.RequestMessageBuilder(self).build(request_name, method)
+            ProtobufBuilder.ResponseMessageBuilder(self).build(response_name, method)
 
             # Add method to service descriptor
 
@@ -219,7 +212,7 @@ class ProtobufBuilder:
             # check methods
 
             for method in TypeDescriptor.for_type(service_type).get_methods():
-                ProtobufBuilder.MethodBuilder(self).method(service_type, method.method)
+                ProtobufBuilder.MethodBuilder(self).method(service_type, method)
 
             # done
 
@@ -306,11 +299,11 @@ class ProtobufBuilder:
     def get_message_type(self, full_name: str):
         return self.factory.GetPrototype(self.pool.FindMessageTypeByName(full_name))
 
-    def get_request_message(self, invocation: DynamicProxy.Invocation):
-        return self.get_message_type(self.get_request_message_name(invocation.type, invocation.method))
+    def get_request_message(self,  type: Type, method: Callable):
+        return self.get_message_type(self.get_request_message_name(type, method))
 
-    def get_response_message(self, invocation: DynamicProxy.Invocation):
-        return self.get_message_type(self.get_response_message_name(invocation.type, invocation.method))
+    def get_response_message(self, type: Type, method: Callable):
+        return self.get_message_type(self.get_response_message_name(type, method))
 
 
 @injectable()
@@ -476,6 +469,15 @@ class ProtobufManager(ProtobufBuilder):
 
             return list(value.values())
 
+        def deserialize_result(self, message: Message) -> list[Any]:
+            # call setters
+
+            value = {}
+            for getter in self.getters:
+                getter(message, value)
+
+            return value["result"]
+
     class MethodSerializer:
         __slots__ = [
             "manager",
@@ -602,20 +604,23 @@ class ProtobufManager(ProtobufBuilder):
 
             # call setters
 
-            for setter in self.setters:
-                setter(message, value)
+            for i in range(len(self.setters)):
+                self.setters[i](message, value)
 
             return message
 
-        def serialize_args(self, invocation: Any) -> Any:
+        def serialize_args(self, args: Sequence[Any]) -> Any:
             # create message instance
 
             message = self.message_type()
 
             # call setters
 
-            for setter, value in zip(self.setters, invocation.args):
-                setter(message, value)
+            for i in range(len(self.setters)):
+                self.setters[i](message, args[i])
+
+            #for setter, value in zip(self.setters, invocation.args):
+            #    setter(message, value)
 
             return message
 
@@ -641,20 +646,16 @@ class ProtobufManager(ProtobufBuilder):
 
     # public
 
-    def create_serializer(self, invocation: DynamicProxy.Invocation) -> ProtobufManager.MethodSerializer:
+    def create_serializer(self, type: Type, method: Callable) -> ProtobufManager.MethodSerializer:
         # is it cached?
 
-        serializer = self.serializer_cache.get(invocation.method, None)
-        if serializer is not None:
-            return serializer
+        serializer = self.serializer_cache.get(method, None)
+        if serializer is None:
+            self.check_service(type) # make sure all messages are created
 
-        # construct
+            serializer = ProtobufManager.MethodSerializer(self, self.get_request_message(type, method)).args(method)
 
-        self.check_service(invocation.type) # make sure all messages are created
-
-        serializer = ProtobufManager.MethodSerializer(self, self.get_request_message(invocation)).args(invocation.method)
-
-        self.serializer_cache[invocation.method] = serializer
+            self.serializer_cache[method] = serializer
 
         return serializer
 
@@ -662,14 +663,10 @@ class ProtobufManager(ProtobufBuilder):
         # is it cached?
 
         deserializer = self.deserializer_cache.get(descriptor, None)
-        if deserializer is not None:
-            return deserializer
+        if deserializer is None:
+            deserializer = ProtobufManager.MethodDeserializer(self, descriptor).args(method)
 
-        # construct
-
-        deserializer = ProtobufManager.MethodDeserializer(self, descriptor).args(method)
-
-        self.deserializer_cache[descriptor] = deserializer
+            self.deserializer_cache[descriptor] = deserializer
 
         return deserializer
 
@@ -677,14 +674,10 @@ class ProtobufManager(ProtobufBuilder):
         # is it cached?
 
         serializer = self.result_serializer_cache.get(descriptor, None)
-        if serializer is not None:
-            return serializer
+        if serializer is None:
+            serializer = ProtobufManager.MethodSerializer(self, descriptor).result(method)
 
-        # construct
-
-        serializer = ProtobufManager.MethodSerializer(self, descriptor).result(method)
-
-        self.result_serializer_cache[descriptor] = serializer
+            self.result_serializer_cache[descriptor] = serializer
 
         return serializer
 
@@ -692,19 +685,54 @@ class ProtobufManager(ProtobufBuilder):
         # is it cached?
 
         deserializer = self.result_deserializer_cache.get(descriptor, None)
-        if deserializer is not None:
-            return deserializer
+        if deserializer is None:
+            deserializer = ProtobufManager.MethodDeserializer(self, descriptor).result(method)
 
-        # construct
-
-        deserializer = ProtobufManager.MethodDeserializer(self, descriptor).result(method)
-
-        self.result_deserializer_cache[descriptor] = deserializer
+            self.result_deserializer_cache[descriptor] = deserializer
 
         return deserializer
 
 @channel("dispatch-protobuf")
 class ProtobufChannel(HTTPXChannel):
+    # local classes
+
+    class Call:
+        __slots__ = [
+            "method_name",
+            "serializer",
+            "response_type",
+            "deserializer"
+        ]
+
+        # constructor
+
+        def __init__(self, method_name: str, serializer: ProtobufManager.MethodSerializer, response_type, deserializer: ProtobufManager.MethodDeserializer):
+            self.method_name = method_name
+            self.serializer = serializer
+            self.response_type = response_type
+            self.deserializer = deserializer
+
+        # public
+
+        def serialize(self, args: Sequence[Any]) -> Any:
+            message = self.serializer.serialize_args(args)
+            return message.SerializeToString()
+
+        def deserialize(self, http_response: httpx.Response) -> Any:
+            response = self.response_type()
+            response.ParseFromString(http_response.content)
+
+            return self.deserializer.deserialize_result(response)
+
+    # slots
+
+    __slots__ = [
+        "manager",
+        "environment",
+        "protobuf_manager",
+        "cache"
+    ]
+
     # constructor
 
     def __init__(self, manager: ServiceManager, protobuf_manager: ProtobufManager):
@@ -713,37 +741,66 @@ class ProtobufChannel(HTTPXChannel):
         self.manager = manager
         self.environment = None
         self.protobuf_manager = protobuf_manager
+        self.cache: dict[Callable, ProtobufChannel.Call] = {}
+
+    # internal
+
+    def get_call(self, type: Type, method: Callable) -> ProtobufChannel.Call:
+        call = self.cache.get(method, None)
+        if call is None:
+            service_name = self.service_names[type]
+            method_name = f"{self.component_descriptor.name}:{service_name}:{method.__name__}"
+
+            serializer = self.protobuf_manager.create_serializer(type, method)
+
+            response_name = self.protobuf_manager.get_response_message_name(type, method)
+            response_type = self.protobuf_manager.get_message_type(response_name)
+
+            deserializer = self.protobuf_manager.create_result_deserializer(response_type, method)
+
+            call = ProtobufChannel.Call(method_name, serializer, response_type, deserializer)
+
+            self.cache[method] = call
+
+        return call
 
     # implement
 
-    # TODO invoke async
-    async def invoke_async(self, invocation: 'DynamicProxy.Invocation'):
-        pass
+    async def invoke_async(self, invocation: DynamicProxy.Invocation):
+        call = self.get_call(invocation.type, invocation.method)
+
+        try:
+            http_result = await self.request_async("post", f"{self.get_url()}/invoke", content=call.serialize(invocation.args),
+                                       timeout=self.timeout, headers={
+                    "Content-Type": "application/x-protobuf",
+                    # "Accept": "application/x-protobuf",
+                    "x-rpc-method": call.method_name
+                })
+
+            # if result["exception"] is not None: TODO: Will we do that as well?
+            #    raise RemoteServiceException(f"server side exception {result['exception']}")
+
+            return call.deserialize(http_result)
+        except (ServiceCommunicationException, AuthorizationException, RemoteServiceException) as e:
+            raise
+
+        except Exception as e:
+            raise ServiceCommunicationException(f"communication exception {e}") from e
 
     def invoke(self, invocation: DynamicProxy.Invocation):
-        service_name = self.service_names[invocation.type]
-        method_name = f"{self.component_descriptor.name}:{service_name}:{invocation.method.__name__}"
+        call = self.get_call(invocation.type, invocation.method)
+
         try:
-            request_message = self.protobuf_manager.create_serializer(invocation).serialize_args(invocation)
-
-            http_result = self.request("post", f"{self.get_url()}/invoke", content=request_message.SerializeToString(), timeout=self.timeout,  headers={
-                    "Content-Type": "application/x-protobuf",  # Protobuf MIME type
+            http_result = self.request("post", f"{self.get_url()}/invoke", content=call.serialize(invocation.args), timeout=self.timeout,  headers={
+                    "Content-Type": "application/x-protobuf",
                     #"Accept": "application/x-protobuf",
-                    "x-rpc-method": method_name
+                    "x-rpc-method": call.method_name
             })
-
-            response_name = self.protobuf_manager.get_response_message_name(invocation.type, invocation.method)
-            response_type = self.protobuf_manager.get_message_type(response_name)
-
-            response = response_type()
-            response.ParseFromString(http_result.content)
-
-            result = self.protobuf_manager.create_result_deserializer(response_type, invocation.method).deserialize(response)[0]
 
             #if result["exception"] is not None: TODO: Will we do that as well?
             #    raise RemoteServiceException(f"server side exception {result['exception']}")
 
-            return result
+            return call.deserialize(http_result)
         except (ServiceCommunicationException, AuthorizationException, RemoteServiceException) as e:
             raise
 
