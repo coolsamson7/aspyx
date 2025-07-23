@@ -94,7 +94,12 @@ class TypeDescriptor:
     """
     This class provides a way to introspect Python classes, their methods, decorators, and type hints.
     """
-    # inner class
+    # inner classes
+
+    class ParameterDescriptor:
+        def __init__(self, name: str, type: str):
+            self.name = name
+            self.type = type
 
     class MethodDescriptor:
         """
@@ -107,12 +112,14 @@ class TypeDescriptor:
             self.method = method
             self.decorators: list[DecoratorDescriptor] = Decorators.get(method)
             self.param_types : list[Type] = []
+            self.params: list[TypeDescriptor.ParameterDescriptor] = []
 
             type_hints = get_type_hints(method)
             sig = signature(method)
 
             for name, _ in sig.parameters.items():
                 if name != 'self':
+                    self.params.append(TypeDescriptor.ParameterDescriptor(name, type_hints.get(name)))
                     self.param_types.append(type_hints.get(name, object))
 
             self.return_type = type_hints.get('return', None)
