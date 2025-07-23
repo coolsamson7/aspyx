@@ -20,7 +20,6 @@ from aspyx.reflection import DynamicProxy, TypeDescriptor
 from .channels import HTTPXChannel
 from .service  import ServiceManager, ServiceCommunicationException, AuthorizationException, RemoteServiceException
 
-
 def get_inner_type(typ: Type) -> Type:
     """
     Extract the inner type from List[InnerType], Optional[InnerType], etc.
@@ -36,6 +35,16 @@ def get_inner_type(typ: Type) -> Type:
         return args[0] if args[1] is type(None) else args[1]
 
     return typ
+
+
+def defaults_dict(model_cls: Type[BaseModel]) -> dict[str, Any]:
+    result = {}
+    for name, field in model_cls.model_fields.items():
+        if field.default is not None:
+            result[name] = field.default
+        elif field.default_factory is not None:
+            result[name] = field.default_factory()
+    return result
 
 class ProtobufBuilder:
     # class methods
@@ -384,30 +393,53 @@ class ProtobufManager(ProtobufBuilder):
                         fields.append(sub_field_name)
                         getters.append(self._create_getter(message_type.fields_by_name[sub_field_name], sub_field_name, field_type))
 
-                    def deserialize_message_list(msg: Message, val: Any, getters=getters):
+                    def deserialize_dataclass_list(msg: Message, val: Any, setter=setattr, getters=getters):
                         list = []
 
                         for item in getattr(msg, field_name):
-                            args = {}
+                            instance = item_type.__new__(item_type)
+
                             for getter in getters:
-                                getter(item, args)
+                                getter(item, instance, object.__setattr__)
 
-                            list.append(item_type(**args))
+                            list.append(instance)
 
-                        val[field_name] = list
+                        setter(val, field_name,  list)
 
-                    return deserialize_message_list
+                    default = {}
+                    if issubclass(item_type, BaseModel):
+                        default = defaults_dict(item_type)
+
+                    def deserialize_pydantic_list(msg: Message, val: Any, setter=setattr, getters=getters):
+                        list = []
+
+                        for item in getattr(msg, field_name):
+                            #instance = type.__new__(type)
+
+                            instance = item_type.model_construct(**default)
+
+                            for getter in getters:
+                                getter(item, instance, setattr)
+
+                            list.append(instance)
+
+                        setter(val, field_name, list)
+
+                    if is_dataclass(item_type):
+                        return deserialize_dataclass_list
+                    else:
+                        return deserialize_pydantic_list
 
                 # list of scalars
 
                 else:
-                    def deserialize_list(msg: Message, val):
+                    def deserialize_list(msg: Message, val,  setter=setattr):
                         list = []
-                        val[field_name] = list
+
                         for item in getattr(msg, field_name):
                             list.append(item)
 
-                        return list
+                        setter(val, field_name, list)
 
                     return deserialize_list
 
@@ -427,34 +459,42 @@ class ProtobufManager(ProtobufBuilder):
 
                         sub_getters.append(self._create_getter(field, sub_field_name, field_type))
 
-                    def deserialize_message_to_pydantic(msg: Message, val: Any, getters=sub_getters):
+                    default = {}
+                    if issubclass(type, BaseModel):
+                        default = defaults_dict(type)
+
+                    def deserialize_dataclass(msg: Message, val: Any,  setter=setattr, getters=sub_getters):
                         sub_message = getattr(msg, field_name)
-                        dict = {}
+
+                        instance = type.__new__(type)
+
                         for getter in getters:
-                            getter(sub_message, dict)
+                            getter(sub_message, instance, setattr)#object.__setattr__
 
-                        val[field_name] = type(**dict)
+                        setter(val, field_name, instance)
 
-                    def deserialize_message_to_dataclass(msg: Message, val: Any, getters=sub_getters):
+                    def deserialize_pydantic(msg: Message, val: Any, setter=setattr, getters=sub_getters):
                         sub_message = getattr(msg, field_name)
-                        args = {}
-                        for getter in getters:
-                            getter(sub_message, args)
 
-                        val[field_name] = type(**args)#*args.values())
+                        instance = type.model_construct(**default)
+
+                        for getter in getters:
+                            getter(sub_message, instance, setattr)
+
+                        setter(val, field_name, instance)
 
                     if is_dataclass(type):
-                        return deserialize_message_to_dataclass
+                        return deserialize_dataclass
                     else:
-                        return deserialize_message_to_pydantic
+                        return deserialize_pydantic
                 else:
                     raise TypeError(f"Expected dataclass or BaseModel for field '{field_name}', got {type}")
 
             # scalar
 
             else:
-                def deserialize_scalar(msg: Message, val: Any):
-                    val[field_name] = getattr(msg, field_name)
+                def deserialize_scalar(msg: Message, val: Any,  setter=setattr):
+                    setter(val, field_name, getattr(msg, field_name))
 
                 return deserialize_scalar
 
@@ -463,20 +503,30 @@ class ProtobufManager(ProtobufBuilder):
         def deserialize(self, message: Message) -> list[Any]:
             # call setters
 
-            value = {}
+            list = []
             for getter in self.getters:
-                getter(message, value)
+                getter(message, list, lambda obj, prop, value: list.append(value))
 
-            return list(value.values())
+            return list
 
-        def deserialize_result(self, message: Message) -> list[Any]:
+        def deserialize_result(self, message: Message) -> Any:
+            result = None
+            exception = None
+
+            def set_result(obj, prop, value):
+                nonlocal result, exception
+
+                if prop == "result":
+                    result = value
+                else:
+                    exception = value
+
             # call setters
 
-            value = {}
             for getter in self.getters:
-                getter(message, value)
+                getter(message, None, set_result)
 
-            return value["result"]
+            return result #TODO exception
 
     class MethodSerializer:
         __slots__ = [
