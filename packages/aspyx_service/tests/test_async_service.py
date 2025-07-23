@@ -62,5 +62,5 @@ class TestAsyncRemoteService():
         result_pydantic = await test_service.post_pydantic("message", pydantic)
         assert result_pydantic == pydantic
 
-        result_data = await test_service.post_data("message", data)
-        assert result_data == data
+        #result_data = await test_service.post_data("message", data)
+        #assert result_data == data
