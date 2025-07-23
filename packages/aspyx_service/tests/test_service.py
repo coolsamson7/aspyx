@@ -47,6 +47,19 @@ class TestSyncRemoteService:
         result_pydantic = test_service.pydantic(pydantic)
         assert result_pydantic == pydantic
 
+    def xtest_dispatch_protobuf(self, service_manager):
+        test_service = service_manager.get_service(TestService, preferred_channel="dispatch-protobuf")
+
+        result = test_service.hello("hello")
+        assert result == "hello"
+
+        result_data = test_service.data(data)
+        assert result_data == data
+
+        result_pydantic = test_service.pydantic(pydantic)
+        assert result_pydantic == pydantic
+
+
     def xtest_dispatch_msgpack(self, service_manager):
         test_service = service_manager.get_service(TestService, preferred_channel="dispatch-msgpack")
 
