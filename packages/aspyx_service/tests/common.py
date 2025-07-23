@@ -23,7 +23,7 @@ from aspyx_service import service, Service, component, Component, \
     implementation, health, AbstractComponent, ChannelAddress, inject_service, \
     FastAPIServer, Server, ServiceModule, ServiceManager, \
     HealthCheckManager, get, post, rest, put, delete, Body, SessionManager, RequestContext, \
-    TokenContextMiddleware
+    TokenContextMiddleware, ProtobufManager
 from aspyx.di.aop import advice, error, Invocation, methods, around
 from aspyx.exception import ExceptionManager, handle
 from aspyx.util import Logger
@@ -38,24 +38,53 @@ Logger.configure(default_level=logging.INFO, levels={
     "httpx": logging.ERROR,
     "aspyx.di": logging.INFO,
     "aspyx.di.aop": logging.ERROR,
-    "aspyx.service": logging.DEBUG,
+    "aspyx.service": logging.INFO,
     "aspyx.event": logging.INFO
 })
 
 # classes
 
+@dataclass
+class EmbeddedDataClass:
+    int_attr: int
+    float_attr: float
+    bool_attr: bool
+    str_attr: str
+
+class EmbeddedPydantic(BaseModel):
+    int_attr: int
+    float_attr: float
+    bool_attr: bool
+    str_attr: str
+
 class Pydantic(BaseModel):
-    i : int
-    f : float
-    b: bool
-    s: str
+    int_attr : int
+    float_attr : float
+    bool_attr : bool
+    str_attr : str
+
+    int_list_attr : list[int]
+    float_list_attr: list[float]
+    bool_list_attr : list[bool]
+    str_list_attr: list[str]
+
+    embedded_pydantic: EmbeddedPydantic
+    embedded_dataclass: EmbeddedDataClass
+
+    embedded_pydantic_list: list[EmbeddedPydantic]
+    embedded_dataclass_list: list[EmbeddedDataClass]
 
 @dataclass
 class Data:
-    i: int
-    f: float
-    b: bool
-    s: str
+    int_attr: int
+    float_attr: float
+    bool_attr: bool
+    str_attr: str
+
+    int_list_attr: list[int]
+    float_list_attr: list[float]
+    bool_list_attr: list[bool]
+    str_list_attr: list[str]
 
 class PydanticAndData(BaseModel):
     p: Pydantic
@@ -65,7 +94,6 @@ class DataAndPydantic:
     d: Data
 
 # jwt
-
 
 SECRET_KEY = "your-secret-key"
 ALGORITHM = "HS256"
@@ -250,9 +278,6 @@ class TestComponent(Component): # pylint: disable=abstract-method
 
 @implementation()
 class TestServiceImpl(TestService):
-    def __init__(self):
-        pass
-
     def hello(self, message: str) -> str:
         return message
 
@@ -267,9 +292,6 @@ class TestServiceImpl(TestService):
 
 @implementation()
 class TestAsyncServiceImpl(TestAsyncService):
-    def __init__(self):
-        pass
-
     async def hello(self, message: str) -> str:
         return message
 
@@ -281,9 +303,6 @@ class TestAsyncServiceImpl(TestAsyncService):
 
 @implementation()
 class TestRestServiceImpl(TestRestService):
-    def __init__(self):
-        pass
-
     @requires_response()
     def get(self, message: str) -> str:
         response = ResponseContext.get()
@@ -306,9 +325,6 @@ class TestRestServiceImpl(TestRestService):
 
 @implementation()
 class TestAsyncRestServiceImpl(TestAsyncRestService):
-    def __init__(self):
-        pass
-
     async def get(self, message: str) -> str:
         return message
 
@@ -364,7 +380,8 @@ class TestComponentImpl(AbstractComponent, TestComponent):
         return [
             ChannelAddress("rest", f"http://{Server.get_local_ip()}:{port}"),
             ChannelAddress("dispatch-json", f"http://{Server.get_local_ip()}:{port}"),
-            ChannelAddress("dispatch-msgpack", f"http://{Server.get_local_ip()}:{port}")
+            ChannelAddress("dispatch-msgpack", f"http://{Server.get_local_ip()}:{port}"),
+            ChannelAddress("dispatch-protobuf", f"http://{Server.get_local_ip()}:{port}"),
         ]
 
     def startup(self) -> None:
@@ -387,16 +404,13 @@ class Foo:
 fastapi = FastAPI()
 
 fastapi.add_middleware(RequestContext)
-fastapi.add_middleware(TokenContextMiddleware)
+#fastapi.add_middleware(TokenContextMiddleware)
 
 @module(imports=[ServiceModule])
 class Module:
-    def __init__(self):
-        pass
-
     @create()
-    def create_server(self,  service_manager: ServiceManager, component_registry: ComponentRegistry) -> FastAPIServer:
-        return FastAPIServer(fastapi, service_manager, component_registry)
+    def create_server(self,  service_manager: ServiceManager, component_registry: ComponentRegistry, protobuf_manager: ProtobufManager) -> FastAPIServer:
+        return FastAPIServer(fastapi, service_manager, component_registry, protobuf_manager)
 
     @create()
     def create_session_storage(self) -> SessionManager.Storage:
