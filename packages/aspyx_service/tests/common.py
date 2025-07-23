@@ -404,7 +404,7 @@ class Foo:
 fastapi = FastAPI()
 
 fastapi.add_middleware(RequestContext)
-#fastapi.add_middleware(TokenContextMiddleware)
+fastapi.add_middleware(TokenContextMiddleware)
 
 @module(imports=[ServiceModule])
 class Module:

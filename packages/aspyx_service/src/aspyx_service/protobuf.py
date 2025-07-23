@@ -131,8 +131,6 @@ class ProtobufBuilder:
 
             # add message type descriptor to the file descriptor proto
 
-            print(f"add {desc}")
-
             self.file_desc_proto.message_type.add().CopyFrom(desc)
 
             # TODO ????? self.file_desc_proto.dependency.append("bar.proto")
