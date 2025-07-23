@@ -381,7 +381,7 @@ class FastAPIServer(Server):
         elif "application/x-protobuf" in content_type:
             content = "protobuf"
             service_descriptor, method = self.get_descriptor_and_method(http_request.headers.get("x-rpc-method") )
-
+            self.protobuf_manager.check_service(service_descriptor.type)
             data = await http_request.body()
 
             request_name = ProtobufManager.get_message_name(service_descriptor.type, f"{method.__name__}Request")
