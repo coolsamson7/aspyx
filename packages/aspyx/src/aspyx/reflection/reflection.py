@@ -97,7 +97,7 @@ class TypeDescriptor:
     # inner classes
 
     class ParameterDescriptor:
-        def __init__(self, name: str, type: str):
+        def __init__(self, name: str, type: Type):
             self.name = name
             self.type = type
 

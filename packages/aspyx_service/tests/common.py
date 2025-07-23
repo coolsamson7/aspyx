@@ -24,12 +24,12 @@ from aspyx_service import service, Service, component, Component, \
     FastAPIServer, Server, ServiceModule, ServiceManager, \
     HealthCheckManager, get, post, rest, put, delete, Body, SessionManager, RequestContext, \
     TokenContextMiddleware, ProtobufManager
-from aspyx.di.aop import advice, error, Invocation, methods, around
+from aspyx.di.aop import advice, error, Invocation
 from aspyx.exception import ExceptionManager, handle
 from aspyx.util import Logger
 from aspyx_service.server import ResponseContext
 from aspyx_service.service import LocalComponentRegistry, component_services, AuthorizationException, ComponentRegistry
-from aspyx.di import module, create, injectable, on_running, Environment, order
+from aspyx.di import module, create, injectable, on_running, Environment
 from aspyx.di.configuration import YamlConfigurationSource
 
 # configure logging

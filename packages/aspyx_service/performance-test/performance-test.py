@@ -6,7 +6,7 @@ import threading
 import time
 import logging
 
-from typing import Callable, TypeVar, Type, Awaitable, Any, Dict, cast
+from typing import Callable, TypeVar, Type, Awaitable, Any, cast
 
 from consul import Consul
 

@@ -6,7 +6,8 @@ from typing import Optional
 from pydantic import BaseModel
 
 from aspyx.di import module, Environment
-from aspyx_service import Service, ProtobufManager, ServiceModule
+from aspyx_service import Service, ProtobufManager, ServiceModule, service, component, AbstractComponent
+
 
 class DataModel(BaseModel):
     optional_attr: Optional[str]
@@ -46,6 +47,7 @@ model_class = DataModel(optional_attr=None, str_attr="", bool_attr=False, int_at
 
 complex_data_class = ComplexDataClass(data_class=data_class, model_class=model_class,data_classes=[data_class], model_classes=[model_class])
 
+@service()
 class ProtobufService(Service):
     def call_scalars(self, n: int, b: bool, s: str):
         pass
@@ -62,6 +64,11 @@ class ProtobufService(Service):
     def call_complex(self, data_class: ComplexDataClass):
         pass
 
+@component(services=[ProtobufService])
+class TestComponent(AbstractComponent):
+    pass
+
+
 @module(imports=[ServiceModule])
 class ProtobufModule:
     pass
@@ -69,7 +76,7 @@ class ProtobufModule:
 environment = Environment(ProtobufModule)
 protobuf_manager = environment.get(ProtobufManager)
 
-protobuf_manager.check_service(ProtobufService)
+protobuf_manager.check(ProtobufService)
 
 class TestProto:
     def test_complex_data_model(self):
@@ -146,5 +153,4 @@ class TestProto:
         deserialized_args = deserializer.deserialize(message)
 
         assert args == deserialized_args
-
 

@@ -423,10 +423,11 @@ class DispatchMSPackChannel(HTTPXChannel):
                 if "invalid_token" in www_auth:
                     if 'expired' in www_auth:
                         raise TokenExpiredException() from e
-                    elif 'missing' in www_auth:
+
+                    if 'missing' in www_auth:
                         raise MissingTokenException() from e
-                    else:
-                        raise InvalidTokenException() from e
+
+                    raise InvalidTokenException() from e
 
             raise RemoteServiceException(str(e)) from e
         except httpx.HTTPError as e:

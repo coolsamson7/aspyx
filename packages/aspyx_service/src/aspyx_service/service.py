@@ -18,6 +18,7 @@ from aspyx.di import injectable, Environment, Providers, ClassInstanceProvider, 
 from aspyx.di.aop.aop import ClassAspectTarget
 from aspyx.reflection import Decorators, DynamicProxy, DecoratorDescriptor, TypeDescriptor
 from aspyx.util import StringBuilder
+
 from .healthcheck import HealthCheckManager, HealthStatus
 
 T = TypeVar("T")
@@ -649,12 +650,16 @@ class ServiceManager:
     def register_component(cls, component_type: Type, services: list[Type]):
         component_descriptor = ComponentDescriptor(component_type, services)
 
+        setattr(component_type, "__descriptor__", component_descriptor)
+
         cls.logger.info("register component %s", component_descriptor.name)
 
         ServiceManager.descriptors[component_type] = component_descriptor
         ServiceManager.descriptors_by_name[component_descriptor.name] = component_descriptor
 
         for component_service in component_descriptor.services:
+            setattr(component_service.type, "__descriptor__", component_service)
+
             ServiceManager.descriptors[component_service.type] = component_service
             ServiceManager.descriptors_by_name[component_service.name] = component_service
 

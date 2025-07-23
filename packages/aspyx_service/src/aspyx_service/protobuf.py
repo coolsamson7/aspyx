@@ -1,15 +1,17 @@
+"""
+Protobuf channel and utilities
+"""
 from __future__ import annotations
 
 import inspect
 from dataclasses import is_dataclass, fields as dc_fields
-from typing import Type, get_type_hints, Callable, Tuple, get_origin, get_args, List, Dict, Any, Union, Sequence
+from typing import Type, get_type_hints, Callable, Tuple, get_origin, get_args, List, Dict, Any, Union, Sequence, \
+    Optional
 
 import httpx
 from pydantic import BaseModel
 
-from .service import channel
-
-from google.protobuf import descriptor_pb2, descriptor_pool, message_factory, text_format
+from google.protobuf import descriptor_pb2, descriptor_pool, message_factory
 from google.protobuf.descriptor_pool import DescriptorPool
 from google.protobuf.message import Message
 from google.protobuf.descriptor import FieldDescriptor, Descriptor
@@ -17,6 +19,7 @@ from google.protobuf.descriptor import FieldDescriptor, Descriptor
 from aspyx.di import injectable
 from aspyx.reflection import DynamicProxy, TypeDescriptor
 
+from .service import channel, ServiceException
 from .channels import HTTPXChannel
 from .service  import ServiceManager, ServiceCommunicationException, AuthorizationException, RemoteServiceException
 
@@ -47,7 +50,14 @@ def defaults_dict(model_cls: Type[BaseModel]) -> dict[str, Any]:
     return result
 
 class ProtobufBuilder:
-    # class methods
+    # slots
+
+    __slots__ = [
+        "pool",
+        "factory",
+        "modules",
+        "components"
+    ]
 
     @classmethod
     def get_message_name(cls, type: Type, suffix="") -> str:
@@ -64,188 +74,21 @@ class ProtobufBuilder:
     def get_response_message_name(cls, type: Type, method: Callable) -> str:
         return cls.get_message_name(type, f"{method.__name__}Response")
 
-    # inner classes
+    # local classes
 
-    class MessageBuilder:
-        """Builds Protobuf fields for a Python type, including repeated and message types."""
+    class Module:
+        # constructor
 
-        def to_proto_type(self, py_type: Type) -> Tuple[int, int, str | None]:
-            """
-            Convert Python type to protobuf (field_type, label, type_name).
-            Returns:
-                - field_type: int (descriptor_pb2.FieldDescriptorProto.TYPE_*)
-                - label: int (descriptor_pb2.FieldDescriptorProto.LABEL_*)
-                - type_name: Optional[str] (fully qualified message name for messages)
-            """
-            origin = get_origin(py_type)
-            args = get_args(py_type)
-
-            # Check for repeated fields (list / List)
-            if origin in (list, List):
-                # Assume single-argument generic list e.g. List[int], List[FooModel]
-                item_type = args[0] if args else str
-                field_type, _, type_name = self._resolve_type(item_type)
-                return (
-                    field_type,
-                    descriptor_pb2.FieldDescriptorProto.LABEL_REPEATED,  # type: ignore
-                    type_name,
-                )
-
-            return self._resolve_type(py_type)
-
-        def _resolve_type(self, py_type: Type) -> Tuple[int, int, str | None]:
-            """Resolves Python type to protobuf scalar or message type with label=optional."""
-            # Structured message (dataclass or Pydantic BaseModel)
-            if is_dataclass(py_type) or (inspect.isclass(py_type) and issubclass(py_type, BaseModel)):
-                type_name = self.method_builder.service_builder.build_message_type(py_type)
-                return (
-                    descriptor_pb2.FieldDescriptorProto.TYPE_MESSAGE,  # type: ignore
-                    descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL,  # type: ignore
-                    type_name,
-                )
-
-            # Scalar mappings
-
-            scalar = self._map_scalar_type(py_type)
-            return scalar, descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL, None  # type: ignore
-
-        def _map_scalar_type(self, py_type: Type) -> int:
-            """Map Python scalar types to protobuf field types."""
-            mapping = {
-                str: descriptor_pb2.FieldDescriptorProto.TYPE_STRING,  # type: ignore
-                int: descriptor_pb2.FieldDescriptorProto.TYPE_INT32,  # type: ignore
-                float: descriptor_pb2.FieldDescriptorProto.TYPE_FLOAT,  # type: ignore
-                bool: descriptor_pb2.FieldDescriptorProto.TYPE_BOOL,  # type: ignore
-                bytes: descriptor_pb2.FieldDescriptorProto.TYPE_BYTES,  # type: ignore
-            }
-
-            return mapping.get(py_type, descriptor_pb2.FieldDescriptorProto.TYPE_STRING)  # type: ignore
-
-    class RequestMessageBuilder(MessageBuilder):
-        """Builds protobuf request message descriptor from method signature."""
-
-        def __init__(self, method_builder: ProtobufBuilder.MethodBuilder):
-            self.method_builder = method_builder
-
-        def build(self, message_name: str, method: TypeDescriptor.MethodDescriptor):
-            request_msg = descriptor_pb2.DescriptorProto()  # type: ignore
-            request_msg.name = message_name.split(".")[-1]
-
-            # loop over parameters
-
-            field_index = 1
-            for param in method.params:
-                field = request_msg.field.add()
-
-                field.name = param.name
-                field.number = field_index
-
-                field_type, label, type_name = self.to_proto_type(param.type)
-                field.type = field_type
-                field.label = label
-                if type_name:
-                    field.type_name = type_name
-
-                field_index += 1
-
-            # add to service file descriptor
-
-            self.method_builder.service_builder.file_desc_proto.message_type.add().CopyFrom(request_msg)
-
-    class ResponseMessageBuilder(MessageBuilder):
-        """Builds protobuf response message descriptor from method return type."""
-
-        def __init__(self, method_builder: ProtobufBuilder.MethodBuilder):
-            self.method_builder = method_builder
-
-        def build(self, message_name: str, method: TypeDescriptor.MethodDescriptor):
-            response_msg = descriptor_pb2.DescriptorProto()  # type: ignore
-            response_msg.name = message_name.split(".")[-1]
-
-            # return
-
-            return_type = method.return_type
-            response_field = response_msg.field.add()
-            response_field.name = "result"
-            response_field.number = 1
-
-            field_type, label, type_name = self.to_proto_type(return_type)
-            response_field.type = field_type
-            response_field.label = label
-            if type_name:
-                response_field.type_name = type_name
-
-            # exception
-
-            exception_field = response_msg.field.add()
-            exception_field.name = "exception"
-            exception_field.number = 2
-
-            field_type, label, type_name = self.to_proto_type(str)
-            exception_field.type = field_type
-            exception_field.label = label
-            if type_name:
-                exception_field.type_name = type_name
-
-            # add to service file descriptor
-
-            self.method_builder.service_builder.file_desc_proto.message_type.add().CopyFrom(response_msg)
-
-    class MethodBuilder:
-        """Builds protobuf MethodDescriptorProto for a service method."""
-
-        def __init__(self, service_builder: ProtobufBuilder.ServiceBuilder):
-            self.service_builder = service_builder
-            self.method_desc = descriptor_pb2.MethodDescriptorProto()  # type: ignore
-
-        def method(self, service_type: Type, method: TypeDescriptor.MethodDescriptor):
-            name = f"{service_type.__name__}{method.get_name()}"
-            package = self.service_builder.file_desc_proto.package
-
-            request_name = f".{package}.{name}Request"
-            response_name = f".{package}.{name}Response"
-
-            self.method_desc.name = method.get_name()
-            self.method_desc.input_type = request_name
-            self.method_desc.output_type = response_name
-
-            # Build request and response message types
-
-            ProtobufBuilder.RequestMessageBuilder(self).build(request_name, method)
-            ProtobufBuilder.ResponseMessageBuilder(self).build(response_name, method)
-
-            # Add method to service descriptor
-
-            self.service_builder.service_desc.method.add().CopyFrom(self.method_desc)
-
-    class ServiceBuilder:
-        def __init__(self, pool: DescriptorPool, service_type: Type):
-            self.pool = pool
-
-            # create a new FileDescriptorProto
-
+        def __init__(self, builder: ProtobufBuilder, name: str):
+            self.builder = builder
+            self.name = name.replace(".", "_")
             self.file_desc_proto = descriptor_pb2.FileDescriptorProto()  # type: ignore
-            self.file_desc_proto.name = f"{service_type.__name__.lower()}.proto"
-            self.file_desc_proto.package = service_type.__module__.replace(".", "_")
+            self.file_desc_proto.name = f"{self.name}.proto"
+            self.file_desc_proto.package = self.name
+            self.types : dict[Type, Any] = {}
+            self.finalized = False
 
-            # create ServiceDescriptorProto
-
-            self.service_desc = descriptor_pb2.ServiceDescriptorProto()  # type: ignore
-            self.service_desc.name = service_type.__name__
-
-            # check methods
-
-            for method in TypeDescriptor.for_type(service_type).get_methods():
-                ProtobufBuilder.MethodBuilder(self).method(service_type, method)
-
-            # done
-
-            self.file_desc_proto.service.add().CopyFrom(self.service_desc)
-            self.pool.Add(self.file_desc_proto)
-
-            #print(text_format.MessageToString(self.file_desc_proto))  # TODO
-
-            print(ProtobufDumper.dump_proto(self.file_desc_proto))
+        # public
 
         def get_fields_and_types(self, type: Type) -> List[Tuple[str, Type]]:
             hints = get_type_hints(type)
@@ -258,10 +101,9 @@ class ProtobufBuilder:
 
             raise TypeError("Expected a dataclass or Pydantic model class.")
 
-        def build_message_type(self, cls: Type) -> str:
-            module = cls.__module__.replace(".", "_")
+        def add_message(self, cls: Type) -> str:
             name = cls.__name__
-            full_name = f"{module}.{name}"
+            full_name = f"{self.name}.{name}"
 
             # Check if a message type is already defined
 
@@ -276,12 +118,7 @@ class ProtobufBuilder:
             if is_dataclass(cls) or issubclass(cls, BaseModel):
                 index = 1
                 for field_name, field_type in self.get_fields_and_types(cls):
-                    # Use MessageBuilder to get proto field info TODO!
-                    mb = ProtobufBuilder.MessageBuilder()
-
-                    mb.method_builder = type("dummy", (),
-                                             {"service_builder": self})()  # Hack to allow calling to_proto_type
-                    field_type_enum, label, type_name = mb.to_proto_type(field_type)
+                    field_type_enum, label, type_name = self.builder.to_proto_type(field_type)
 
                     f = desc.field.add()
                     f.name = field_name
@@ -292,44 +129,232 @@ class ProtobufBuilder:
                         f.type_name = type_name
                     index += 1
 
-            else:
-                raise TypeError(f"Unsupported structured type for proto message: {cls}")
-
             # add message type descriptor to the file descriptor proto
+
+            print(f"add {desc}")
 
             self.file_desc_proto.message_type.add().CopyFrom(desc)
 
+            # TODO ????? self.file_desc_proto.dependency.append("bar.proto")
+
             return f".{full_name}"
 
-    # slots
+        def check_message(self, type: Type) -> str:
+            if type not in self.types:
+                self.types[type] = self.add_message(type)
 
-    __slots__ = [
-        "pool",
-        "factory",
-        "service_cache"
-    ]
+            return self.types[type]
+
+        def build_request_message(self, method: TypeDescriptor.MethodDescriptor, request_name: str):
+            request_msg = descriptor_pb2.DescriptorProto()  # type: ignore
+            request_msg.name = request_name.split(".")[-1]
+
+            # loop over parameters
+
+            field_index = 1
+            for param in method.params:
+                field = request_msg.field.add()
+
+                field.name = param.name
+                field.number = field_index
+
+                field_type, label, type_name = self.builder.to_proto_type(param.type)
+                field.type = field_type
+                field.label = label
+                if type_name:
+                    field.type_name = type_name
+
+                field_index += 1
+
+            # add to service file descriptor
+
+            self.file_desc_proto.message_type.add().CopyFrom(request_msg)
+
+        def build_response_message(self, method: TypeDescriptor.MethodDescriptor, response_name: str):
+            response_msg = descriptor_pb2.DescriptorProto()  # type: ignore
+            response_msg.name = response_name.split(".")[-1]
+
+            # return
+
+            return_type = method.return_type
+            response_field = response_msg.field.add()
+            response_field.name = "result"
+            response_field.number = 1
+
+            field_type, label, type_name = self.builder.to_proto_type(return_type)
+            response_field.type = field_type
+            response_field.label = label
+            if type_name:
+                response_field.type_name = type_name
+
+            # exception
+
+            exception_field = response_msg.field.add()
+            exception_field.name = "exception"
+            exception_field.number = 2
+
+            field_type, label, type_name = self.builder.to_proto_type(str)
+            exception_field.type = field_type
+            exception_field.label = label
+            if type_name:
+                exception_field.type_name = type_name
+
+            # add to service file descriptor
+
+            self.file_desc_proto.message_type.add().CopyFrom(response_msg)
+
+        def build_service_method(self, service_desc: descriptor_pb2.ServiceDescriptorProto, service_type: TypeDescriptor, method: TypeDescriptor.MethodDescriptor):
+            name = f"{service_type.cls.__name__}{method.get_name()}"
+            package = self.name
+
+            method_desc =  descriptor_pb2.MethodDescriptorProto()
+
+            request_name = f".{package}.{name}Request"
+            response_name = f".{package}.{name}Response"
+
+            method_desc.name = method.get_name()
+            method_desc.input_type = request_name
+            method_desc.output_type = response_name
+
+            # Build request and response message types
+
+            self.build_request_message(method, request_name)
+            self.build_response_message(method, response_name)
+
+            # Add method to service descriptor
+
+            service_desc.method.add().CopyFrom(method_desc)
+
+        def add_service(self, service_type: TypeDescriptor):
+            service_desc = descriptor_pb2.ServiceDescriptorProto()  # type: ignore
+            service_desc.name = service_type.cls.__name__
+
+            # check methods
+
+            for method in service_type.get_methods():
+                self.build_service_method(service_desc, service_type, method)
+
+            # done
+
+            self.file_desc_proto.service.add().CopyFrom(service_desc)
+
+        def finalize(self, pool: DescriptorPool):
+            if self.finalized:
+                raise ServiceException(f"module {self.name} already sealed")
+
+            #for m in self.file_desc_proto.message_type:
+            #    print(m)
+
+            self.finalized = True
+            pool.Add(self.file_desc_proto)
+
+            #ProtobufDumper.dump_proto(self.file_desc_proto)
 
     # constructor
 
     def __init__(self):
         self.pool: DescriptorPool = descriptor_pool.Default()
         self.factory = message_factory.MessageFactory(self.pool)
-        self.service_cache: Dict[Type, ProtobufManager.ServiceBuilder] = {}
+        self.modules: Dict[str, ProtobufBuilder.Module] = {}
+        self.components = {}
 
-    # public
+    # internal
 
-    def check_service(self, service_type: Type):
-        if self.service_cache.get(service_type, None) is None:
-            self.service_cache[service_type] = ProtobufManager.ServiceBuilder(self.pool, service_type)
+    def to_proto_type(self, py_type: Type) -> Tuple[int, int, Optional[str]]:
+        """
+        Convert Python type to protobuf (field_type, label, type_name).
+        Returns:
+            - field_type: int (descriptor_pb2.FieldDescriptorProto.TYPE_*)
+            - label: int (descriptor_pb2.FieldDescriptorProto.LABEL_*)
+            - type_name: Optional[str] (fully qualified message name for messages)
+        """
+        origin = get_origin(py_type)
+        args = get_args(py_type)
+
+        # Check for repeated fields (list / List)
+        if origin in (list, List):
+            # Assume single-argument generic list e.g. List[int], List[FooModel]
+            item_type = args[0] if args else str
+            field_type, _, type_name = self._resolve_type(item_type)
+            return (
+                field_type,
+                descriptor_pb2.FieldDescriptorProto.LABEL_REPEATED,  # type: ignore
+                type_name,
+            )
+
+        return self._resolve_type(py_type)
+
+    def _resolve_type(self, py_type: Type) -> Tuple[int, int, Optional[str]]:
+        """Resolves Python type to protobuf scalar or message type with label=optional."""
+        # Structured message (dataclass or Pydantic BaseModel)
+        if is_dataclass(py_type) or (inspect.isclass(py_type) and issubclass(py_type, BaseModel)):
+            type_name =  self.get_module(py_type).check_message(py_type)
+            return (
+                descriptor_pb2.FieldDescriptorProto.TYPE_MESSAGE,  # type: ignore
+                descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL,  # type: ignore
+                type_name,
+            )
+
+        # Scalar mappings
+
+        scalar = self._map_scalar_type(py_type)
+
+        return scalar, descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL, None  # type: ignore
+
+    def _map_scalar_type(self, py_type: Type) -> int:
+        """Map Python scalar types to protobuf field types."""
+        mapping = {
+            str: descriptor_pb2.FieldDescriptorProto.TYPE_STRING,  # type: ignore
+            int: descriptor_pb2.FieldDescriptorProto.TYPE_INT32,  # type: ignore
+            float: descriptor_pb2.FieldDescriptorProto.TYPE_FLOAT,  # type: ignore
+            bool: descriptor_pb2.FieldDescriptorProto.TYPE_BOOL,  # type: ignore
+            bytes: descriptor_pb2.FieldDescriptorProto.TYPE_BYTES,  # type: ignore
+        }
+
+        return mapping.get(py_type, descriptor_pb2.FieldDescriptorProto.TYPE_STRING)  # type: ignore
+
+    def check_type(self, type: Type):
+        self.get_module(type).check_message(type)
 
     def get_message_type(self, full_name: str):
         return self.factory.GetPrototype(self.pool.FindMessageTypeByName(full_name))
 
-    def get_request_message(self,  type: Type, method: Callable):
+    def get_request_message(self, type: Type, method: Callable):
         return self.get_message_type(self.get_request_message_name(type, method))
 
     def get_response_message(self, type: Type, method: Callable):
         return self.get_message_type(self.get_response_message_name(type, method))
+
+    def get_module(self, type: Type):
+        module = self.modules.get(type.__module__, None)
+        if module is None:
+            module = ProtobufBuilder.Module(self, type.__module__)
+            self.modules[type.__module__] = module
+
+        return module
+
+    def build_service(self, service: TypeDescriptor):
+        self.get_module(service.cls).add_service(service)
+
+    # public
+
+    def check(self, service_type: Type):
+        descriptor = getattr(service_type, "__descriptor__")
+
+        component_descriptor = descriptor.component_descriptor
+
+        if component_descriptor not in self.components:
+            for service in component_descriptor.services:
+                self.build_service(TypeDescriptor.for_type(service.type))
+
+            # finalize
+
+            for module in self.modules.values():
+                module.finalize(self.pool)
+
+            # done
+
+            self.components[component_descriptor] = True
 
 
 @injectable()
@@ -550,8 +575,8 @@ class ProtobufManager(ProtobufBuilder):
 
             if result is None:
                 raise RemoteServiceException(f"server side exception {exception}")
-            else:
-                return result
+
+            return result
 
     class MethodSerializer:
         __slots__ = [
@@ -749,7 +774,7 @@ class ProtobufManager(ProtobufBuilder):
 
         serializer = self.serializer_cache.get(method, None)
         if serializer is None:
-            self.check_service(type) # make sure all messages are created
+            self.check(type) # make sure all messages are created
 
             serializer = ProtobufManager.MethodSerializer(self, self.get_request_message(type, method)).args(method)
 

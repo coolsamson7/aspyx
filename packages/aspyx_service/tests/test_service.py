@@ -2,10 +2,17 @@
 Tests
 """
 
-from .common import TestService, TestRestService, Pydantic, Data, service_manager, Foo
+from .common import TestService, TestRestService, Pydantic, Data, service_manager, Foo, EmbeddedPydantic, \
+    EmbeddedDataClass
 
-pydantic = Pydantic(i=1, f=1.0, b=True, s="s")
-data = Data(i=1, f=1.0, b=True, s="s")
+embedded_pydantic=EmbeddedPydantic(int_attr=1, float_attr=1.0, bool_attr=True, str_attr="s")
+embedded_dataclass=EmbeddedDataClass(int_attr=1, float_attr=1.0, bool_attr=True, str_attr="s")
+pydantic = Pydantic(int_attr=1, float_attr=1.0, bool_attr=True, str_attr="s", int_list_attr=[1], float_list_attr=[1.0], bool_list_attr=[True], str_list_attr=[""],
+                    embedded_pydantic=embedded_pydantic,
+                    embedded_dataclass=embedded_dataclass,
+                    embedded_pydantic_list =[embedded_pydantic],
+                    embedded_dataclass_list=[embedded_dataclass])
+data = Data(int_attr=1, float_attr=1.0, bool_attr=True, str_attr="s", int_list_attr=[1], float_list_attr=[1.0], bool_list_attr=[True], str_list_attr=[""])
 
 
 class TestLocalService():
@@ -47,7 +54,7 @@ class TestSyncRemoteService:
         result_pydantic = test_service.pydantic(pydantic)
         assert result_pydantic == pydantic
 
-    def xtest_dispatch_protobuf(self, service_manager):
+    def test_dispatch_protobuf(self, service_manager):
         test_service = service_manager.get_service(TestService, preferred_channel="dispatch-protobuf")
 
         result = test_service.hello("hello")
