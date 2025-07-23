@@ -14,7 +14,8 @@ dependencies = [
     "fastapi~=0.115.13",
     "httpx~=0.28.1",
     "msgpack~=1.1.1",
-    "uvicorn[standard]"
+    "uvicorn[standard]",
+    "protobuf~=5.29.4"
 ]
 
 [build-system]
