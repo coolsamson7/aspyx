@@ -190,7 +190,7 @@ class ProtobufBuilder:
             request_name = f".{package}.{name}Request"
             response_name = f".{package}.{name}Response"
 
-            self.method_desc.name = name
+            self.method_desc.name = method.get_name()
             self.method_desc.input_type = request_name
             self.method_desc.output_type = response_name
 
@@ -228,7 +228,9 @@ class ProtobufBuilder:
             self.file_desc_proto.service.add().CopyFrom(self.service_desc)
             self.pool.Add(self.file_desc_proto)
 
-            print(text_format.MessageToString(self.file_desc_proto))  # TODO
+            #print(text_format.MessageToString(self.file_desc_proto))  # TODO
+
+            print(ProtobufDumper.dump_proto(self.file_desc_proto))
 
         def get_fields_and_types(self, type: Type) -> List[Tuple[str, Type]]:
             hints = get_type_hints(type)
@@ -798,15 +800,10 @@ class ProtobufChannel(HTTPXChannel):
     def get_call(self, type: Type, method: Callable) -> ProtobufChannel.Call:
         call = self.cache.get(method, None)
         if call is None:
-            service_name = self.service_names[type]
-            method_name = f"{self.component_descriptor.name}:{service_name}:{method.__name__}"
-
-            serializer = self.protobuf_manager.create_serializer(type, method)
-
-            response_name = self.protobuf_manager.get_response_message_name(type, method)
-            response_type = self.protobuf_manager.get_message_type(response_name)
-
-            deserializer = self.protobuf_manager.create_result_deserializer(response_type, method)
+            method_name   = f"{self.component_descriptor.name}:{self.service_names[type]}:{method.__name__}"
+            serializer    = self.protobuf_manager.create_serializer(type, method)
+            response_type = self.protobuf_manager.get_message_type(self.protobuf_manager.get_response_message_name(type, method))
+            deserializer  = self.protobuf_manager.create_result_deserializer(response_type, method)
 
             call = ProtobufChannel.Call(method_name, serializer, response_type, deserializer)
 
@@ -856,3 +853,136 @@ class ProtobufChannel(HTTPXChannel):
 
         except Exception as e:
             raise ServiceCommunicationException(f"communication exception {e}") from e
+
+class ProtobufDumper:
+    @classmethod
+    def dump_proto(cls, fd: descriptor_pb2.FileDescriptorProto) -> str:
+        lines = []
+
+        # Syntax
+
+        syntax = fd.syntax if fd.syntax else "proto2"
+        lines.append(f'syntax = "{syntax}";\n')
+
+        # Package
+
+        if fd.package:
+            lines.append(f'package {fd.package};\n')
+
+        # Imports
+
+        for dep in fd.dependency:
+            lines.append(f'import "{dep}";')
+
+        if fd.dependency:
+            lines.append('')  # blank line
+
+        # Options (basic)
+        for opt in fd.options.ListFields() if fd.HasField('options') else []:
+            # Just a simple string option dump; for complex options you'd need more logic
+            name = opt[0].name
+            value = opt[1]
+            lines.append(f'option {name} = {value};')
+        if fd.HasField('options'):
+            lines.append('')
+
+        # Enums
+        def dump_enum(enum: descriptor_pb2.EnumDescriptorProto, indent=''):
+            enum_lines = [f"{indent}enum {enum.name} {{"]
+            for value in enum.value:
+                enum_lines.append(f"{indent}  {value.name} = {value.number};")
+            enum_lines.append(f"{indent}}}\n")
+            return enum_lines
+
+        # Messages (recursive)
+        def dump_message(msg: descriptor_pb2.DescriptorProto, indent=''):
+            msg_lines = [f"{indent}message {msg.name} {{"]
+            # Nested enums
+            for enum in msg.enum_type:
+                msg_lines.extend(dump_enum(enum, indent + '  '))
+
+            # Nested messages
+            for nested in msg.nested_type:
+                # skip map entry messages (synthetic)
+                if nested.options.map_entry:
+                    continue
+                msg_lines.extend(dump_message(nested, indent + '  '))
+
+            # Fields
+            for field in msg.field:
+                label = {
+                    1: 'optional',
+                    2: 'required',
+                    3: 'repeated'
+                }.get(field.label, '')
+
+                # Field type string
+                if field.type_name:
+                    # It's a message or enum type
+                    # type_name is fully qualified, remove leading dot if present
+                    type_str = field.type_name.lstrip('.')
+                else:
+                    # primitive type
+                    type_map = {
+                        1: "double",
+                        2: "float",
+                        3: "int64",
+                        4: "uint64",
+                        5: "int32",
+                        6: "fixed64",
+                        7: "fixed32",
+                        8: "bool",
+                        9: "string",
+                        10: "group",  # deprecated
+                        11: "message",
+                        12: "bytes",
+                        13: "uint32",
+                        14: "enum",
+                        15: "sfixed32",
+                        16: "sfixed64",
+                        17: "sint32",
+                        18: "sint64",
+                    }
+                    type_str = type_map.get(field.type, f"TYPE_{field.type}")
+
+                # Field options (only packed example)
+                opts = []
+                if field.options.HasField('packed'):
+                    opts.append(f"packed = {str(field.options.packed).lower()}")
+
+                opts_str = f" [{', '.join(opts)}]" if opts else ""
+
+                msg_lines.append(f"{indent}  {label} {type_str} {field.name} = {field.number}{opts_str};")
+
+            msg_lines.append(f"{indent}}}\n")
+
+            return msg_lines
+
+        # Services
+        def dump_service(svc: descriptor_pb2.ServiceDescriptorProto, indent=''):
+            svc_lines = [f"{indent}service {svc.name} {{"]
+            for method in svc.method:
+                input_type = method.input_type.lstrip('.') if method.input_type else 'Unknown'
+                output_type = method.output_type.lstrip('.') if method.output_type else 'Unknown'
+                client_streaming = 'stream ' if method.client_streaming else ''
+                server_streaming = 'stream ' if method.server_streaming else ''
+                svc_lines.append(f"{indent}  rpc {method.name} ({client_streaming}{input_type}) returns ({server_streaming}{output_type});")
+            svc_lines.append(f"{indent}}}\n")
+            return svc_lines
+
+        # Dump enums at file level
+
+        for enum in fd.enum_type:
+            lines.extend(dump_enum(enum))
+
+        # Dump messages
+
+        for msg in fd.message_type:
+            lines.extend(dump_message(msg))
+
+        # Dump services
+
+        for svc in fd.service:
+            lines.extend(dump_service(svc))
+
+        return "\n".join(lines)
