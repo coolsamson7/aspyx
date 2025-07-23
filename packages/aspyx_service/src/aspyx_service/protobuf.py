@@ -9,6 +9,7 @@ from typing import Type, get_type_hints, Callable, Tuple, get_origin, get_args, 
     Optional
 
 import httpx
+from google.protobuf.message_factory import GetMessageClass
 from pydantic import BaseModel
 
 from google.protobuf import descriptor_pb2, descriptor_pool, message_factory
@@ -97,7 +98,7 @@ class ProtobufBuilder:
                 return [(f.name, hints.get(f.name, str)) for f in dc_fields(type)]
 
             if issubclass(type, BaseModel):
-                return [(name, hints.get(name, str)) for name in type.__fields__]
+                return [(name, hints.get(name, str)) for name in type.model_fields]
 
             raise TypeError("Expected a dataclass or Pydantic model class.")
 
@@ -315,7 +316,8 @@ class ProtobufBuilder:
         self.get_module(type).check_message(type)
 
     def get_message_type(self, full_name: str):
-        return self.factory.GetPrototype(self.pool.FindMessageTypeByName(full_name))
+        return GetMessageClass(self.pool.FindMessageTypeByName(full_name))
+        #return self.factory.GetPrototype(self.pool.FindMessageTypeByName(full_name))
 
     def get_request_message(self, type: Type, method: Callable):
         return self.get_message_type(self.get_request_message_name(type, method))
@@ -411,7 +413,7 @@ class ProtobufManager(ProtobufBuilder):
                 return [(f.name, hints.get(f.name, str)) for f in dc_fields(type)]
 
             if issubclass(type, BaseModel):
-                return [(name, hints.get(name, str)) for name in type.__fields__]
+                return [(name, hints.get(name, str)) for name in type.model_fields]
 
             raise TypeError("Expected a dataclass or Pydantic model class.")
 
@@ -630,7 +632,7 @@ class ProtobufManager(ProtobufBuilder):
                 return [(f.name, hints.get(f.name, str)) for f in dc_fields(type)]
 
             if issubclass(type, BaseModel):
-                return [(name, hints.get(name, str)) for name in type.__fields__]
+                return [(name, hints.get(name, str)) for name in type.model_fields]
 
             raise TypeError("Expected a dataclass or Pydantic model class.")
 
