@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Optional
 
 from pydantic import BaseModel
 
@@ -8,6 +9,8 @@ from aspyx.di import module, Environment
 from aspyx_service import Service, ProtobufManager, ServiceModule
 
 class DataModel(BaseModel):
+    optional_attr: Optional[str]
+
     str_attr: str
     bool_attr: bool
     int_attr: int
@@ -18,6 +21,8 @@ class DataModel(BaseModel):
 
 @dataclass
 class DataClass:
+    optional_attr: Optional[str]
+
     str_attr: str
     bool_attr: bool
     int_attr: int
@@ -36,8 +41,8 @@ class ComplexDataClass:
 
 # some constants
 
-data_class = DataClass(str_attr="", bool_attr=False, int_attr=0, str_attr_list=[""], bool_attr_list=[False], int_attr_list=[1])
-model_class = DataModel(str_attr="", bool_attr=False, int_attr=0, str_attr_list=[""], bool_attr_list=[False], int_attr_list=[1])
+data_class = DataClass(optional_attr=None, str_attr="", bool_attr=False, int_attr=0, str_attr_list=[""], bool_attr_list=[False], int_attr_list=[1])
+model_class = DataModel(optional_attr=None, str_attr="", bool_attr=False, int_attr=0, str_attr_list=[""], bool_attr_list=[False], int_attr_list=[1])
 
 complex_data_class = ComplexDataClass(data_class=data_class, model_class=model_class,data_classes=[data_class], model_classes=[model_class])
 
