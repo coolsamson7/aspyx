@@ -382,7 +382,7 @@ class FastAPIServer(Server):
             content = "protobuf"
             service_descriptor, method = self.get_descriptor_and_method(http_request.headers.get("x-rpc-method") )
 
-            data = await http_request.body() # TODO -> name
+            data = await http_request.body()
 
             request_name = ProtobufManager.get_message_name(service_descriptor.type, f"{method.__name__}Request")
 
@@ -409,13 +409,15 @@ class FastAPIServer(Server):
                 return Response(result=None, exception=str(e)).model_dump()
 
         elif content == "protobuf":
+            response_name = ProtobufManager.get_message_name(service_descriptor.type, f"{method.__name__}Response")
+            response_type = self.protobuf_manager.get_message_type(response_name)
+
+            result_serializer = self.protobuf_manager.create_result_serializer(response_type, method)
+
             try:
                 result = await self.dispatch(service_descriptor, method, args)
 
-                response_name = ProtobufManager.get_message_name(service_descriptor.type, f"{method.__name__}Response")
-                response_type = self.protobuf_manager.get_message_type(response_name)
-
-                result_message = self.protobuf_manager.create_result_serializer(response_type, method).serialize(result)
+                result_message = result_serializer.serialize_result(result, None)
 
                 return HttpResponse(
                     content=result_message.SerializeToString(),
@@ -423,7 +425,12 @@ class FastAPIServer(Server):
                 )
 
             except Exception as e:
-                raise e #  TODO
+                result_message = result_serializer.serialize_result(None, str(e))
+
+                return HttpResponse(
+                    content=result_message.SerializeToString(),
+                    media_type="application/x-protobuf"
+                )
 
         else:
             try:

@@ -162,6 +162,8 @@ class ProtobufBuilder:
             response_msg = descriptor_pb2.DescriptorProto()  # type: ignore
             response_msg.name = message_name.split(".")[-1]
 
+            # return
+
             return_type = method.return_type
             response_field = response_msg.field.add()
             response_field.name = "result"
@@ -173,7 +175,20 @@ class ProtobufBuilder:
             if type_name:
                 response_field.type_name = type_name
 
-            # Add to service file descriptor
+            # exception
+
+            exception_field = response_msg.field.add()
+            exception_field.name = "exception"
+            exception_field.number = 2
+
+            field_type, label, type_name = self.to_proto_type(str)
+            exception_field.type = field_type
+            exception_field.label = label
+            if type_name:
+                exception_field.type_name = type_name
+
+            # add to service file descriptor
+
             self.method_builder.service_builder.file_desc_proto.message_type.add().CopyFrom(response_msg)
 
     class MethodBuilder:
@@ -358,9 +373,11 @@ class ProtobufManager(ProtobufBuilder):
 
             return_type = type_hints.get('return')
 
-            field_desc = self.descriptor.DESCRIPTOR.fields_by_name["result"]
+            result_field_desc = self.descriptor.DESCRIPTOR.fields_by_name["result"]
+            exception_field_desc = self.descriptor.DESCRIPTOR.fields_by_name["exception"]
 
-            self.getters.append(self._create_getter(field_desc, "result", return_type))
+            self.getters.append(self._create_getter(result_field_desc, "result", return_type))
+            self.getters.append(self._create_getter(exception_field_desc, "exception", str))
 
             return self
 
@@ -528,7 +545,10 @@ class ProtobufManager(ProtobufBuilder):
             for getter in self.getters:
                 getter(message, None, set_result)
 
-            return result #TODO exception
+            if result is None:
+                raise RemoteServiceException(f"server side exception {exception}")
+            else:
+                return result
 
     class MethodSerializer:
         __slots__ = [
@@ -551,9 +571,11 @@ class ProtobufManager(ProtobufBuilder):
 
             return_type = type_hints["return"]
 
-            field_desc = msg_descriptor.fields_by_name["result"]
+            result_field_desc = msg_descriptor.fields_by_name["result"]
+            exception_field_desc = msg_descriptor.fields_by_name["exception"]
 
-            self.setters.append(self._create_setter(field_desc, "result", return_type))
+            self.setters.append(self._create_setter(result_field_desc, "result", return_type))
+            self.setters.append(self._create_setter(exception_field_desc, "exception", return_type))
 
             return self
 
@@ -617,7 +639,7 @@ class ProtobufManager(ProtobufBuilder):
                 # list of scalars
 
                 else:
-                    return lambda msg, val: getattr(msg, field_name).extend(val) # TODO ???
+                    return lambda msg, val: getattr(msg, field_name).extend(val)
 
             # message
 
@@ -658,6 +680,21 @@ class ProtobufManager(ProtobufBuilder):
 
             for i in range(len(self.setters)):
                 self.setters[i](message, value)
+
+            return message
+
+        def serialize_result(self, value: Any, exception: str) -> Any:
+            # create message instance
+
+            message = self.message_type()
+
+            # call setters
+
+            if value is not None:
+                self.setters[0](message, value)
+
+            if exception is not None:
+                self.setters[1](message, exception)
 
             return message
 
