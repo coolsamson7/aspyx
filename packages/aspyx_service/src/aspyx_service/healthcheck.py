@@ -15,7 +15,7 @@ from aspyx.reflection import Decorators, TypeDescriptor
 
 def health_checks():
     """
-    Instances of classes that are annotated with @injectable can be created by an Environment.
+    Instances of classes that are annotated with @health_checks contain healt mehtods.
     """
     def decorator(cls):
         Decorators.add(cls, health_checks)
@@ -31,7 +31,7 @@ def health_checks():
 
 def health_check(name="", cache = 0, fail_if_slower_than = 0):
     """
-    Methods annotated with `@on_init` will be called when the instance is created.
+    Methods annotated with `@health_check` specify health checks that will be executed.
     """
     def decorator(func):
         Decorators.add(func, health_check, name, cache, fail_if_slower_than)
