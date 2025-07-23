@@ -239,16 +239,16 @@ class ProtobufBuilder:
             self.file_desc_proto.service.add().CopyFrom(service_desc)
 
         def finalize(self, pool: DescriptorPool):
-            if self.finalized:
-                raise ServiceException(f"module {self.name} already sealed")
+            if not self.finalized:
+                #raise ServiceException(f"module {self.name} already sealed")
 
-            #for m in self.file_desc_proto.message_type:
-            #    print(m)
+                #for m in self.file_desc_proto.message_type:
+                #    print(m)
 
-            self.finalized = True
-            pool.Add(self.file_desc_proto)
+                self.finalized = True
+                pool.Add(self.file_desc_proto)
 
-            #ProtobufDumper.dump_proto(self.file_desc_proto)
+                #ProtobufDumper.dump_proto(self.file_desc_proto)
 
     # constructor
 
