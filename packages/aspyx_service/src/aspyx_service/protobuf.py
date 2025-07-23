@@ -513,7 +513,10 @@ class ProtobufManager(ProtobufBuilder):
 
             else:
                 def deserialize_scalar(msg: Message, val: Any,  setter=setattr):
-                    setter(val, field_name, getattr(msg, field_name))
+                    if msg.HasField(field_name):
+                        setter(val, field_name, getattr(msg, field_name))
+                    else:
+                        setter(val, field_name, None)
 
                 return deserialize_scalar
 
@@ -669,7 +672,13 @@ class ProtobufManager(ProtobufBuilder):
             # scalar
 
             else:
-                return lambda msg, val: setattr(msg, field_name, val)
+                def set_attr(msg, val):
+                    if val is not None:
+                        setattr(msg, field_name, val)
+                    else:
+                        pass#delattr(msg, field_name)
+
+                return set_attr# lambda msg, val: setattr(msg, field_name, val)
 
         def serialize(self, value: Any) -> Any:
             # create message instance
