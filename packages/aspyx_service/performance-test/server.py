@@ -7,7 +7,8 @@ from typing import Optional
 from consul import Consul
 from fastapi import FastAPI
 
-from aspyx_service import HealthCheckManager, ServiceModule, ConsulComponentRegistry, SessionManager, FastAPIServer
+from aspyx_service import HealthCheckManager, ServiceModule, ConsulComponentRegistry, SessionManager, FastAPIServer, \
+    ProtobufManager
 
 from client import ClientModule, TestService, TestAsyncService, Data, Pydantic, TestRestService, TestAsyncRestService, TestComponent
 
@@ -133,7 +134,8 @@ class TestComponentImpl(AbstractComponent, TestComponent):
         return [
             ChannelAddress("rest", f"http://{Server.get_local_ip()}:{port}"),
             ChannelAddress("dispatch-json", f"http://{Server.get_local_ip()}:{port}"),
-            ChannelAddress("dispatch-msgpack", f"http://{Server.get_local_ip()}:{port}")
+            ChannelAddress("dispatch-msgpack", f"http://{Server.get_local_ip()}:{port}"),
+            ChannelAddress("dispatch-protobuf", f"http://{Server.get_local_ip()}:{port}")
         ]
 
     def startup(self) -> None:
@@ -156,8 +158,8 @@ class ServerModule:
     #    return YamlConfigurationSource(f"{Path(__file__).parent}/config.yaml")
 
     @create()
-    def create_server(self, service_manager: ServiceManager, component_registry: ComponentRegistry) -> FastAPIServer:
-        return FastAPIServer(self.fastapi, service_manager, component_registry)
+    def create_server(self, service_manager: ServiceManager, component_registry: ComponentRegistry, protobuf_manager: ProtobufManager) -> FastAPIServer:
+        return FastAPIServer(self.fastapi, service_manager, component_registry, protobuf_manager)
 
     @create()
     def create_session_storage(self) -> SessionManager.Storage:

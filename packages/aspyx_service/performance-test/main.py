@@ -11,11 +11,11 @@ from server import  ServerModule
 from aspyx.util import Logger
 
 
-Logger.configure(default_level=logging.DEBUG, levels={
+Logger.configure(default_level=logging.INFO, levels={
     "httpx": logging.ERROR,
-    "aspyx.di": logging.ERROR,
-    "aspyx.di.aop": logging.ERROR,
-    "aspyx.service": logging.ERROR
+    "aspyx.di": logging.INFO,
+    "aspyx.di.aop": logging.INFO,
+    "aspyx.service": logging.INFO
 })
 
 PORT = int(os.getenv("FAST_API_PORT", "8000"))

@@ -95,6 +95,8 @@ data = Data(i=1, f=1.0, b=True, s="s",
             )
 
 def run_loops(name: str, loops: int, type: Type[T], instance: T,  callable: Callable[[T], None]):
+    callable(instance) # initialization
+
     start = time.perf_counter()
     for _ in range(loops):
         callable(instance)
@@ -105,6 +107,8 @@ def run_loops(name: str, loops: int, type: Type[T], instance: T,  callable: Call
     print(f"run {name}, loops={loops}: avg={avg_ms:.3f} ms")
 
 async def run_async_loops(name: str, loops: int, type: Type[T], instance: T,  callable: Callable[[T], Awaitable[Any]]):
+    await callable(instance)  # initialization
+
     start = time.perf_counter()
     for _ in range(loops):
         await callable(instance)
@@ -192,12 +196,17 @@ async def main():
     run_loops("rest", loops, TestRestService, manager.get_service(TestRestService, preferred_channel="rest"), lambda service: service.get("world"))
     run_loops("json", loops, TestService, manager.get_service(TestService, preferred_channel="dispatch-json"), lambda service: service.hello("world"))
     run_loops("msgpack", loops, TestService, manager.get_service(TestService, preferred_channel="dispatch-msgpack"), lambda service: service.hello("world"))
+    run_loops("protobuf", loops, TestService, manager.get_service(TestService, preferred_channel="dispatch-protobuf"),
+              lambda service: service.hello("world"))
 
     # pydantic
 
     run_loops("rest & pydantic", loops, TestRestService, manager.get_service(TestRestService, preferred_channel="rest"), lambda service: service.post_pydantic("hello", pydantic))
     run_loops("json & pydantic", loops, TestService, manager.get_service(TestService, preferred_channel="dispatch-json"), lambda service: service.pydantic(pydantic))
     run_loops("msgpack & pydantic", loops, TestService, manager.get_service(TestService, preferred_channel="dispatch-msgpack"), lambda service: service.pydantic(pydantic))
+    run_loops("protobuf & pydantic", loops, TestService,
+              manager.get_service(TestService, preferred_channel="dispatch-protobuf"),
+              lambda service: service.pydantic(pydantic))
 
     # data class
 
@@ -209,6 +218,9 @@ async def main():
     run_loops("msgpack & data", loops, TestService,
               manager.get_service(TestService, preferred_channel="dispatch-msgpack"),
               lambda service: service.data(data))
+    run_loops("protobuf & data", loops, TestService,
+              manager.get_service(TestService, preferred_channel="dispatch-protobuf"),
+              lambda service: service.data(data))
 
     # async
 
@@ -218,6 +230,9 @@ async def main():
               lambda service: service.hello("world"))
     await run_async_loops("async msgpack", loops, TestAsyncService, manager.get_service(TestAsyncService, preferred_channel="dispatch-msgpack"),
               lambda service: service.hello("world"))
+    await run_async_loops("async protobuf", loops, TestAsyncService,
+                          manager.get_service(TestAsyncService, preferred_channel="dispatch-protobuf"),
+                          lambda service: service.hello("world"))
 
     # pydantic
 
@@ -229,6 +244,9 @@ async def main():
     await run_async_loops("async msgpack & pydantic", loops, TestAsyncService,
               manager.get_service(TestAsyncService, preferred_channel="dispatch-msgpack"),
               lambda service: service.pydantic(pydantic))
+    await run_async_loops("async protobuf & pydantic", loops, TestAsyncService,
+                          manager.get_service(TestAsyncService, preferred_channel="dispatch-protobuf"),
+                          lambda service: service.pydantic(pydantic))
 
     # data class
 
@@ -242,6 +260,9 @@ async def main():
     await run_async_loops("async msgpack & data", loops, TestAsyncService,
               manager.get_service(TestAsyncService, preferred_channel="dispatch-msgpack"),
               lambda service: service.data(data))
+    await run_async_loops("async protobuf & data", loops, TestAsyncService,
+                          manager.get_service(TestAsyncService, preferred_channel="dispatch-protobuf"),
+                          lambda service: service.data(data))
 
     # a real thread test
 
@@ -262,6 +283,9 @@ async def main():
     run_threaded_sync_loops("threaded sync json, 16 thread", loops, 16, TestService,
                              manager.get_service(TestService, preferred_channel="dispatch-json"),
                              lambda service: service.hello("world"))
+    run_threaded_sync_loops("threaded sync protobuf, 16 thread", loops, 16, TestService,
+                            manager.get_service(TestService, preferred_channel="dispatch-protobuf"),
+                            lambda service: service.hello("world"))
 
     # async
 
@@ -279,6 +303,9 @@ async def main():
                              lambda service: service.hello("world"))
     run_threaded_async_loops("threaded async json, 16 thread", loops, 16, TestAsyncService,
                              manager.get_service(TestAsyncService, preferred_channel="dispatch-json"),
+                             lambda service: service.hello("world"))
+    run_threaded_async_loops("threaded async protobuf, 16 thread", loops, 16, TestAsyncService,
+                             manager.get_service(TestAsyncService, preferred_channel="dispatch-protobuf"),
                              lambda service: service.hello("world"))
 
 if __name__ == "__main__":
