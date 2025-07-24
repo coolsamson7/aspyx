@@ -456,6 +456,7 @@ def start_environment() -> Environment:
 def service_manager():
     environment = start_environment()
 
-    yield environment.get(ServiceManager)
-
-    environment.destroy()
+    try:
+        yield environment.get(ServiceManager)
+    finally:
+        environment.destroy()
