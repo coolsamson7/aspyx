@@ -141,8 +141,6 @@ class ProtobufBuilder:
 
             self.file_desc_proto.message_type.add().CopyFrom(desc)
 
-            # TODO ????? self.file_desc_proto.dependency.append("bar.proto")
-
             return f".{full_name}"
 
         def check_message(self, origin, type: Type) -> str:
@@ -269,11 +267,9 @@ class ProtobufBuilder:
                 for dependency in self.file_desc_proto.dependency:
                     builder.modules[dependency].finalize(builder)
 
-                print(self.file_desc_proto)
-
                 builder.pool.Add(self.file_desc_proto)
 
-                print(ProtobufDumper.dump_proto(self.file_desc_proto))
+                #print(ProtobufDumper.dump_proto(self.file_desc_proto))
 
     # constructor
 
@@ -816,38 +812,13 @@ class ProtobufManager(ProtobufBuilder):
         return serializer
 
     def create_deserializer(self, descriptor: Descriptor, method: Callable) -> ProtobufManager.MethodDeserializer:
-        # is it cached?
-
-        deserializer = self.deserializer_cache.get(descriptor)
-        if deserializer is None:
-            deserializer = ProtobufManager.MethodDeserializer(self, descriptor).args(method)
-
-            self.deserializer_cache.put(descriptor, deserializer)
-
-        return deserializer
+        return self.deserializer_cache.get(descriptor, lambda descriptor: ProtobufManager.MethodDeserializer(self, descriptor).args(method))
 
     def create_result_serializer(self, descriptor: Descriptor, method: Callable) -> ProtobufManager.MethodSerializer:
-        # is it cached?
+        return self.result_serializer_cache.get(descriptor, lambda descriptor: ProtobufManager.MethodSerializer(self, descriptor).args(method))
 
-        serializer = self.result_serializer_cache.get(descriptor)
-        if serializer is None:
-            serializer = ProtobufManager.MethodSerializer(self, descriptor).result(method)
-
-            self.result_serializer_cache.put(descriptor, serializer)
-
-        return serializer
-
-    def create_result_deserializer(self, descriptor: Descriptor,
-                                   method: Callable) -> ProtobufManager.MethodDeserializer:
-        # is it cached?
-
-        deserializer = self.result_deserializer_cache.get(descriptor)
-        if deserializer is None:
-            deserializer = ProtobufManager.MethodDeserializer(self, descriptor).result(method)
-
-            self.result_deserializer_cache.put(descriptor, deserializer)
-
-        return deserializer
+    def create_result_deserializer(self, descriptor: Descriptor, method: Callable) -> ProtobufManager.MethodDeserializer:
+        return self.result_deserializer_cache.get(descriptor, lambda descriptor: ProtobufManager.MethodDeserializer(self, descriptor).args(method))
 
 @channel("dispatch-protobuf")
 class ProtobufChannel(HTTPXChannel):
