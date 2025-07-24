@@ -4,6 +4,7 @@ Protobuf channel and utilities
 from __future__ import annotations
 
 import inspect
+import threading
 from dataclasses import is_dataclass, fields as dc_fields
 from typing import Type, get_type_hints, Callable, Tuple, get_origin, get_args, List, Dict, Any, Union, Sequence, \
     Optional
@@ -18,7 +19,9 @@ from google.protobuf.message import Message
 from google.protobuf.descriptor import FieldDescriptor, Descriptor
 
 from aspyx.di import injectable
+from aspyx.di.threading import synchronized
 from aspyx.reflection import DynamicProxy, TypeDescriptor
+from aspyx.util import CopyOnWriteCache
 
 from .service import channel, ServiceException
 from .channels import HTTPXChannel
@@ -57,7 +60,8 @@ class ProtobufBuilder:
         "pool",
         "factory",
         "modules",
-        "components"
+        "components",
+        "lock"
     ]
 
     @classmethod
@@ -88,6 +92,7 @@ class ProtobufBuilder:
             self.file_desc_proto.package = self.name
             self.types : dict[Type, Any] = {}
             self.finalized = False
+            self.lock = threading.RLock()
 
         # public
 
@@ -247,7 +252,7 @@ class ProtobufBuilder:
                 self.finalized = True
                 pool.Add(self.file_desc_proto)
 
-                #ProtobufDumper.dump_proto(self.file_desc_proto)
+                print(ProtobufDumper.dump_proto(self.file_desc_proto))
 
     # constructor
 
@@ -256,6 +261,7 @@ class ProtobufBuilder:
         self.factory = message_factory.MessageFactory(self.pool)
         self.modules: Dict[str, ProtobufBuilder.Module] = {}
         self.components = {}
+        self.lock = threading.RLock()
 
     # internal
 
@@ -338,23 +344,25 @@ class ProtobufBuilder:
 
     # public
 
+    #@synchronized()
     def check(self, service_type: Type):
         descriptor = getattr(service_type, "__descriptor__")
 
         component_descriptor = descriptor.component_descriptor
 
-        if component_descriptor not in self.components:
-            for service in component_descriptor.services:
-                self.build_service(TypeDescriptor.for_type(service.type))
+        with self.lock:
+            if component_descriptor not in self.components:
+                for service in component_descriptor.services:
+                    self.build_service(TypeDescriptor.for_type(service.type))
 
-            # finalize
+                # finalize
 
-            for module in self.modules.values():
-                module.finalize(self.pool)
+                for module in self.modules.values():
+                    module.finalize(self.pool)
 
-            # done
+                # done
 
-            self.components[component_descriptor] = True
+                self.components[component_descriptor] = True
 
 
 @injectable()
@@ -378,7 +386,7 @@ class ProtobufManager(ProtobufBuilder):
 
         # internal
 
-        def args(self, method: Callable)-> 'ProtobufManager.MethodDeserializer':
+        def args(self, method: Callable)-> ProtobufManager.MethodDeserializer:
             type_hints = get_type_hints(method)
 
             # loop over parameters
@@ -421,6 +429,16 @@ class ProtobufManager(ProtobufBuilder):
             is_repeated = field_desc.label == field_desc.LABEL_REPEATED
             is_message = field_desc.message_type is not None
 
+            ## local func
+
+            def compute_class_getters(item_type: Type) -> list[Callable]:
+                getters = []
+
+                for sub_field_name, field_type in self.get_fields_and_types(item_type):
+                    getters.append(self._create_getter(message_type.fields_by_name[sub_field_name], sub_field_name, field_type))
+
+                return getters
+
             # list
 
             if is_repeated:
@@ -431,11 +449,7 @@ class ProtobufManager(ProtobufBuilder):
                 if is_dataclass(item_type) or issubclass(item_type, BaseModel):
                     message_type = self.manager.pool.FindMessageTypeByName(ProtobufManager.get_message_name(item_type))
 
-                    getters = []
-                    fields = []
-                    for sub_field_name, field_type in self.get_fields_and_types(item_type):
-                        fields.append(sub_field_name)
-                        getters.append(self._create_getter(message_type.fields_by_name[sub_field_name], sub_field_name, field_type))
+                    getters = self.manager.getter_lambdas_cache.get(item_type, compute_class_getters)
 
                     def deserialize_dataclass_list(msg: Message, val: Any, setter=setattr, getters=getters):
                         list = []
@@ -493,15 +507,7 @@ class ProtobufManager(ProtobufBuilder):
                 if is_dataclass(type) or issubclass(type, BaseModel):
                     message_type = self.manager.pool.FindMessageTypeByName(ProtobufManager.get_message_name(type))
 
-                    sub_getters = []
-                    fields = []
-
-                    for sub_field_name, field_type in self.get_fields_and_types(type):
-                        fields.append(sub_field_name)
-
-                        field = message_type.fields_by_name[sub_field_name]
-
-                        sub_getters.append(self._create_getter(field, sub_field_name, field_type))
+                    sub_getters = self.manager.getter_lambdas_cache.get(type, compute_class_getters)
 
                     default = {}
                     if issubclass(type, BaseModel):
@@ -603,7 +609,7 @@ class ProtobufManager(ProtobufBuilder):
             exception_field_desc = msg_descriptor.fields_by_name["exception"]
 
             self.setters.append(self._create_setter(result_field_desc, "result", return_type))
-            self.setters.append(self._create_setter(exception_field_desc, "exception", return_type))
+            self.setters.append(self._create_setter(exception_field_desc, "exception", str))
 
             return self
 
@@ -753,7 +759,9 @@ class ProtobufManager(ProtobufBuilder):
         "serializer_cache",
         "deserializer_cache",
         "result_serializer_cache",
-        "result_deserializer_cache"
+        "result_deserializer_cache",
+        "setter_lambdas_cache",
+        "getter_lambdas_cache"
     ]
 
     # constructor
@@ -761,57 +769,60 @@ class ProtobufManager(ProtobufBuilder):
     def __init__(self):
         super().__init__()
 
-        self.serializer_cache: Dict[Callable, ProtobufManager.MethodSerializer] = {}
-        self.deserializer_cache: Dict[Descriptor, ProtobufManager.MethodDeserializer] = {}
+        self.serializer_cache = CopyOnWriteCache[Callable, ProtobufManager.MethodSerializer]()
+        self.deserializer_cache = CopyOnWriteCache[Descriptor, ProtobufManager.MethodDeserializer]()
 
-        self.result_serializer_cache: Dict[Descriptor, ProtobufManager.MethodSerializer] = {}
-        self.result_deserializer_cache: Dict[Descriptor, ProtobufManager.MethodDeserializer] = {}
+        self.result_serializer_cache = CopyOnWriteCache[Descriptor, ProtobufManager.MethodSerializer]()
+        self.result_deserializer_cache = CopyOnWriteCache[Descriptor, ProtobufManager.MethodDeserializer]()
+
+        self.setter_lambdas_cache = CopyOnWriteCache[Type, list[Callable]]()
+        self.getter_lambdas_cache = CopyOnWriteCache[Type, list[Callable]]()
 
     # public
 
     def create_serializer(self, type: Type, method: Callable) -> ProtobufManager.MethodSerializer:
         # is it cached?
 
-        serializer = self.serializer_cache.get(method, None)
+        serializer = self.serializer_cache.get(method)
         if serializer is None:
             self.check(type) # make sure all messages are created
 
             serializer = ProtobufManager.MethodSerializer(self, self.get_request_message(type, method)).args(method)
 
-            self.serializer_cache[method] = serializer
+            self.serializer_cache.put(method, serializer)
 
         return serializer
 
     def create_deserializer(self, descriptor: Descriptor, method: Callable) -> ProtobufManager.MethodDeserializer:
         # is it cached?
 
-        deserializer = self.deserializer_cache.get(descriptor, None)
+        deserializer = self.deserializer_cache.get(descriptor)
         if deserializer is None:
             deserializer = ProtobufManager.MethodDeserializer(self, descriptor).args(method)
 
-            self.deserializer_cache[descriptor] = deserializer
+            self.deserializer_cache.put(descriptor, deserializer)
 
         return deserializer
 
     def create_result_serializer(self, descriptor: Descriptor, method: Callable) -> ProtobufManager.MethodSerializer:
         # is it cached?
 
-        serializer = self.result_serializer_cache.get(descriptor, None)
+        serializer = self.result_serializer_cache.get(descriptor)
         if serializer is None:
             serializer = ProtobufManager.MethodSerializer(self, descriptor).result(method)
 
-            self.result_serializer_cache[descriptor] = serializer
+            self.result_serializer_cache.put(descriptor, serializer)
 
         return serializer
 
     def create_result_deserializer(self, descriptor: Descriptor, method: Callable) -> ProtobufManager.MethodDeserializer:
         # is it cached?
 
-        deserializer = self.result_deserializer_cache.get(descriptor, None)
+        deserializer = self.result_deserializer_cache.get(descriptor)
         if deserializer is None:
             deserializer = ProtobufManager.MethodDeserializer(self, descriptor).result(method)
 
-            self.result_deserializer_cache[descriptor] = deserializer
+            self.result_deserializer_cache.put(descriptor, deserializer)
 
         return deserializer
 
@@ -864,12 +875,12 @@ class ProtobufChannel(HTTPXChannel):
         self.manager = manager
         self.environment = None
         self.protobuf_manager = protobuf_manager
-        self.cache: dict[Callable, ProtobufChannel.Call] = {}
+        self.cache = CopyOnWriteCache[Callable, ProtobufChannel.Call]()
 
     # internal
 
     def get_call(self, type: Type, method: Callable) -> ProtobufChannel.Call:
-        call = self.cache.get(method, None)
+        call = self.cache.get(method)
         if call is None:
             method_name   = f"{self.component_descriptor.name}:{self.service_names[type]}:{method.__name__}"
             serializer    = self.protobuf_manager.create_serializer(type, method)
@@ -878,7 +889,7 @@ class ProtobufChannel(HTTPXChannel):
 
             call = ProtobufChannel.Call(method_name, serializer, response_type, deserializer)
 
-            self.cache[method] = call
+            self.cache.put(method, call)
 
         return call
 
