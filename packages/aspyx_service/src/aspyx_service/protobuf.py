@@ -812,13 +812,38 @@ class ProtobufManager(ProtobufBuilder):
         return serializer
 
     def create_deserializer(self, descriptor: Descriptor, method: Callable) -> ProtobufManager.MethodDeserializer:
-        return self.deserializer_cache.get(descriptor, lambda descriptor: ProtobufManager.MethodDeserializer(self, descriptor).args(method))
+        # is it cached?
+
+        deserializer = self.deserializer_cache.get(descriptor)
+        if deserializer is None:
+            deserializer = ProtobufManager.MethodDeserializer(self, descriptor).args(method)
+
+            self.deserializer_cache.put(descriptor, deserializer)
+
+        return deserializer
 
     def create_result_serializer(self, descriptor: Descriptor, method: Callable) -> ProtobufManager.MethodSerializer:
-        return self.result_serializer_cache.get(descriptor, lambda descriptor: ProtobufManager.MethodSerializer(self, descriptor).args(method))
+        # is it cached?
 
-    def create_result_deserializer(self, descriptor: Descriptor, method: Callable) -> ProtobufManager.MethodDeserializer:
-        return self.result_deserializer_cache.get(descriptor, lambda descriptor: ProtobufManager.MethodDeserializer(self, descriptor).args(method))
+        serializer = self.result_serializer_cache.get(descriptor)
+        if serializer is None:
+            serializer = ProtobufManager.MethodSerializer(self, descriptor).result(method)
+
+            self.result_serializer_cache.put(descriptor, serializer)
+
+        return serializer
+
+    def create_result_deserializer(self, descriptor: Descriptor,
+                                   method: Callable) -> ProtobufManager.MethodDeserializer:
+        # is it cached?
+
+        deserializer = self.result_deserializer_cache.get(descriptor)
+        if deserializer is None:
+            deserializer = ProtobufManager.MethodDeserializer(self, descriptor).result(method)
+
+            self.result_deserializer_cache.put(descriptor, deserializer)
+
+        return deserializer
 
 @channel("dispatch-protobuf")
 class ProtobufChannel(HTTPXChannel):
