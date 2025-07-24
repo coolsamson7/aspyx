@@ -215,6 +215,7 @@ class FastAPIServer(Server):
         self.add_routes()
         self.fast_api.include_router(self.router)
 
+        # TODO: trace routes
         #for route in self.fast_api.routes:
         #    print(f"{route.name}: {route.path} [{route.methods}]")
 

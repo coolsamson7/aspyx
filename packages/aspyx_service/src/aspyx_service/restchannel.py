@@ -9,6 +9,7 @@ from typing import get_type_hints, TypeVar, Annotated, Callable, get_origin, get
 from pydantic import BaseModel
 
 from aspyx.reflection import DynamicProxy, Decorators
+from aspyx.util import get_serializer
 
 from .channels import HTTPXChannel
 from .service import channel, ServiceCommunicationException
@@ -130,8 +131,25 @@ class RestChannel(HTTPXChannel):
     # local class
 
     class Call:
+        # slots
+
+        __slots__ = [
+            "type",
+            "url_template",
+            "path_param_names",
+            "body_param_name",
+            "query_param_names",
+            "return_type",
+            "signature",
+            "body_serializer"
+        ]
+
+        # constructor
+
         def __init__(self, type: Type, method : Callable):
             self.signature = inspect.signature(method)
+
+            type_hints = get_type_hints(method)
 
             param_names = list(self.signature.parameters.keys())
             param_names.remove("self")
@@ -171,6 +189,7 @@ class RestChannel(HTTPXChannel):
 
                     if BodyMarker in metadata:
                         self.body_param_name = param_name
+                        self.body_serializer = get_serializer(type_hints[param_name])
                         param_names.remove(param_name)
                     elif QueryParamMarker in metadata:
                         self.query_param_names.add(param_name)
@@ -197,6 +216,7 @@ class RestChannel(HTTPXChannel):
                                     or is_dataclass(typ)
                             ):
                                 self.body_param_name = name
+                                self.body_serializer = get_serializer(type_hints[name])
                                 param_names.remove(name)
                                 break
 
@@ -207,7 +227,7 @@ class RestChannel(HTTPXChannel):
 
             # return type
 
-            self.return_type = get_type_hints(method)['return']
+            self.return_type = type_hints['return']
 
     # constructor
 
@@ -241,7 +261,7 @@ class RestChannel(HTTPXChannel):
         query_params = {k: arguments[k] for k in call.query_param_names if k in arguments}
         body = {}
         if call.body_param_name is not None:
-            body = self.to_dict(arguments.get(call.body_param_name))
+            body = call.body_serializer(arguments.get(call.body_param_name))#self.to_dict(arguments.get(call.body_param_name))
 
         # call
 
@@ -273,7 +293,7 @@ class RestChannel(HTTPXChannel):
         query_params = {k: arguments[k] for k in call.query_param_names if k in arguments}
         body = {}
         if call.body_param_name is not None:
-            body = self.to_dict(arguments.get(call.body_param_name))
+            body = call.body_serializer(arguments.get(call.body_param_name))#self.to_dict(arguments.get(call.body_param_name))
 
         # call
 

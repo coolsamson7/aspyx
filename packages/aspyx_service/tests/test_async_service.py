@@ -16,7 +16,7 @@ pydantic = Pydantic(int_attr=1, float_attr=1.0, bool_attr=True, str_attr="s", in
 data = Data(int_attr=1, float_attr=1.0, bool_attr=True, str_attr="s", int_list_attr=[1], float_list_attr=[1.0], bool_list_attr=[True], str_list_attr=[""])
 
 
-class TestAsyncRemoteService():
+class TestAsyncRemoteService:
     @pytest.mark.asyncio
     async def test(self, service_manager):
 
@@ -62,5 +62,5 @@ class TestAsyncRemoteService():
         result_pydantic = await test_service.post_pydantic("message", pydantic)
         assert result_pydantic == pydantic
 
-        #result_data = await test_service.post_data("message", data)
-        #assert result_data == data
+        result_data = await test_service.post_data("message", data)
+        assert result_data == data

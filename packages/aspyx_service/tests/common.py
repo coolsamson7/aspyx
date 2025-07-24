@@ -220,24 +220,24 @@ def requires_response():
 @rest("/api")
 class TestRestService(Service):
     @abstractmethod
-    @get("/hello/{message}")
+    @get("/get/{message}")
     @requires_response()
     def get(self, message: str) -> str:
         pass
 
-    @put("/hello/{message}")
+    @put("/put/{message}")
     def put(self, message: str) -> str:
         pass
 
-    @post("/hello/{message}")
+    @post("/post_pydantic/{message}")
     def post_pydantic(self, message: str, data: Body(Pydantic)) -> Pydantic:
         pass
 
-    @post("/hello/{message}")
+    @post("/post_data/{message}")
     def post_data(self, message: str, data: Body(Data)) -> Data:
         pass
 
-    @delete("/hello/{message}")
+    @delete("/delete/{message}")
     def delete(self, message: str) -> str:
         pass
 
@@ -245,23 +245,23 @@ class TestRestService(Service):
 @rest("/async-api")
 class TestAsyncRestService(Service):
     @abstractmethod
-    @get("/hello/{message}")
+    @get("/get/{message}")
     async def get(self, message: str) -> str:
         pass
 
-    @put("/hello/{message}")
+    @put("/put/{message}")
     async def put(self, message: str) -> str:
         pass
 
-    @post("/hello/{message}")
+    @post("/post_pydantic/{message}")
     async def post_pydantic(self, message: str, data: Body(Pydantic)) -> Pydantic:
         pass
 
-    @post("/hello/{message}")
+    @post("/post_data/{message}")
     async def post_data(self, message: str, data: Body(Data)) -> Data:
         pass
 
-    @delete("/hello/{message}")
+    @delete("/delete/{message}")
     async def delete(self, message: str) -> str:
         pass
 
