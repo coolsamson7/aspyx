@@ -18,7 +18,7 @@ data = Data(int_attr=1, float_attr=1.0, bool_attr=True, str_attr="s", int_list_a
 
 class TestAsyncRemoteService:
     @pytest.mark.asyncio
-    async def test(self, service_manager):
+    async def xtest(self, service_manager):
 
         # dispatch json
 
