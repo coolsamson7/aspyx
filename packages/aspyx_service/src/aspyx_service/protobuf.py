@@ -646,6 +646,17 @@ class ProtobufManager(ProtobufBuilder):
             is_repeated = field_desc.label == field_desc.LABEL_REPEATED
             is_message = field_desc.message_type is not None
 
+            # local func
+
+            def create(message_type: Descriptor, item_type: Type) -> Tuple[list[Callable],list[str]]:
+                setters = []
+                fields = []
+                for field_name, field_type in self.get_fields_and_types(item_type):
+                    fields.append(field_name)
+                    setters.append(self._create_setter(message_type.fields_by_name[field_name], field_name, field_type))
+
+                return setters, fields
+
             # list
 
             if is_repeated:
@@ -656,11 +667,7 @@ class ProtobufManager(ProtobufBuilder):
                 if is_dataclass(item_type) or issubclass(item_type, BaseModel):
                     message_type = self.manager.pool.FindMessageTypeByName(ProtobufManager.get_message_name(item_type))
 
-                    setters = []
-                    fields = []
-                    for sub_field_name, field_type in self.get_fields_and_types(item_type):
-                        fields.append(sub_field_name)
-                        setters.append(self._create_setter(message_type.fields_by_name[sub_field_name], sub_field_name, field_type))
+                    setters, fields = self.manager.setter_lambdas_cache.get(item_type, lambda t: create(message_type, item_type))
 
                     def serialize_message_list(msg: Message, val: Any, fields=fields, setters=setters):
                         for item in val:
@@ -681,15 +688,7 @@ class ProtobufManager(ProtobufBuilder):
                 if is_dataclass(type) or issubclass(type, BaseModel):
                     message_type = self.manager.pool.FindMessageTypeByName(ProtobufManager.get_message_name(type))
 
-                    sub_setters = []
-                    fields = []
-
-                    for sub_field_name, field_type in self.get_fields_and_types(type):
-                        fields.append(sub_field_name)
-
-                        field = message_type.fields_by_name[sub_field_name]
-
-                        sub_setters.append(self._create_setter(field, sub_field_name, field_type))
+                    sub_setters, fields = self.manager.setter_lambdas_cache.get(type, lambda t: create(message_type, type))
 
                     def serialize_message(msg: Message, val: Any, fields=fields, setters=sub_setters):
                         field = getattr(msg, field_name)
@@ -776,7 +775,7 @@ class ProtobufManager(ProtobufBuilder):
         self.result_deserializer_cache = CopyOnWriteCache[Descriptor, ProtobufManager.MethodDeserializer]()
 
         self.setter_lambdas_cache = CopyOnWriteCache[Type, list[Callable]]()
-        self.getter_lambdas_cache = CopyOnWriteCache[Type, list[Callable]]()
+        self.getter_lambdas_cache = CopyOnWriteCache[Type, Tuple[list[Callable], list[str]]]()
 
     # public
 
