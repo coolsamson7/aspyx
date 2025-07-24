@@ -1,6 +1,6 @@
 [project]
 name = "aspyx"
-version = "1.6.1"
+version = "1.7.0"
 description = "A DI and AOP library for Python"
 authors = [{ name = "Andreas Ernst", email = "andreas.ernst7@gmail.com" }]
 readme = "README.md"
