@@ -9,7 +9,7 @@ readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.9"
 dependencies = [
-    "aspyx>=1.6.0",
+    "aspyx>=1.7.0",
     "python-consul2~=0.1.5",
     "fastapi~=0.115.13",
     "httpx~=0.28.1",

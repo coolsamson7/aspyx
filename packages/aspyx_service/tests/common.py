@@ -31,6 +31,7 @@ from aspyx_service.server import ResponseContext
 from aspyx_service.service import LocalComponentRegistry, component_services, AuthorizationException, ComponentRegistry
 from aspyx.di import module, create, injectable, on_running, Environment
 from aspyx.di.configuration import YamlConfigurationSource
+from .other import EmbeddedPydantic
 
 # configure logging
 
@@ -51,11 +52,11 @@ class EmbeddedDataClass:
     bool_attr: bool
     str_attr: str
 
-class EmbeddedPydantic(BaseModel):
-    int_attr: int
-    float_attr: float
-    bool_attr: bool
-    str_attr: str
+#class EmbeddedPydantic(BaseModel):
+#    int_attr: int
+#    float_attr: float
+#    bool_attr: bool
+#    str_attr: str
 
 class Pydantic(BaseModel):
     int_attr : int

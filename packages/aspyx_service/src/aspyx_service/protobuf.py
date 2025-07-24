@@ -19,7 +19,6 @@ from google.protobuf.message import Message
 from google.protobuf.descriptor import FieldDescriptor, Descriptor
 
 from aspyx.di import injectable
-from aspyx.di.threading import synchronized
 from aspyx.reflection import DynamicProxy, TypeDescriptor
 from aspyx.util import CopyOnWriteCache
 
@@ -108,6 +107,9 @@ class ProtobufBuilder:
             raise TypeError("Expected a dataclass or Pydantic model class.")
 
         def add_message(self, cls: Type) -> str:
+            if self.finalized:
+                raise ServiceException(f"module {self.name} is already sealed")
+
             name = cls.__name__
             full_name = f"{self.name}.{name}"
 
@@ -124,7 +126,7 @@ class ProtobufBuilder:
             if is_dataclass(cls) or issubclass(cls, BaseModel):
                 index = 1
                 for field_name, field_type in self.get_fields_and_types(cls):
-                    field_type_enum, label, type_name = self.builder.to_proto_type(field_type)
+                    field_type_enum, label, type_name = self.builder.to_proto_type(self, field_type)
 
                     f = desc.field.add()
                     f.name = field_name
@@ -143,13 +145,20 @@ class ProtobufBuilder:
 
             return f".{full_name}"
 
-        def check_message(self, type: Type) -> str:
+        def check_message(self, origin, type: Type) -> str:
             if type not in self.types:
+                if self is not origin:
+                    if not self.name in  origin.file_desc_proto.dependency:
+                        origin.file_desc_proto.dependency.append(self.file_desc_proto.name)
+
                 self.types[type] = self.add_message(type)
 
             return self.types[type]
 
         def build_request_message(self, method: TypeDescriptor.MethodDescriptor, request_name: str):
+            if self.finalized:
+                raise ServiceException(f"module {self.name} is already sealed")
+
             request_msg = descriptor_pb2.DescriptorProto()  # type: ignore
             request_msg.name = request_name.split(".")[-1]
 
@@ -162,7 +171,7 @@ class ProtobufBuilder:
                 field.name = param.name
                 field.number = field_index
 
-                field_type, label, type_name = self.builder.to_proto_type(param.type)
+                field_type, label, type_name = self.builder.to_proto_type(self, param.type)
                 field.type = field_type
                 field.label = label
                 if type_name:
@@ -175,6 +184,9 @@ class ProtobufBuilder:
             self.file_desc_proto.message_type.add().CopyFrom(request_msg)
 
         def build_response_message(self, method: TypeDescriptor.MethodDescriptor, response_name: str):
+            if self.finalized:
+                raise ServiceException(f"module {self.name} is already sealed")
+
             response_msg = descriptor_pb2.DescriptorProto()  # type: ignore
             response_msg.name = response_name.split(".")[-1]
 
@@ -185,7 +197,7 @@ class ProtobufBuilder:
             response_field.name = "result"
             response_field.number = 1
 
-            field_type, label, type_name = self.builder.to_proto_type(return_type)
+            field_type, label, type_name = self.builder.to_proto_type(self, return_type)
             response_field.type = field_type
             response_field.label = label
             if type_name:
@@ -197,7 +209,7 @@ class ProtobufBuilder:
             exception_field.name = "exception"
             exception_field.number = 2
 
-            field_type, label, type_name = self.builder.to_proto_type(str)
+            field_type, label, type_name = self.builder.to_proto_type(self, str)
             exception_field.type = field_type
             exception_field.label = label
             if type_name:
@@ -230,6 +242,9 @@ class ProtobufBuilder:
             service_desc.method.add().CopyFrom(method_desc)
 
         def add_service(self, service_type: TypeDescriptor):
+            if self.finalized:
+                raise ServiceException(f"module {self.name} is already sealed")
+
             service_desc = descriptor_pb2.ServiceDescriptorProto()  # type: ignore
             service_desc.name = service_type.cls.__name__
 
@@ -242,15 +257,21 @@ class ProtobufBuilder:
 
             self.file_desc_proto.service.add().CopyFrom(service_desc)
 
-        def finalize(self, pool: DescriptorPool):
+        def finalize(self, builder: ProtobufBuilder):
             if not self.finalized:
-                #raise ServiceException(f"module {self.name} already sealed")
+                self.finalized = True
 
                 #for m in self.file_desc_proto.message_type:
                 #    print(m)
 
-                self.finalized = True
-                pool.Add(self.file_desc_proto)
+                # add dependency first
+
+                for dependency in self.file_desc_proto.dependency:
+                    builder.modules[dependency].finalize(builder)
+
+                print(self.file_desc_proto)
+
+                builder.pool.Add(self.file_desc_proto)
 
                 print(ProtobufDumper.dump_proto(self.file_desc_proto))
 
@@ -265,7 +286,7 @@ class ProtobufBuilder:
 
     # internal
 
-    def to_proto_type(self, py_type: Type) -> Tuple[int, int, Optional[str]]:
+    def to_proto_type(self, module_origin, py_type: Type) -> Tuple[int, int, Optional[str]]:
         """
         Convert Python type to protobuf (field_type, label, type_name).
         Returns:
@@ -280,20 +301,20 @@ class ProtobufBuilder:
         if origin in (list, List):
             # Assume single-argument generic list e.g. List[int], List[FooModel]
             item_type = args[0] if args else str
-            field_type, _, type_name = self._resolve_type(item_type)
+            field_type, _, type_name = self._resolve_type(module_origin, item_type)
             return (
                 field_type,
                 descriptor_pb2.FieldDescriptorProto.LABEL_REPEATED,  # type: ignore
                 type_name,
             )
 
-        return self._resolve_type(py_type)
+        return self._resolve_type(module_origin, py_type)
 
-    def _resolve_type(self, py_type: Type) -> Tuple[int, int, Optional[str]]:
+    def _resolve_type(self, origin, py_type: Type) -> Tuple[int, int, Optional[str]]:
         """Resolves Python type to protobuf scalar or message type with label=optional."""
         # Structured message (dataclass or Pydantic BaseModel)
         if is_dataclass(py_type) or (inspect.isclass(py_type) and issubclass(py_type, BaseModel)):
-            type_name =  self.get_module(py_type).check_message(py_type)
+            type_name =  self.get_module(py_type).check_message(origin, py_type)
             return (
                 descriptor_pb2.FieldDescriptorProto.TYPE_MESSAGE,  # type: ignore
                 descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL,  # type: ignore
@@ -332,10 +353,12 @@ class ProtobufBuilder:
         return self.get_message_type(self.get_response_message_name(type, method))
 
     def get_module(self, type: Type):
-        module = self.modules.get(type.__module__, None)
+        name = type.__module__#.replace(".", "_")
+        key = name.replace(".", "_") + ".proto"
+        module = self.modules.get(key, None)
         if module is None:
-            module = ProtobufBuilder.Module(self, type.__module__)
-            self.modules[type.__module__] = module
+            module = ProtobufBuilder.Module(self, name)
+            self.modules[key] = module
 
         return module
 
@@ -358,7 +381,7 @@ class ProtobufBuilder:
                 # finalize
 
                 for module in self.modules.values():
-                    module.finalize(self.pool)
+                    module.finalize(self)
 
                 # done
 
@@ -784,7 +807,7 @@ class ProtobufManager(ProtobufBuilder):
 
         serializer = self.serializer_cache.get(method)
         if serializer is None:
-            self.check(type) # make sure all messages are created
+            self.check(type)  # make sure all messages are created
 
             serializer = ProtobufManager.MethodSerializer(self, self.get_request_message(type, method)).args(method)
 
@@ -814,7 +837,8 @@ class ProtobufManager(ProtobufBuilder):
 
         return serializer
 
-    def create_result_deserializer(self, descriptor: Descriptor, method: Callable) -> ProtobufManager.MethodDeserializer:
+    def create_result_deserializer(self, descriptor: Descriptor,
+                                   method: Callable) -> ProtobufManager.MethodDeserializer:
         # is it cached?
 
         deserializer = self.result_deserializer_cache.get(descriptor)
@@ -905,9 +929,6 @@ class ProtobufChannel(HTTPXChannel):
                     "x-rpc-method": call.method_name
                 })
 
-            # if result["exception"] is not None: TODO: Will we do that as well?
-            #    raise RemoteServiceException(f"server side exception {result['exception']}")
-
             return call.deserialize(http_result)
         except (ServiceCommunicationException, AuthorizationException, RemoteServiceException) as e:
             raise
@@ -924,9 +945,6 @@ class ProtobufChannel(HTTPXChannel):
                     #"Accept": "application/x-protobuf",
                     "x-rpc-method": call.method_name
             })
-
-            #if result["exception"] is not None: TODO: Will we do that as well?
-            #    raise RemoteServiceException(f"server side exception {result['exception']}")
 
             return call.deserialize(http_result)
         except (ServiceCommunicationException, AuthorizationException, RemoteServiceException) as e:
