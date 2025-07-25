@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, cast
 
 from pydantic import BaseModel
 
 from aspyx.di import module, Environment
-from aspyx_service import Service, ProtobufManager, ServiceModule, service, component, AbstractComponent
+from aspyx_service import Service, ProtobufManager, ServiceModule, service, component, AbstractComponent, \
+    ServiceManager, ComponentDescriptor
 
 
 class DataModel(BaseModel):
@@ -74,6 +75,11 @@ class ProtobufModule:
     pass
 
 environment = Environment(ProtobufModule)
+service_manager = environment.get(ServiceManager)
+
+
+service_manager.channel_factory.prepare_channel("dispatch-protobuf", cast(ComponentDescriptor, service_manager.get_descriptor(TestComponent)))
+#service_manager.get_descriptor()
 protobuf_manager = environment.get(ProtobufManager)
 
 class TestProto:
