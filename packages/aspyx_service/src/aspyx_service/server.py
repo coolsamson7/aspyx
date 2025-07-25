@@ -359,89 +359,86 @@ class FastAPIServer(Server):
 
         return service_descriptor, getattr(service, method_name)
 
+    async def invoke_json(self, http_request: HttpRequest):
+        data = await http_request.json()
+        service_descriptor, method = self.get_descriptor_and_method(data["method"])
+        args = self.deserialize_args(data["args"], service_descriptor.type, method)
+
+        try:
+            result = await self.dispatch(service_descriptor, method, args)
+
+            return Response(result=result, exception=None).model_dump()
+        except Exception as e:
+            return Response(result=None, exception=str(e)).model_dump()
+
+    async def invoke_msgpack(self, http_request: HttpRequest):
+        data = msgpack.unpackb(await http_request.body(), raw=False)
+        service_descriptor, method = self.get_descriptor_and_method(data["method"])
+        args = self.deserialize_args(data["args"], service_descriptor.type, method)
+
+        try:
+            response = Response(result=await self.dispatch(service_descriptor, method, args), exception=None).model_dump()
+        except Exception as e:
+            response = Response(result=None, exception=str(e)).model_dump()
+
+        return HttpResponse(
+            content=msgpack.packb(response, use_bin_type=True),
+            media_type="application/msgpack"
+        )
+
+    async def invoke_protobuf(self, http_request: HttpRequest):
+        service_descriptor, method = self.get_descriptor_and_method(http_request.headers.get("x-rpc-method"))
+
+        self.protobuf_manager.check(service_descriptor.type) # TODO...
+
+        data = await http_request.body()
+
+        # create message
+
+        request =  self.protobuf_manager.get_request_message(service_descriptor.type, method)()
+        request.ParseFromString(data)
+
+        # and parse
+
+        args = self.protobuf_manager.create_deserializer(request.DESCRIPTOR, method).deserialize(request)
+
+        response_type =  self.protobuf_manager.get_response_message(service_descriptor.type,method)
+        result_serializer = self.protobuf_manager.create_result_serializer(response_type, method)
+        try:
+            result = await self.dispatch(service_descriptor, method, args)
+
+            result_message = result_serializer.serialize_result(result, None)
+
+            return HttpResponse(
+                content=result_message.SerializeToString(),
+                media_type="application/x-protobuf"
+            )
+
+        except Exception as e:
+            result_message = result_serializer.serialize_result(None, str(e))
+
+            return HttpResponse(
+                content=result_message.SerializeToString(),
+                media_type="application/x-protobuf"
+            )
+
     async def invoke(self, http_request: HttpRequest):
         content_type = http_request.headers.get("content-type", "")
-        response_name = ""
 
-        service_descriptor : ServiceDescriptor
-        method : Callable
-        args : list[Any]
+        if content_type == "application/x-protobuf":
+            return await self.invoke_protobuf(http_request)
 
-        content = "json"
-        if "application/msgpack" in content_type:
-            content = "msgpack"
-            data = msgpack.unpackb(await http_request.body(), raw=False)
-            service_descriptor, method = self.get_descriptor_and_method(data["method"])
-            args = self.deserialize_args(data["args"], service_descriptor.type, method)
+        elif content_type == "application/msgpack":
+            return await self.invoke_msgpack(http_request)
 
-        elif "application/json" in content_type:
-            data = await http_request.json()
-            service_descriptor, method = self.get_descriptor_and_method(data["method"])
-            args = self.deserialize_args(data["args"], service_descriptor.type, method)
-
-        elif "application/x-protobuf" in content_type:
-            content = "protobuf"
-            service_descriptor, method = self.get_descriptor_and_method(http_request.headers.get("x-rpc-method") )
-            self.protobuf_manager.check(service_descriptor.type)
-            data = await http_request.body()
-
-            request_name = ProtobufManager.get_message_name(service_descriptor.type, f"{method.__name__}Request")
-
-            request = self.protobuf_manager.get_message_type(request_name)()
-            request.ParseFromString(data)
-
-            args = self.protobuf_manager.create_deserializer(request.DESCRIPTOR, method).deserialize(request)
+        elif content_type == "application/json":
+            return await self.invoke_json(http_request)
 
         else:
             return HttpResponse(
                 content="Unsupported Content-Type",
                 status_code=415,
                 media_type="text/plain"
-            )
-
-        request = data
-
-        if content == "json":
-            try:
-                result = await self.dispatch(service_descriptor, method, args)
-
-                return Response(result=result, exception=None).model_dump()
-            except Exception as e:
-                return Response(result=None, exception=str(e)).model_dump()
-
-        elif content == "protobuf":
-            response_name = ProtobufManager.get_message_name(service_descriptor.type, f"{method.__name__}Response")
-            response_type = self.protobuf_manager.get_message_type(response_name)
-
-            result_serializer = self.protobuf_manager.create_result_serializer(response_type, method)
-
-            try:
-                result = await self.dispatch(service_descriptor, method, args)
-
-                result_message = result_serializer.serialize_result(result, None)
-
-                return HttpResponse(
-                    content=result_message.SerializeToString(),
-                    media_type="application/x-protobuf"
-                )
-
-            except Exception as e:
-                result_message = result_serializer.serialize_result(None, str(e))
-
-                return HttpResponse(
-                    content=result_message.SerializeToString(),
-                    media_type="application/x-protobuf"
-                )
-
-        else:
-            try:
-                response = Response(result=await self.dispatch(service_descriptor, method, args), exception=None).model_dump()
-            except Exception as e:
-                response = Response(result=None, exception=str(e)).model_dump()
-
-            return HttpResponse(
-                content=msgpack.packb(response, use_bin_type=True),
-                media_type="application/msgpack"
             )
 
     async def dispatch(self, service_descriptor: ServiceDescriptor, method: Callable, args: list[Any]) :

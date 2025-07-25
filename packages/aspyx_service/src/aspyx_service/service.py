@@ -42,7 +42,7 @@ class ComponentStatus(Enum):
 
 class Server(ABC):
     """
-    A server is a central entity that boots a main module and initializes the ServiceManager.
+    A server is a central class that boots a main module and initializes the ServiceManager.
     It also is the place where http servers get initialized.
     """
     port = 0
