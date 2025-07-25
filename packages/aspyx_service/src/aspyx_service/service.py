@@ -573,7 +573,7 @@ class ChannelFactory:
     # constructor
 
     def __init__(self):
-        self.environment = None
+        self.environment : Optional[Environment] = None
 
     # lifecycle hooks
 
@@ -582,6 +582,12 @@ class ChannelFactory:
         self.environment = environment
 
     # public
+
+    def prepare_channel(self, channel: str, component_descriptor: ComponentDescriptor):
+        type = self.factories[channel]
+
+        if getattr(type, "prepare", None) is not None:
+            getattr(type, "prepare", None)(self.environment, component_descriptor)
 
     def make(self, name: str, descriptor: ComponentDescriptor, address: ChannelInstances) -> Channel:
         ServiceManager.logger.info("create channel %s: %s", name, self.factories.get(name).__name__)
@@ -665,9 +671,9 @@ class ServiceManager:
 
     # constructor
 
-    def __init__(self, component_registry: ComponentRegistry, channel_manager: ChannelFactory):
+    def __init__(self, component_registry: ComponentRegistry, channel_factory: ChannelFactory):
         self.component_registry = component_registry
-        self.channel_manager = channel_manager
+        self.channel_factory = channel_factory
         self.environment : Optional[Environment] = None
         self.preferred_channel = ""
 
@@ -737,6 +743,9 @@ class ServiceManager:
                         server.route_health(health_name, instance.get_health)
 
                     # register addresses
+
+                    for address in descriptor.addresses:
+                        self.channel_factory.prepare_channel(address.channel, descriptor.get_component_descriptor())
 
                     self.component_registry.register(descriptor.get_component_descriptor(), descriptor.addresses)
 
@@ -823,7 +832,7 @@ class ServiceManager:
                 if channel_instance is None:
                     # create channel
 
-                    channel_instance = self.channel_manager.make(address.channel, component_descriptor, address)
+                    channel_instance = self.channel_factory.make(address.channel, component_descriptor, address)
 
                     # cache
 

@@ -389,8 +389,6 @@ class FastAPIServer(Server):
     async def invoke_protobuf(self, http_request: HttpRequest):
         service_descriptor, method = self.get_descriptor_and_method(http_request.headers.get("x-rpc-method"))
 
-        self.protobuf_manager.check(service_descriptor.type) # TODO...
-
         data = await http_request.body()
 
         # create message

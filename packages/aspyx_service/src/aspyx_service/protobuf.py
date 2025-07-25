@@ -7,7 +7,7 @@ import inspect
 import threading
 from dataclasses import is_dataclass, fields as dc_fields
 from typing import Type, get_type_hints, Callable, Tuple, get_origin, get_args, List, Dict, Any, Union, Sequence, \
-    Optional
+    Optional, cast
 
 import httpx
 from google.protobuf.message_factory import GetMessageClass
@@ -18,9 +18,10 @@ from google.protobuf.descriptor_pool import DescriptorPool
 from google.protobuf.message import Message
 from google.protobuf.descriptor import FieldDescriptor, Descriptor
 
-from aspyx.di import injectable
+from aspyx.di import injectable, Environment
 from aspyx.reflection import DynamicProxy, TypeDescriptor
 from aspyx.util import CopyOnWriteCache
+from . import ComponentDescriptor
 
 from .service import channel, ServiceException
 from .channels import HTTPXChannel
@@ -53,6 +54,8 @@ def defaults_dict(model_cls: Type[BaseModel]) -> dict[str, Any]:
     return result
 
 class ProtobufBuilder:
+    #logger = logging.getLogger("aspyx.service.protobuf")  #
+
     # slots
 
     __slots__ = [
@@ -90,7 +93,7 @@ class ProtobufBuilder:
             self.file_desc_proto.name = f"{self.name}.proto"
             self.file_desc_proto.package = self.name
             self.types : dict[Type, Any] = {}
-            self.finalized = False
+            self.sealed = False
             self.lock = threading.RLock()
 
         # public
@@ -107,7 +110,7 @@ class ProtobufBuilder:
             raise TypeError("Expected a dataclass or Pydantic model class.")
 
         def add_message(self, cls: Type) -> str:
-            if self.finalized:
+            if self.sealed:
                 raise ServiceException(f"module {self.name} is already sealed")
 
             name = cls.__name__
@@ -154,7 +157,7 @@ class ProtobufBuilder:
             return self.types[type]
 
         def build_request_message(self, method: TypeDescriptor.MethodDescriptor, request_name: str):
-            if self.finalized:
+            if self.sealed:
                 raise ServiceException(f"module {self.name} is already sealed")
 
             request_msg = descriptor_pb2.DescriptorProto()  # type: ignore
@@ -182,7 +185,7 @@ class ProtobufBuilder:
             self.file_desc_proto.message_type.add().CopyFrom(request_msg)
 
         def build_response_message(self, method: TypeDescriptor.MethodDescriptor, response_name: str):
-            if self.finalized:
+            if self.sealed:
                 raise ServiceException(f"module {self.name} is already sealed")
 
             response_msg = descriptor_pb2.DescriptorProto()  # type: ignore
@@ -240,7 +243,7 @@ class ProtobufBuilder:
             service_desc.method.add().CopyFrom(method_desc)
 
         def add_service(self, service_type: TypeDescriptor):
-            if self.finalized:
+            if self.sealed:
                 raise ServiceException(f"module {self.name} is already sealed")
 
             service_desc = descriptor_pb2.ServiceDescriptorProto()  # type: ignore
@@ -255,17 +258,14 @@ class ProtobufBuilder:
 
             self.file_desc_proto.service.add().CopyFrom(service_desc)
 
-        def finalize(self, builder: ProtobufBuilder):
-            if not self.finalized:
-                self.finalized = True
-
-                #for m in self.file_desc_proto.message_type:
-                #    print(m)
+        def seal(self, builder: ProtobufBuilder):
+            if not self.sealed:
+                self.sealed = True
 
                 # add dependency first
 
                 for dependency in self.file_desc_proto.dependency:
-                    builder.modules[dependency].finalize(builder)
+                    builder.modules[dependency].seal(builder)
 
                 builder.pool.Add(self.file_desc_proto)
 
@@ -364,11 +364,7 @@ class ProtobufBuilder:
     # public
 
     #@synchronized()
-    def check(self, service_type: Type):
-        descriptor = getattr(service_type, "__descriptor__")
-
-        component_descriptor = descriptor.component_descriptor
-
+    def prepare_component(self, component_descriptor: ComponentDescriptor):
         with self.lock:
             if component_descriptor not in self.components:
                 for service in component_descriptor.services:
@@ -377,7 +373,7 @@ class ProtobufBuilder:
                 # finalize
 
                 for module in self.modules.values():
-                    module.finalize(self)
+                    module.seal(self)
 
                 # done
 
@@ -803,8 +799,6 @@ class ProtobufManager(ProtobufBuilder):
 
         serializer = self.serializer_cache.get(method)
         if serializer is None:
-            self.check(type)  # make sure all messages are created
-
             serializer = ProtobufManager.MethodSerializer(self, self.get_request_message(type, method)).args(method)
 
             self.serializer_cache.put(method, serializer)
@@ -847,6 +841,13 @@ class ProtobufManager(ProtobufBuilder):
 
 @channel("dispatch-protobuf")
 class ProtobufChannel(HTTPXChannel):
+    # class methods
+
+    @classmethod
+    def prepare(cls, environment: Environment, component_descriptor: ComponentDescriptor):
+        protobuf_manager = environment.get(ProtobufManager)
+        protobuf_manager.prepare_component(component_descriptor)
+
     # local classes
 
     class Call:
@@ -895,6 +896,12 @@ class ProtobufChannel(HTTPXChannel):
         self.environment = None
         self.protobuf_manager = protobuf_manager
         self.cache = CopyOnWriteCache[Callable, ProtobufChannel.Call]()
+
+        # make sure, all protobuf messages are created
+
+        for descriptor in manager.descriptors.values():
+            if descriptor.is_component():
+                protobuf_manager.prepare_component(cast(ComponentDescriptor, descriptor))
 
     # internal
 

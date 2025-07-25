@@ -76,8 +76,6 @@ class ProtobufModule:
 environment = Environment(ProtobufModule)
 protobuf_manager = environment.get(ProtobufManager)
 
-protobuf_manager.check(ProtobufService)
-
 class TestProto:
     def test_complex_data_model(self):
         method = getattr(ProtobufService, "call_complex")

@@ -77,9 +77,6 @@ After booting the DI infrastructure with a main module we could already call a s
 ```python
 @module(imports=[ServiceModule])
 class Module:
-    def __init__(self):
-        pass
-
     @create()
     def create_registry(self) -> ConsulComponentRegistry:
         return ConsulComponentRegistry(Server.port, Consul(host="localhost", port=8500))  # a consul based registry!
@@ -100,11 +97,6 @@ As we can also host implementations, lets look at this side as well:
 ```python
 @implementation()
 class TestComponentImpl(AbstractComponent, TestComponent):
-    # constructor
-
-    def __init__(self):
-        super().__init__()
-
     # implement Component
 
     def get_addresses(self, port: int) -> list[ChannelAddress]:
@@ -112,9 +104,6 @@ class TestComponentImpl(AbstractComponent, TestComponent):
 
 @implementation()
 class TestServiceImpl(TestService):
-    def __init__(self):
-        pass
-
     def hello(self, message: str) -> str:
         return f"hello {message}"
 ```
@@ -226,8 +215,7 @@ Service implementations implement the corresponding interface and are decorated 
 ```python
 @implementation()
 class TestServiceImpl(TestService):
-    def __init__(self):
-        pass
+    pass
 ```
 
 The constructor is required since the instances are managed by the DI framework.
@@ -237,11 +225,6 @@ Component implementations derive from the interface and the abstract base class 
 ```python
 @implementation()
 class TestComponentImpl(AbstractComponent, TestComponent):
-    # constructor
-
-    def __init__(self):
-        super().__init__()
-
     # implement Component
 
     def get_addresses(self, port: int) -> list[ChannelAddress]:
@@ -276,7 +259,9 @@ For this purpose injectable classes can be decorated with `@health_checks()` tha
 @injectable()
 class Checks:
     def __init__(self):
-        pass
+        pass #  normally, we would inject stuff here
+    
+    # checks
 
     @health_check(fail_if_slower_than=1)
     def check_performance(self, result: HealthCheckManager.Result):
@@ -345,6 +330,8 @@ Several channels are implemented:
    channel that posts generic `Request` objects via a `invoke` POST-call
 - `dispatch-msgpack`
    channel that posts generic `Request` objects via a `invoke` POST-call after packing the json with msgpack
+- `dispatch-protobuf`
+   channel that posts parameters via a `invoke` POST-call after packing the arguments with protobuf
 - `rest`
   channel that executes regular rest-calls as defined by a couple of decorators.
 
@@ -364,14 +351,6 @@ To customize the behavior, an `around` advice can be implemented easily:
 ```python
 @advice
 class ChannelAdvice:
-    def __init__(self):
-        pass
-
-@advice
-class ChannelAdvice:
-    def __init__(self):
-        pass
-
     @around(methods().named("customize").of_type(Channel))
     def customize_channel(self, invocation: Invocation):
         channel = cast(Channel, invocation.args[0])
@@ -389,6 +368,7 @@ The avg response times - on a local server - where all below 1ms per call.
 - rest calls are the slowest ( about 0.7ms )
 - dispatching-json 20% faster
 - dispatching-msgpack 30% faster
+- dispatching protobuf
 
 The biggest advantage of the dispatching flavors is, that you don't have to worry about the additional decorators!
 
@@ -418,6 +398,11 @@ If the class is decorated with `@rest(<prefix>)`, the corresponding prefix will 
 Additional annotations are
 - `Body` the post body
 - `QueryParam`marked for query params
+
+You can skip the annotations, assuming the following heuristic:
+
+- if no body is marked it will pick the first parameter which is a dataclass or a pydantic model
+- all parameters which are not in the path or equal to the body are assumed to be query params.
 
 ### Intercepting calls
 
@@ -464,7 +449,7 @@ The required - `FastAPI` - infrastructure to expose those services requires:
 - and a final `boot` call with the root module, which will return an `Environment`
 
 ```python
-fast_api = FastAPI() # so you can run it with uvivorn from command-line
+fast_api = FastAPI() # so you can run it with uvicorn from command-line
 
 @module(imports=[ServiceModule])
 class Module:
@@ -476,7 +461,7 @@ class Module:
         return FastAPIServer(fastapi, service_manager, component_registry)
     
 
-environment = FastAPIServer.boot(Moudle, host="0.0.0.0", port=8000)
+environment = FastAPIServer.boot(Module, host="0.0.0.0", port=8000)
 ```
 
 This setup will also expose all service interfaces decorated with the corresponding http decorators!
@@ -522,6 +507,10 @@ class FancyChannel(Channel):
 **0.10.0**
 
 - first release version
+
+**0.11.0**
+
+- added protobuf support
 
 
 
