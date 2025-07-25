@@ -51,6 +51,7 @@ class Server(ABC):
 
     def __init__(self):
         self.environment : Optional[Environment] = None
+        self.instance = self
 
     # public
 
@@ -583,11 +584,11 @@ class ChannelFactory:
 
     # public
 
-    def prepare_channel(self, channel: str, component_descriptor: ComponentDescriptor):
+    def prepare_channel(self, server: Server, channel: str, component_descriptor: ComponentDescriptor):
         type = self.factories[channel]
 
         if getattr(type, "prepare", None) is not None:
-            getattr(type, "prepare", None)(self.environment, component_descriptor)
+            getattr(type, "prepare", None)(server, component_descriptor)
 
     def make(self, name: str, descriptor: ComponentDescriptor, address: ChannelInstances) -> Channel:
         ServiceManager.logger.info("create channel %s: %s", name, self.factories.get(name).__name__)
@@ -706,8 +707,22 @@ class ServiceManager:
 
     # lifecycle
 
+
     def startup(self, server: Server) -> None:
         self.logger.info("startup on port %s", server.port)
+
+        # add some introspection endpoints
+
+        server.route("/report", lambda: self.report())
+
+        #def report_protobuf():
+        #    protobuf_manager = self.environment.get(ProtobufManager)#
+
+        #    return protobuf_manager.report()
+
+        #server.route("/report-protobuf", report_protobuf)
+
+        # boot components
 
         for descriptor in self.descriptors.values():
             if descriptor.is_component():
@@ -731,8 +746,6 @@ class ServiceManager:
 
                     self.component_registry.register(descriptor.get_component_descriptor(), [ChannelAddress("local", "")])
 
-                    #health_name = next((decorator.args[0] for decorator in Decorators.get(descriptor.type) if decorator.decorator is health), None)
-
                     # startup
 
                     instance.startup()
@@ -745,11 +758,9 @@ class ServiceManager:
                     # register addresses
 
                     for address in descriptor.addresses:
-                        self.channel_factory.prepare_channel(address.channel, descriptor.get_component_descriptor())
+                        self.channel_factory.prepare_channel(server, address.channel, descriptor.get_component_descriptor())
 
                     self.component_registry.register(descriptor.get_component_descriptor(), descriptor.addresses)
-
-        print(self.report())
 
     def shutdown(self):
         self.logger.info("shutdown")

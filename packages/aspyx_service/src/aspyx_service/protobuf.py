@@ -20,10 +20,9 @@ from google.protobuf.descriptor import FieldDescriptor, Descriptor
 
 from aspyx.di import injectable, Environment
 from aspyx.reflection import DynamicProxy, TypeDescriptor
-from aspyx.util import CopyOnWriteCache
-from . import ComponentDescriptor
+from aspyx.util import CopyOnWriteCache, StringBuilder
 
-from .service import channel, ServiceException
+from .service import channel, ServiceException, Server, ComponentDescriptor
 from .channels import HTTPXChannel
 from .service  import ServiceManager, ServiceCommunicationException, AuthorizationException, RemoteServiceException
 
@@ -839,14 +838,28 @@ class ProtobufManager(ProtobufBuilder):
 
         return deserializer
 
+    def report(self) -> str:
+        builder = StringBuilder()
+        for module in self.modules.values():
+            builder.append("###")
+            builder.append(ProtobufDumper.dump_proto(module.file_desc_proto))
+
+        return str(builder)
+
 @channel("dispatch-protobuf")
 class ProtobufChannel(HTTPXChannel):
     # class methods
 
     @classmethod
-    def prepare(cls, environment: Environment, component_descriptor: ComponentDescriptor):
-        protobuf_manager = environment.get(ProtobufManager)
+    def prepare(cls,  server: Server, component_descriptor: ComponentDescriptor):
+        protobuf_manager = server.get(ProtobufManager)
         protobuf_manager.prepare_component(component_descriptor)
+
+        def report_protobuf():
+            return protobuf_manager.report()
+
+        server.route("/report-protobuf", report_protobuf)
+
 
     # local classes
 
