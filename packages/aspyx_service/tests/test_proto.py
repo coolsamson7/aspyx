@@ -3,11 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional, cast
 
+from fastapi import FastAPI
 from pydantic import BaseModel
 
-from aspyx.di import module, Environment
+from aspyx.di import module, Environment, create
 from aspyx_service import Service, ProtobufManager, ServiceModule, service, component, AbstractComponent, \
-    ServiceManager, ComponentDescriptor
+    ServiceManager, ComponentDescriptor, FastAPIServer, ComponentRegistry
 
 
 class DataModel(BaseModel):
@@ -69,17 +70,13 @@ class ProtobufService(Service):
 class TestComponent(AbstractComponent):
     pass
 
+from .common import Module
 
-@module(imports=[ServiceModule])
-class ProtobufModule:
-    pass
-
-environment = Environment(ProtobufModule)
+environment = Environment(Module)
 service_manager = environment.get(ServiceManager)
+server = environment.get(FastAPIServer)
 
-
-service_manager.channel_factory.prepare_channel("dispatch-protobuf", cast(ComponentDescriptor, service_manager.get_descriptor(TestComponent)))
-#service_manager.get_descriptor()
+service_manager.channel_factory.prepare_channel(server,"dispatch-protobuf", cast(ComponentDescriptor, service_manager.get_descriptor(TestComponent)))
 protobuf_manager = environment.get(ProtobufManager)
 
 class TestProto:

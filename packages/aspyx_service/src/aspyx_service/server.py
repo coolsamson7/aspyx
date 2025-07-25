@@ -14,7 +14,7 @@ import msgpack
 import uvicorn
 
 from fastapi import FastAPI, APIRouter, Request as HttpRequest, Response as HttpResponse, HTTPException
-
+from fastapi.datastructures import DefaultPlaceholder, Default
 
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -451,6 +451,9 @@ class FastAPIServer(Server):
 
     def route(self, url: str, callable: Callable):
         self.router.get(url)(callable)
+
+    def add_route(self, path: str, endpoint: Callable, methods: list[str], response_class: typing.Union[Type[Response], DefaultPlaceholder] = Default(JSONResponse)):
+        self.router.add_api_route(path=path, endpoint=endpoint, methods=methods, response_class=response_class)
 
     def route_health(self, url: str, callable: Callable):
         async def get_health_response():

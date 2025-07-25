@@ -7,11 +7,16 @@ import re
 import socket
 import logging
 import threading
+import typing
 from abc import abstractmethod, ABC
 from dataclasses import dataclass
 from enum import Enum, auto
 
 from typing import Type, TypeVar, Generic, Callable, Optional, cast
+
+from fastapi.datastructures import DefaultPlaceholder, Default
+from httpx import Response
+from starlette.responses import JSONResponse, PlainTextResponse
 
 from aspyx.di import injectable, Environment, Providers, ClassInstanceProvider, inject_environment, order, \
     Lifecycle, LifecycleCallable, InstanceProvider
@@ -60,6 +65,10 @@ class Server(ABC):
 
     @abstractmethod
     def route(self, url : str, callable: Callable):
+        pass
+
+    @abstractmethod
+    def add_route(self, path : str, endpoint : Callable, methods : list[str], response_class : typing.Union[Type[Response], DefaultPlaceholder] = Default(JSONResponse)):
         pass
 
     @abstractmethod
@@ -713,14 +722,7 @@ class ServiceManager:
 
         # add some introspection endpoints
 
-        server.route("/report", lambda: self.report())
-
-        #def report_protobuf():
-        #    protobuf_manager = self.environment.get(ProtobufManager)#
-
-        #    return protobuf_manager.report()
-
-        #server.route("/report-protobuf", report_protobuf)
+        server.add_route(path="/report", endpoint=lambda: self.report(), methods=["GET"], response_class=PlainTextResponse)
 
         # boot components
 

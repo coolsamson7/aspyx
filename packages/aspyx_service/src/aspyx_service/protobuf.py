@@ -17,6 +17,7 @@ from google.protobuf import descriptor_pb2, descriptor_pool, message_factory
 from google.protobuf.descriptor_pool import DescriptorPool
 from google.protobuf.message import Message
 from google.protobuf.descriptor import FieldDescriptor, Descriptor
+from starlette.responses import PlainTextResponse
 
 from aspyx.di import injectable, Environment
 from aspyx.reflection import DynamicProxy, TypeDescriptor
@@ -74,11 +75,11 @@ class ProtobufBuilder:
 
     @classmethod
     def get_request_message_name(cls, type: Type, method: Callable) -> str:
-        return cls.get_message_name(type, f"{method.__name__}Request")
+        return cls.get_message_name(type, f"_{method.__name__}_Request")
 
     @classmethod
     def get_response_message_name(cls, type: Type, method: Callable) -> str:
-        return cls.get_message_name(type, f"{method.__name__}Response")
+        return cls.get_message_name(type, f"_{method.__name__}_Response")
 
     # local classes
 
@@ -220,13 +221,13 @@ class ProtobufBuilder:
             self.file_desc_proto.message_type.add().CopyFrom(response_msg)
 
         def build_service_method(self, service_desc: descriptor_pb2.ServiceDescriptorProto, service_type: TypeDescriptor, method: TypeDescriptor.MethodDescriptor):
-            name = f"{service_type.cls.__name__}{method.get_name()}"
+            name = f"{service_type.cls.__name__}_{method.get_name()}"
             package = self.name
 
             method_desc =  descriptor_pb2.MethodDescriptorProto()
 
-            request_name = f".{package}.{name}Request"
-            response_name = f".{package}.{name}Response"
+            request_name = f".{package}.{name}_Request"
+            response_name = f".{package}.{name}_Response"
 
             method_desc.name = method.get_name()
             method_desc.input_type = request_name
@@ -339,7 +340,6 @@ class ProtobufBuilder:
 
     def get_message_type(self, full_name: str):
         return GetMessageClass(self.pool.FindMessageTypeByName(full_name))
-        #return self.factory.GetPrototype(self.pool.FindMessageTypeByName(full_name))
 
     def get_request_message(self, type: Type, method: Callable):
         return self.get_message_type(self.get_request_message_name(type, method))
@@ -841,7 +841,6 @@ class ProtobufManager(ProtobufBuilder):
     def report(self) -> str:
         builder = StringBuilder()
         for module in self.modules.values():
-            builder.append("###")
             builder.append(ProtobufDumper.dump_proto(module.file_desc_proto))
 
         return str(builder)
@@ -858,8 +857,7 @@ class ProtobufChannel(HTTPXChannel):
         def report_protobuf():
             return protobuf_manager.report()
 
-        server.route("/report-protobuf", report_protobuf)
-
+        server.add_route(path="/report-protobuf", endpoint=report_protobuf, methods=["GET"], response_class=PlainTextResponse)
 
     # local classes
 
