@@ -707,7 +707,7 @@ class ServiceManager:
     def get_instance(self, type: Type[T]) -> T:
         instance = self.instances.get(type)
         if instance is None:
-            ServiceManager.logger.info("create implementation %s", type.__name__)
+            ServiceManager.logger.debug("create implementation %s", type.__name__)
 
             instance = self.environment.get(type)
             self.instances[type] = instance

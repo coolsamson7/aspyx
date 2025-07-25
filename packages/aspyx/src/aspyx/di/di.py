@@ -975,7 +975,7 @@ class Environment:
         """
 
         def add_provider(type: Type, provider: AbstractInstanceProvider):
-            Environment.logger.info("\tadd provider %s for %s", provider, type)
+            Environment.logger.debug("\tadd provider %s for %s", provider, type)
 
             self.providers[type] = provider
 

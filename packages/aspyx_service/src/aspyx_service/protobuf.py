@@ -4,6 +4,7 @@ Protobuf channel and utilities
 from __future__ import annotations
 
 import inspect
+import logging
 import threading
 from dataclasses import is_dataclass, fields as dc_fields
 from typing import Type, get_type_hints, Callable, Tuple, get_origin, get_args, List, Dict, Any, Union, Sequence, \
@@ -54,7 +55,7 @@ def defaults_dict(model_cls: Type[BaseModel]) -> dict[str, Any]:
     return result
 
 class ProtobufBuilder:
-    #logger = logging.getLogger("aspyx.service.protobuf")  #
+    logger = logging.getLogger("aspyx.service.protobuf")  #
 
     # slots
 
@@ -113,8 +114,12 @@ class ProtobufBuilder:
             if self.sealed:
                 raise ServiceException(f"module {self.name} is already sealed")
 
+
+
             name = cls.__name__
             full_name = f"{self.name}.{name}"
+
+            ProtobufBuilder.logger.debug(f"adding message {full_name}")
 
             # Check if a message type is already defined
 
@@ -163,6 +168,8 @@ class ProtobufBuilder:
             request_msg = descriptor_pb2.DescriptorProto()  # type: ignore
             request_msg.name = request_name.split(".")[-1]
 
+            ProtobufBuilder.logger.debug(f"adding request message {request_msg.name }")
+
             # loop over parameters
 
             field_index = 1
@@ -190,6 +197,8 @@ class ProtobufBuilder:
 
             response_msg = descriptor_pb2.DescriptorProto()  # type: ignore
             response_msg.name = response_name.split(".")[-1]
+
+            ProtobufBuilder.logger.debug(f"adding request message {response_msg.name}")
 
             # return
 
@@ -249,6 +258,8 @@ class ProtobufBuilder:
             service_desc = descriptor_pb2.ServiceDescriptorProto()  # type: ignore
             service_desc.name = service_type.cls.__name__
 
+            ProtobufBuilder.logger.debug(f"add service {service_desc.name }")
+
             # check methods
 
             for method in service_type.get_methods():
@@ -260,6 +271,8 @@ class ProtobufBuilder:
 
         def seal(self, builder: ProtobufBuilder):
             if not self.sealed:
+                ProtobufBuilder.logger.debug(f"create protobuf {self.file_desc_proto.name}")
+
                 self.sealed = True
 
                 # add dependency first
