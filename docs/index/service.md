@@ -44,9 +44,6 @@ After booting the DI infrastructure with a main module we could already call a s
 ```python
 @module(imports=[ServiceModule])
 class Module:
-    def __init__(self):
-        pass
-
     @create()
     def create_registry(self) -> ConsulComponentRegistry:
         return ConsulComponentRegistry(Server.port, Consul(host="localhost", port=8500))  # a consul based registry!
@@ -67,11 +64,6 @@ As we can also host implementations, lets look at this side as well:
 ```python
 @implementation()
 class TestComponentImpl(AbstractComponent, TestComponent):
-    # constructor
-
-    def __init__(self):
-        super().__init__()
-
     # implement Component
 
     def get_addresses(self, port: int) -> list[ChannelAddress]:
@@ -79,9 +71,6 @@ class TestComponentImpl(AbstractComponent, TestComponent):
 
 @implementation()
 class TestServiceImpl(TestService):
-    def __init__(self):
-        pass
-
     def hello(self, message: str) -> str:
         return f"hello {message}"
 ```
@@ -101,15 +90,12 @@ fast_api = FastAPI() # so you can run it with uvivorn from command-line
 
 @module(imports=[ServiceModule])
 class Module:
-    def __init__(self):
-        pass
-
     @create()
     def create_server(self,  service_manager: ServiceManager, component_registry: ComponentRegistry) -> FastAPIServer:
         return FastAPIServer(fastapi, service_manager, component_registry)
     
 
-environment = FastAPIServer.boot(Moudle, host="0.0.0.0", port=8000)
+environment = FastAPIServer.boot(Module, host="0.0.0.0", port=8000)
 ```
 
 Of course, service can also be called locally. In case of multiple possible channels, a keyword argument is used to 
@@ -185,8 +171,7 @@ Service implementations implement the corresponding interface and are decorated 
 ```python
 @implementation()
 class TestServiceImpl(TestService):
-    def __init__(self):
-        pass
+    ...
 ```
 
 The constructor is required since the instances are managed by the DI framework.
@@ -196,11 +181,6 @@ Component implementations derive from the interface and the abstract base class 
 ```python
 @implementation()
 class TestComponentImpl(AbstractComponent, TestComponent):
-    # constructor
-
-    def __init__(self):
-        super().__init__()
-
     # implement Component
 
     def get_addresses(self, port: int) -> list[ChannelAddress]:
@@ -234,9 +214,6 @@ For this purpose injectable classes can be decorated with `@health_checks()` tha
 @health_checks()
 @injectable()
 class Checks:
-    def __init__(self):
-        pass
-
     @health_check(fail_if_slower_than=1)
     def check_performance(self, result: HealthCheckManager.Result):
         ... # should be done in under a second
@@ -305,7 +282,7 @@ Constructor arguments are
 
 - `port: int` the own port
 - `consul: Consul` the consul instance
-- 
+
 **Example**:
 
 ```python
@@ -331,6 +308,8 @@ Several channels are implemented:
    channel that dispatches generic `Request` objects via a generic `invoke` POST-call
 - `dispatch-msgpack`
    channel that dispatches generic `Request` objects via a generic `invoke` POST-call after packing the json with msgpack
+- `dispatch-protobuf`
+   channel that dispatches binary parameters via a generic `invoke` POST-call after packing the parameters with protobuf
 - `rest`
   channel that executes regular rest-calls as defined by a couple of decorators.
 
@@ -348,9 +327,6 @@ To customize the behavior, an `around` advice can be implemented easily:
 ```python
 @advice
 class ChannelAdvice:
-    def __init__(self):
-        pass
-
     @around(methods().named("customize").of_type(Channel))
     def customize_channel(self, invocation: Invocation):
         channel = cast(Channel, invocation.args[0])
@@ -449,14 +425,17 @@ In order to expose components via HTTP, the corresponding infrastructure in form
 
 
 ```python
-@module()
-class Module():
-    def __init__(self):
-        pass
-    
- server = FastAPIServer(host="0.0.0.0", port=8000)
 
- environment = server.boot(Module) # will start the http server
+fast_api = FastAPI() # so you can run it with uvicorn from command-line
+
+@module()
+class Module:
+    @create()
+    def create_server(self,  service_manager: ServiceManager, component_registry: ComponentRegistry) -> FastAPIServer:
+        return FastAPIServer(fastapi, service_manager, component_registry)
+
+environment = FastAPIServer.boot(Module, host="0.0.0.0", port=8000)
+
 ```
 
 This setup will also expose all service interfaces decorated with the corresponding http decorators!
@@ -482,11 +461,6 @@ The main methods to implement are `ìnvoke` and `ìnvoke_async`
 ```python
 @channel("fancy")
 class FancyChannel(Channel):
-    # constructor
-
-    def __init__(self):
-        super().__init__()
-
     # override
 
     def invoke(self, invocation: DynamicProxy.Invocation):
@@ -496,6 +470,17 @@ class FancyChannel(Channel):
         return await ...
         
 ```
+
+# Version History
+
+**0.10.0**
+
+- first release version
+
+**0.11.0**
+
+- added protobuf support
+
 
 
 

@@ -50,7 +50,7 @@ class HelloEventListener(EventListener[HelloEvent]):
     # constructor
 
     def __init__(self):
-        pass
+        ...
 
     # implement
 
@@ -161,11 +161,6 @@ The second argument `exception_manager` is an `ExceptionManager` thet wil be use
 ```python
 @module(imports=[EventModule])
 class Module:
-    # constructor
-
-    def __init__(self):
-        pass
-
     # handlers
 
     @catch()
