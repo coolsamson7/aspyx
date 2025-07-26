@@ -807,50 +807,16 @@ class ProtobufManager(ProtobufBuilder):
     # public
 
     def create_serializer(self, type: Type, method: Callable) -> ProtobufManager.MethodSerializer:
-        # is it cached?
-
-        serializer = self.serializer_cache.get(method)
-        if serializer is None:
-            serializer = ProtobufManager.MethodSerializer(self, self.get_request_message(type, method)).args(method)
-
-            self.serializer_cache.put(method, serializer)
-
-        return serializer
+        return self.serializer_cache.get(method, lambda m: ProtobufManager.MethodSerializer(self, self.get_request_message(type, m)).args(m) )
 
     def create_deserializer(self, descriptor: Descriptor, method: Callable) -> ProtobufManager.MethodDeserializer:
-        # is it cached?
-
-        deserializer = self.deserializer_cache.get(descriptor)
-        if deserializer is None:
-            deserializer = ProtobufManager.MethodDeserializer(self, descriptor).args(method)
-
-            self.deserializer_cache.put(descriptor, deserializer)
-
-        return deserializer
+        return self.deserializer_cache.get(descriptor, lambda d:  ProtobufManager.MethodDeserializer(self, d).args(method))
 
     def create_result_serializer(self, descriptor: Descriptor, method: Callable) -> ProtobufManager.MethodSerializer:
         return self.result_serializer_cache.get(descriptor, lambda d: ProtobufManager.MethodSerializer(self, d).result(method))
-        # is it cached?
 
-        serializer = self.result_serializer_cache.get(descriptor)
-        if serializer is None:
-            serializer = ProtobufManager.MethodSerializer(self, descriptor).result(method)
-
-            self.result_serializer_cache.put(descriptor, serializer)
-
-        return serializer
-
-    def create_result_deserializer(self, descriptor: Descriptor,
-                                   method: Callable) -> ProtobufManager.MethodDeserializer:
-        # is it cached?
-
-        deserializer = self.result_deserializer_cache.get(descriptor)
-        if deserializer is None:
-            deserializer = ProtobufManager.MethodDeserializer(self, descriptor).result(method)
-
-            self.result_deserializer_cache.put(descriptor, deserializer)
-
-        return deserializer
+    def create_result_deserializer(self, descriptor: Descriptor, method: Callable) -> ProtobufManager.MethodDeserializer:
+        return  self.result_deserializer_cache.get(descriptor, lambda d: ProtobufManager.MethodDeserializer(self, d).result(method))
 
     def report(self) -> str:
         builder = StringBuilder()

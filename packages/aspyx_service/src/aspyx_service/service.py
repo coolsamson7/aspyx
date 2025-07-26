@@ -64,10 +64,6 @@ class Server(ABC):
         return self.environment.get(type)
 
     @abstractmethod
-    def route(self, url : str, callable: Callable):
-        pass
-
-    @abstractmethod
     def add_route(self, path : str, endpoint : Callable, methods : list[str], response_class : typing.Union[Type[Response], DefaultPlaceholder] = Default(JSONResponse)):
         pass
 

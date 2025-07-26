@@ -447,9 +447,6 @@ class FastAPIServer(Server):
 
     # override
 
-    def route(self, url: str, callable: Callable):
-        self.router.get(url)(callable)
-
     def add_route(self, path: str, endpoint: Callable, methods: list[str], response_class: typing.Union[Type[Response], DefaultPlaceholder] = Default(JSONResponse)):
         self.router.add_api_route(path=path, endpoint=endpoint, methods=methods, response_class=response_class)
 
