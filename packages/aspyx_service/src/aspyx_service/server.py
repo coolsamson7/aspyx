@@ -21,7 +21,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from aspyx.di import Environment, on_init, inject_environment, on_destroy
 from aspyx.reflection import TypeDescriptor, Decorators
-from aspyx.util import get_deserializer, get_serializer
+from aspyx.util import get_deserializer, get_serializer, CopyOnWriteCache
 
 from .protobuf import ProtobufManager
 from .service import ComponentRegistry, ServiceDescriptor
@@ -192,7 +192,7 @@ class FastAPIServer(Server):
 
         # cache
 
-        self.deserializers: dict[str, list[Callable]] = {}
+        self.deserializers = CopyOnWriteCache[str, list[Callable]]()
 
         # that's the overall dispatcher
 
@@ -328,18 +328,16 @@ class FastAPIServer(Server):
         self.thread.start()
 
     def get_deserializers(self, service: Type, method):
-        deserializers = self.deserializers.get(method, None)
+        deserializers = self.deserializers.get(method)
         if deserializers is None:
             descriptor = TypeDescriptor.for_type(service).get_method(method.__name__)
 
             deserializers = [get_deserializer(type) for type in descriptor.param_types]
-            self.deserializers[method] = deserializers
+            self.deserializers.put(method, deserializers)
 
         return deserializers
 
     def deserialize_args(self, args: list[Any], type: Type, method: Callable) -> list:
-        #args = list(request.args)
-
         deserializers = self.get_deserializers(type, method)
 
         for i, arg in enumerate(args):
@@ -354,7 +352,7 @@ class FastAPIServer(Server):
         service_name = parts[1]
         method_name = parts[2]
 
-        service_descriptor : ServiceDescriptor = typing.cast(ServiceDescriptor, ServiceManager.descriptors_by_name[service_name])
+        service_descriptor = typing.cast(ServiceDescriptor, ServiceManager.descriptors_by_name[service_name])
         service = self.service_manager.get_service(service_descriptor.type, preferred_channel="local")
 
         return service_descriptor, getattr(service, method_name)
@@ -440,7 +438,7 @@ class FastAPIServer(Server):
             )
 
     async def dispatch(self, service_descriptor: ServiceDescriptor, method: Callable, args: list[Any]) :
-        ServiceManager.logger.debug("dispatch request %s.%s", service_descriptor, method.__name__)
+        #ServiceManager.logger.debug("dispatch request %s.%s", service_descriptor, method.__name__)
 
         if inspect.iscoroutinefunction(method):
             return await method(*args)

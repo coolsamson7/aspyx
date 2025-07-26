@@ -119,7 +119,7 @@ class ProtobufBuilder:
             name = cls.__name__
             full_name = f"{self.name}.{name}"
 
-            ProtobufBuilder.logger.debug(f"adding message {full_name}")
+            ProtobufBuilder.logger.debug(f"adding message %s", full_name)
 
             # Check if a message type is already defined
 
@@ -168,7 +168,7 @@ class ProtobufBuilder:
             request_msg = descriptor_pb2.DescriptorProto()  # type: ignore
             request_msg.name = request_name.split(".")[-1]
 
-            ProtobufBuilder.logger.debug(f"adding request message {request_msg.name }")
+            ProtobufBuilder.logger.debug(f"adding request message %s", request_msg.name)
 
             # loop over parameters
 
@@ -198,7 +198,7 @@ class ProtobufBuilder:
             response_msg = descriptor_pb2.DescriptorProto()  # type: ignore
             response_msg.name = response_name.split(".")[-1]
 
-            ProtobufBuilder.logger.debug(f"adding request message {response_msg.name}")
+            ProtobufBuilder.logger.debug(f"adding response message %s", response_msg.name)
 
             # return
 
@@ -258,7 +258,7 @@ class ProtobufBuilder:
             service_desc = descriptor_pb2.ServiceDescriptorProto()  # type: ignore
             service_desc.name = service_type.cls.__name__
 
-            ProtobufBuilder.logger.debug(f"add service {service_desc.name }")
+            ProtobufBuilder.logger.debug(f"add service %s", service_desc.name)
 
             # check methods
 
@@ -829,6 +829,7 @@ class ProtobufManager(ProtobufBuilder):
         return deserializer
 
     def create_result_serializer(self, descriptor: Descriptor, method: Callable) -> ProtobufManager.MethodSerializer:
+        return self.result_serializer_cache.get(descriptor, lambda d: ProtobufManager.MethodSerializer(self, d).result(method))
         # is it cached?
 
         serializer = self.result_serializer_cache.get(descriptor)
