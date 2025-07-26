@@ -55,6 +55,9 @@ def defaults_dict(model_cls: Type[BaseModel]) -> dict[str, Any]:
     return result
 
 class ProtobufBuilder:
+    """
+    used to infer protobuf services and messages given component and service structures.
+    """
     logger = logging.getLogger("aspyx.service.protobuf")  #
 
     # slots
@@ -827,6 +830,9 @@ class ProtobufManager(ProtobufBuilder):
 
 @channel("dispatch-protobuf")
 class ProtobufChannel(HTTPXChannel):
+    """
+    channel, encoding requests and responses with protobuf
+    """
     # class methods
 
     @classmethod
@@ -971,6 +977,7 @@ class ProtobufDumper:
             lines.append('')  # blank line
 
         # Options (basic)
+
         for opt in fd.options.ListFields() if fd.HasField('options') else []:
             # Just a simple string option dump; for complex options you'd need more logic
             name = opt[0].name
@@ -980,6 +987,7 @@ class ProtobufDumper:
             lines.append('')
 
         # Enums
+
         def dump_enum(enum: descriptor_pb2.EnumDescriptorProto, indent=''):
             enum_lines = [f"{indent}enum {enum.name} {{"]
             for value in enum.value:
@@ -988,6 +996,7 @@ class ProtobufDumper:
             return enum_lines
 
         # Messages (recursive)
+
         def dump_message(msg: descriptor_pb2.DescriptorProto, indent=''):
             msg_lines = [f"{indent}message {msg.name} {{"]
             # Nested enums
@@ -995,6 +1004,7 @@ class ProtobufDumper:
                 msg_lines.extend(dump_enum(enum, indent + '  '))
 
             # Nested messages
+
             for nested in msg.nested_type:
                 # skip map entry messages (synthetic)
                 if nested.options.map_entry:
@@ -1002,6 +1012,7 @@ class ProtobufDumper:
                 msg_lines.extend(dump_message(nested, indent + '  '))
 
             # Fields
+
             for field in msg.field:
                 label = {
                     1: 'optional',
@@ -1052,6 +1063,7 @@ class ProtobufDumper:
             return msg_lines
 
         # Services
+
         def dump_service(svc: descriptor_pb2.ServiceDescriptorProto, indent=''):
             svc_lines = [f"{indent}service {svc.name} {{"]
             for method in svc.method:

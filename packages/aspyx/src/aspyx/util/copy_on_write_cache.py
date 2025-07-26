@@ -4,6 +4,9 @@ K = TypeVar("K")
 V = TypeVar("V")
 
 class CopyOnWriteCache(Generic[K, V]):
+    """
+    cache, that clones the existing dict, whenever a new item is added, avoiding any locks
+    """
     # constructor
 
     def __init__(self, factory: Optional[Callable[[K], V]] = None) -> None:

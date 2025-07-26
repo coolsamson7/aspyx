@@ -61,6 +61,9 @@ class TokenContext:
             cls.refresh_token.reset(refresh_token)
 
 class HTTPXChannel(Channel):
+    """
+    A channel using the httpx clients.
+    """
     __slots__ = [
         "client",
         "async_client",
