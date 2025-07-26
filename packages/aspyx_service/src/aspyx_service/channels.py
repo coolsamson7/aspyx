@@ -16,7 +16,7 @@ from pydantic import BaseModel
 from aspyx.di.configuration import inject_value
 from aspyx.reflection import DynamicProxy, TypeDescriptor
 from aspyx.threading import ThreadLocal, ContextLocal
-from aspyx.util import get_deserializer, TypeDeserializer, TypeSerializer, get_serializer
+from aspyx.util import get_deserializer, TypeDeserializer, TypeSerializer, get_serializer, CopyOnWriteCache
 from .service import ServiceManager, ServiceCommunicationException, TokenExpiredException, InvalidTokenException, \
     AuthorizationException, MissingTokenException
 
@@ -75,28 +75,6 @@ class HTTPXChannel(Channel):
     client_local = ThreadLocal[Client]()
     async_client_local = ThreadLocal[AsyncClient]()
 
-    # class methods
-
-    @classmethod
-    def to_dict(cls, obj: Any) -> Any:
-        if isinstance(obj, BaseModel):
-            return obj.model_dump()
-
-        elif is_dataclass(obj):
-            return {
-                f.name: cls.to_dict(getattr(obj, f.name))
-
-                for f in fields(obj)
-            }
-
-        elif isinstance(obj, (list, tuple)):
-            return [cls.to_dict(item) for item in obj]
-
-        elif isinstance(obj, dict):
-            return {key: cls.to_dict(value) for key, value in obj.items()}
-
-        return obj
-
     # constructor
 
     def __init__(self):
@@ -104,9 +82,8 @@ class HTTPXChannel(Channel):
 
         self.timeout = 1000.0
         self.service_names: dict[Type, str] = {}
-        self.serializers: dict[Callable, list[Callable]] = {}
-        self.deserializers: dict[Callable, Callable] = {}
-        self.optimize_serialization = True
+        self.serializers = CopyOnWriteCache[Callable, list[Callable]]()
+        self.deserializers = CopyOnWriteCache[Callable, Callable]()
 
     # inject
 
@@ -132,7 +109,7 @@ class HTTPXChannel(Channel):
 
             serializers = [get_serializer(type) for type in param_types]
 
-            self.serializers[method] = serializers
+            self.serializers.put(method, serializers)
 
         return serializers
 
@@ -143,7 +120,7 @@ class HTTPXChannel(Channel):
 
             deserializer = get_deserializer(return_type)
 
-            self.deserializers[method] = deserializer
+            self.deserializers.put(method, deserializer)
 
         return deserializer
 
@@ -317,15 +294,10 @@ class DispatchJSONChannel(HTTPXChannel):
     def invoke(self, invocation: DynamicProxy.Invocation):
         service_name = self.service_names[invocation.type]  # map type to registered service name
 
-        request : dict = {
-            "method": f"{self.component_descriptor.name}:{service_name}:{invocation.method.__name__}"
-            #"args": invocation.args
+        request = {
+            "method": f"{self.component_descriptor.name}:{service_name}:{invocation.method.__name__}",
+            "args": self.serialize_args(invocation)
         }
-
-        if self.optimize_serialization:
-            request["args"] = self.serialize_args(invocation)
-        else:
-            request["args"] = self.to_dict(invocation.args)
 
         try:
             http_result = self.request( "post", f"{self.get_url()}/invoke", json=request, timeout=self.timeout)
@@ -343,14 +315,10 @@ class DispatchJSONChannel(HTTPXChannel):
 
     async def invoke_async(self, invocation: DynamicProxy.Invocation):
         service_name = self.service_names[invocation.type]  # map type to registered service name
-        request : dict = {
-            "method": f"{self.component_descriptor.name}:{service_name}:{invocation.method.__name__}"
+        request = {
+            "method": f"{self.component_descriptor.name}:{service_name}:{invocation.method.__name__}",
+            "args": self.serialize_args(invocation)
         }
-
-        if self.optimize_serialization:
-            request["args"] = self.serialize_args(invocation)
-        else:
-            request["args"] = self.to_dict(invocation.args)
 
         try:
             data =  await self.request_async("post", f"{self.get_url()}/invoke", json=request, timeout=self.timeout)
@@ -387,14 +355,10 @@ class DispatchMSPackChannel(HTTPXChannel):
 
     def invoke(self, invocation: DynamicProxy.Invocation):
         service_name = self.service_names[invocation.type]  # map type to registered service name
-        request: dict = {
-            "method": f"{self.component_descriptor.name}:{service_name}:{invocation.method.__name__}"
+        request = {
+            "method": f"{self.component_descriptor.name}:{service_name}:{invocation.method.__name__}",
+            "args": self.serialize_args(invocation)
         }
-
-        if self.optimize_serialization:
-            request["args"] = self.serialize_args(invocation)
-        else:
-            request["args"] = self.to_dict(invocation.args)
 
         try:
             packed = msgpack.packb(request, use_bin_type=True)
@@ -444,14 +408,10 @@ class DispatchMSPackChannel(HTTPXChannel):
 
     async def invoke_async(self, invocation: DynamicProxy.Invocation):
         service_name = self.service_names[invocation.type]  # map type to registered service name
-        request: dict = {
-            "method": f"{self.component_descriptor.name}:{service_name}:{invocation.method.__name__}"
+        request = {
+            "method": f"{self.component_descriptor.name}:{service_name}:{invocation.method.__name__}",
+            "args": self.serialize_args(invocation)
         }
-
-        if self.optimize_serialization:
-            request["args"] = self.serialize_args(invocation)
-        else:
-            request["args"] = self.to_dict(invocation.args)
 
         try:
             packed = msgpack.packb(request, use_bin_type=True)
