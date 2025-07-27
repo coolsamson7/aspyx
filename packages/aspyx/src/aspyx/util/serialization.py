@@ -24,7 +24,9 @@ class TypeDeserializer:
         args = get_args(typ)
 
         if origin is Union:
-            deserializers = [TypeDeserializer(arg) for arg in args if arg is not type(None)]
+            # Optional[X] => Union[X, NoneType]
+            deserializers = [self._build_deserializer(arg) for arg in args if arg is not type(None)]
+
             def deser_union(value):
                 if value is None:
                     return None
@@ -33,34 +35,61 @@ class TypeDeserializer:
                         return d(value)
                     except Exception:
                         continue
-                return value
+                raise ValueError(f"Cannot deserialize value: {value!r} into Union[{args}]")
+
             return deser_union
 
         if isinstance(typ, type) and issubclass(typ, BaseModel):
-            return typ.model_validate
+            field_deserializers = {
+                name: self._build_deserializer(field.annotation)
+                for name, field in typ.model_fields.items()
+            }
+
+            def deser_model(value):
+                if isinstance(value, typ):
+                    return value
+                if not isinstance(value, dict):
+                    raise TypeError(f"Expected dict to construct {typ.__name__}, got {type(value).__name__}")
+                kwargs = {
+                    k: field_deserializers[k](v)
+                    for k, v in value.items()
+                    if k in field_deserializers
+                }
+                return typ.model_construct(**kwargs)
+
+            return deser_model
 
         if is_dataclass(typ):
-            field_deserializers = {f.name: TypeDeserializer(f.type) for f in fields(typ)}
-            def deser_dataclass(value):
-                if is_dataclass(value):
-                    return value
+            field_deserializers = {
+                f.name: self._build_deserializer(f.type) for f in fields(typ)
+            }
 
+            def deser_dataclass(value):
+                if isinstance(value, typ):
+                    return value
+                if not isinstance(value, dict):
+                    raise TypeError(f"Expected dict to construct {typ}, got {type(value).__name__}")
                 return typ(**{
-                    k: field_deserializers[k](v) for k, v in value.items()
+                    k: field_deserializers[k](v) for k, v in value.items() if k in field_deserializers
                 })
+
             return deser_dataclass
 
         if origin is list:
-            item_deser = TypeDeserializer(args[0]) if args else lambda x: x
+            item_type = args[0] if args else Any
+            item_deser = self._build_deserializer(item_type)
             return lambda v: [item_deser(item) for item in v]
 
         if origin is dict:
-            key_deser = TypeDeserializer(args[0]) if args else lambda x: x
-            val_deser = TypeDeserializer(args[1]) if len(args) > 1 else lambda x: x
+            key_type = args[0] if args else Any
+            val_type = args[1] if len(args) > 1 else Any
+            key_deser = self._build_deserializer(key_type)
+            val_deser = self._build_deserializer(val_type)
             return lambda v: {key_deser(k): val_deser(val) for k, val in v.items()}
 
-        # Fallback
-        return lambda v: v
+        # Fallback: primitive types, str, int, etc.
+        return lambda v: typ(v) if callable(typ) else v
+
 
 class TypeSerializer:
     def __init__(self, typ):
