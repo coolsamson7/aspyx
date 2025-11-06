@@ -5,12 +5,50 @@ including their methods, decorators, and type hints. It supports caching for per
 from __future__ import annotations
 
 import inspect
+from abc import ABC, abstractmethod
+from dataclasses import is_dataclass, fields
 from inspect import signature
 import threading
 from types import FunctionType
 
-from typing import Callable, get_type_hints, Type, Dict, Optional
+from typing import Callable, get_type_hints, Type, Dict, Optional, Any
 from weakref import WeakKeyDictionary
+
+from pydantic import BaseModel
+from sqlalchemy.orm import class_mapper, ColumnProperty
+
+def get_safe_type_hints(obj) -> Dict[str, Any]:
+    """
+    Safe wrapper around typing.get_type_hints that never raises.
+    Returns either the resolved hints or a best-effort fallback (raw __annotations__).
+    """
+    try:
+        # If obj is a function/method, use its globals so forward refs that are resolvable succeed
+        if inspect.isfunction(obj) or inspect.ismethod(obj):
+            return get_type_hints(obj, globalns=obj.__globals__, localns={})
+        # classes / other objects
+        return get_type_hints(obj)
+    except Exception:
+        # fallback: return raw annotations (may contain strings / TypeVar names)
+        anns = getattr(obj, "__annotations__", {})
+        # make a safe copy; don't attempt to eval strings
+        return dict(anns)
+
+def make_setter(cls: Type, field_name: str) -> Callable[[Any, Any], None]:
+    attr = getattr(cls, field_name, None)
+
+    # If it's a property with a fset, call that directly
+    if isinstance(attr, property) and attr.fset:
+        fset = attr.fset
+        def setter(instance: Any, value: Any):
+            fset(instance, value)
+        return setter
+
+    # Default: setattr
+    def setter(instance: Any, value: Any):
+        setattr(instance, field_name, value)
+
+    return setter
 
 def get_method_class(method):
     """
@@ -32,7 +70,6 @@ def get_method_class(method):
                 return cls
 
     return None
-
 
 class DecoratorDescriptor:
     """
@@ -110,17 +147,122 @@ class Decorators:
         #return getattr(func_or_class, '__decorators__', []) #will return inherited as well
         return func_or_class.__dict__.get('__decorators__', [])
 
+class PropertyExtractor(ABC):
+    """Base interface for all property extraction strategies."""
+
+    @abstractmethod
+    def extract(self, cls: Type) -> Optional[Dict[str, "TypeDescriptor.PropertyDescriptor"]]:
+        """
+        Attempt to extract property descriptors for the given class.
+        Return a dict if successful, or None if not applicable.
+        """
+        pass
+
+class PydanticPropertyExtractor(PropertyExtractor):
+    def extract(self, cls: Type):
+        if not issubclass(cls, BaseModel):
+            return None
+
+        props = {}
+        for name, field in cls.model_fields.items():
+            props[name] = TypeDescriptor.PropertyDescriptor(
+                cls,
+                name,
+                field.annotation,
+                field.default if field.default is not None else None
+            )
+        return props
+
+class DataclassPropertyExtractor(PropertyExtractor):
+    def extract(self, cls: Type):
+        if not is_dataclass(cls):
+            return None
+
+        props = {}
+        for field in fields(cls):
+            props[field.name] = TypeDescriptor.PropertyDescriptor(
+                cls,
+                field.name,
+                field.type,
+                field.default if field.default is not field.default_factory else None
+            )
+        return props
+
+class DefaultPropertyExtractor(PropertyExtractor):
+    def extract(self, cls: Type):
+        try:
+            hints = get_type_hints(cls)
+        except Exception:
+            hints = {}
+        try:
+            sig = inspect.signature(cls.__init__)
+        except Exception:
+            return None
+
+        props = {}
+        for name, param in sig.parameters.items():
+            if name == "self":
+                continue
+            props[name] = TypeDescriptor.PropertyDescriptor(
+                cls,
+                name,
+                hints.get(name, object),
+                None if param.default is inspect.Parameter.empty else param.default
+            )
+        return props
+
 
 class TypeDescriptor:
     """
     This class provides a way to introspect Python classes, their methods, decorators, and type hints.
     """
+
+    # static
+
+    _extractors: list[PropertyExtractor] = [
+        PydanticPropertyExtractor(),
+        DataclassPropertyExtractor(),
+        DefaultPropertyExtractor()
+    ]
+
+    @classmethod
+    def register_extractor(cls, extractor: PropertyExtractor):
+        TypeDescriptor._extractors.insert(0, extractor)
+
+    @classmethod
+    def extract_properties(cls, type: Type) -> Optional[Dict[str, "TypeDescriptor.PropertyDescriptor"]]:
+        for extractor in TypeDescriptor._extractors:
+            properties = extractor.extract(type)
+            if properties is not None:
+                return properties
+
+        raise Exception("no properties")
+
     # inner classes
 
     class ParameterDescriptor:
         def __init__(self, name: str, type: Type):
             self.name = name
             self.type = type
+
+    class PropertyDescriptor:
+        """
+        Describes a class property (field) — can be read and written via reflection.
+        """
+        def __init__(self, cls: Type, name: str, typ: Optional[Type] = None, default: Any = None):
+            self.clazz = cls
+            self.name = name
+            self.type = typ or object
+            self.default = default
+
+        def get(self, instance):
+            return getattr(instance, self.name, self.default)
+
+        def set(self, instance, value):
+            setattr(instance, self.name, value)
+
+        def __str__(self):
+            return f"Property({self.name}: {getattr(self.type, '__name__', self.type)})"
 
     class MethodDescriptor:
         """
@@ -135,7 +277,7 @@ class TypeDescriptor:
             self.param_types : list[Type] = []
             self.params: list[TypeDescriptor.ParameterDescriptor] = []
 
-            type_hints = get_type_hints(method)
+            type_hints = get_safe_type_hints(method)
             sig = signature(method)
 
             for name, _ in sig.parameters.items():
@@ -244,10 +386,11 @@ class TypeDescriptor:
         self.decorators = Decorators.get(cls)
         self.methods: Dict[str, TypeDescriptor.MethodDescriptor] = {}
         self.local_methods: Dict[str, TypeDescriptor.MethodDescriptor] = {}
+        self.properties: Dict[str, TypeDescriptor.PropertyDescriptor] = {}
 
         # check superclasses
 
-        self.super_types = [TypeDescriptor.for_type(x) for x in cls.__bases__ if not x is object]
+        self.super_types = [TypeDescriptor.for_type(x) for x in cls.__bases__ if not self._is_framework_class(x)]
 
         for super_type in self.super_types:
             self.methods = self.methods | super_type.methods
@@ -259,7 +402,35 @@ class TypeDescriptor:
             self.local_methods[name] = method
             self.methods[name] = method
 
+        # properties
+
+        self.properties = TypeDescriptor.extract_properties(cls)
+
+        # constructor
+
+        self.constructor = self._create_constructor()
+
     # internal
+
+    def _is_framework_class(self, cls):
+        if cls is object:
+            return True
+
+        module = getattr(cls, "__module__", "")
+
+        return module.startswith("pydantic.") or module.startswith("sqlalchemy.")
+
+    def _create_constructor(self) -> Callable[..., object]:
+        cls = self.cls
+
+        def make(**kwargs: Any) -> object:
+            return cls(**kwargs)
+
+        return make
+
+        #    # For other classes, fallback to bypassing __init__
+        #    def constructor():
+        #        return cls.__new__(cls)
 
     def _get_local_members(self, cls):
         #return [
@@ -274,7 +445,30 @@ class TypeDescriptor:
             if isinstance(attr, FunctionType)
         ]
 
+    # public new
+
+    def constructor_parameters(self):
+        return self.local_methods["__init__"].params
+
+    def is_immutable(self) -> bool:
+        return False
+
+    def has_default_constructor(self) -> bool:
+        return False
+
     # public
+
+    def get_properties(self) -> list[TypeDescriptor.PropertyDescriptor]:
+        return list(self.properties.values())
+
+    def get_property_names(self) -> list[str]:
+        return [prop.name for prop in self.properties.values()]
+
+    def get_property(self, name: str) -> Optional[TypeDescriptor.PropertyDescriptor]:
+        return self.properties.get(name)
+
+    def has_property(self, name: str) -> bool:
+        return self.properties.get(name) is not None
 
     def get_decorator(self, decorator: Callable) -> Optional[DecoratorDescriptor]:
         """
