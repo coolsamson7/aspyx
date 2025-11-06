@@ -5,12 +5,13 @@ from abc import ABC, abstractmethod
 from typing import Any, Callable, List, Optional, Type
 from dataclasses import dataclass
 
+from .convert import TypeConversions
 from ..reflection.reflection import TypeDescriptor
 from .transformer import Operation, Property
 
-
 class MapperException(Exception):
     pass
+
 
 class MapperProperty(Property["MappingContext"], ABC):
     """
@@ -310,6 +311,8 @@ class IntermediateResultDefinition:
     def create_buffer(self):
         return Buffer(self, self.n_args, self.constructor_args)
 
+type_conversions = TypeConversions()
+
 class TargetNode:
     def __init__(self, accessor, match=None, parent=None):
         self.parent = parent
@@ -345,7 +348,7 @@ class TargetNode:
             return SetPropertyValueReceiver(property=self.accessor.make_transformer_property(True))
 
     def try_convert(self, source_type, target_type):
-        conv = self.accessor.mapper.type_conversions.get_converter(source_type, target_type)
+        conv = type_conversions.get_converter(source_type, target_type)
         if conv is not None:
             return conv
         raise MapperException(f"cannot convert {source_type} to {target_type}")

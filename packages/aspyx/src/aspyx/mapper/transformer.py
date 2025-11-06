@@ -3,7 +3,6 @@ from typing import Any, Generic, List, TypeVar
 
 CONTEXT = TypeVar("CONTEXT")
 
-
 class Property(ABC, Generic[CONTEXT]):
     """
     A Property is able to read and write property values given an instance.

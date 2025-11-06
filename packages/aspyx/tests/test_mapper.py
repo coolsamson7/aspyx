@@ -121,7 +121,7 @@ class TestMapper(unittest.TestCase):
         res = mapper.map(TestMapper.convert)
         #self.assertEqual(res.id, TestMapper.c.id)
 
-    def xtest_conversion(self):
+    def test_conversion(self):
         mapper = Mapper(
             MappingDefinition(source_class=Convert, target_class=Convert)
                 .map(from_="b", to="b")
@@ -130,7 +130,7 @@ class TestMapper(unittest.TestCase):
                 .map(from_="s", to="s")
         )
 
-        res = mapper.map(TestMapper.c)
+        res = mapper.map(TestMapper.convert)
         #self.assertEqual(res.id, TestMapper.c.id)
 
     def test_benchmark(self):
