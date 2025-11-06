@@ -4,13 +4,9 @@
 
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 from dataclasses import dataclass
-from dataclasses import Field as DataclassField
-import pydantic
-
-from pydantic import BaseModel
-from pydantic_core.core_schema import DataclassField
 
 from .operation_builder import MapperException, MapperProperty, IntermediateResultDefinition, OperationBuilder
+from .transformer import Transformer
 from ..reflection.reflection import TypeDescriptor
 
 Converter = Callable[[Any], Any]
@@ -127,6 +123,10 @@ class ValidatingPropertyProperty(PropertyProperty):
         return getattr(self.type_info, 'type', object)
 
 class ConstantValue(MapperProperty):
+    __slots__ = [
+        "value"
+    ]
+
     def __init__(self, value):
         self.value = value
 
@@ -441,21 +441,23 @@ class MappingKey:
     def __hash__(self):
         return 0
 
-class Mapping:
+class Mapping(Transformer[MappingContext]):
     def __init__(self, mapper, definition, constructor, stack_size, intermediate_result_definitions, operations, finalizer):
+        super().__init__(operations=operations)
+
         self.mapper = mapper
         self.definition = definition
         self.constructor = constructor
         self.stack_size = stack_size
         self.intermediate_result_definitions = intermediate_result_definitions
         self.finalizer = finalizer or []
-        self.operations = operations
         self.type_descriptor = TypeDescriptor.for_type(definition.target_class)
         self.lazy = self.type_descriptor.is_immutable() or not self.type_descriptor.has_default_constructor()
     def setup_context(self, context: MappingContext):
         state = MappingState(context)
         context.setup(self.intermediate_result_definitions, self.stack_size)
         return state
+
     def new_instance(self):
         return self.constructor()
     def transform_target(self, source, target, context: MappingContext):

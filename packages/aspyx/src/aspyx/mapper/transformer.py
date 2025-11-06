@@ -23,6 +23,11 @@ class Property(ABC, Generic[CONTEXT]):
 
 
 class Operation(Generic[CONTEXT]):
+    __slots__ = [
+        "source",
+        "target"
+    ]
+
     """
     An Operation contains a source and a target Property that are used
     to read values from a source and set the result in the target object.
@@ -49,10 +54,13 @@ class Transformer(Generic[CONTEXT]):
     given a list of Operations.
     """
 
+    __slots__ = [
+        "operations"
+    ]
+
     def __init__(self, operations: List[Operation[CONTEXT]]):
         self.operations = operations
 
     def transform_target(self, source: Any, target: Any, context: CONTEXT) -> None:
-        """Modify a target instance by applying all specified operations."""
         for op in self.operations:
             op.set_target(source, target, context)

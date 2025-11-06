@@ -49,7 +49,7 @@ class MapList2List(MapperProperty):
         self.mapping = None
         self.polymorphic = False
         #TODO if TypeDescriptor.has_type_static(source_type):
-        self.polymorphic = False#bool(TypeDescriptor.for_type(source_type).child_classes())
+        self.polymorphic = False#bool(TypeDescriptor.for_type(source_type).child_classes()) TODO
 
     def set(self, instance, value, context):
         if value is None:
