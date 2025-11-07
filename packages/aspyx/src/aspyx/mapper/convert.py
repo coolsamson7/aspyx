@@ -1,23 +1,25 @@
 from dataclasses import dataclass
-from typing import Optional, Type, Callable, Any, Dict, Tuple
-
+from typing import Optional, Type, Callable, Any, Dict, Tuple, TypeVar, Generic
 
 Converter = Callable[[Any], Any]
 
-@dataclass(frozen=True)
-class Convert:
-    convert_source_func: Optional[Converter] = None
-    convert_target_func: Optional[Converter] = None
-    source_type: Type = object
-    target_type: Type = object
+S = TypeVar('S')
+T = TypeVar('T')
 
-    def convert_source(self, source):
+class Convert(Generic[S, T]):
+    def __init__(self, source_type: type[S], target_type: type[T], convert_source: Callable[[S], T], convert_target: Optional[Callable[[T], S]] = None):
+        self.source_type = source_type
+        self.target_type = target_type
+        self.convert_source_func= convert_source
+        self.convert_target_func= convert_target
+
+    def convert_source(self, source: S) -> T:
         if self.convert_source_func is None:
             raise Exception("No convert_source function")
 
         return self.convert_source_func(source)
 
-    def convert_target(self, source):
+    def convert_target(self, source: T) -> S:
         if self.convert_target_func is None:
             raise Exception("No convert_target function")
 

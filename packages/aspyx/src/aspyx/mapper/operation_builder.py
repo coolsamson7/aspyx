@@ -282,7 +282,7 @@ class Buffer:
         self.value_receiver = definition.value_receiver
         self.n_supplied_args = 0
         self.arguments = {}
-        self.array_arguments = [None] * constructor_args
+        #self.array_arguments = [None] * constructor_args
         self.result = None
         if constructor_args == 0:
             self.result = self.constructor({})

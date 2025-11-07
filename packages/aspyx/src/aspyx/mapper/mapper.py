@@ -244,10 +244,13 @@ class MapAccessor(MapOperation):
 
 # MappingDefinition, Mapping, MappingContext, Mapper
 
+def path(*args: str):
+    return [x for x in args if x is not None]
+
 class MappingDefinition:
-    def __init__(self, source_class: Type=None, target_class: Type=None):
-        self.source_class = source_class
-        self.target_class = target_class
+    def __init__(self, source: Type=None, target: Type=None):
+        self.source_class = source
+        self.target_class = target
         self.operations: List[MapOperation] = []
         self.intermediate_result_definitions = []
         self.finalizer = None
