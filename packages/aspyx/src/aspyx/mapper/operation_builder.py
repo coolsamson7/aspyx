@@ -343,7 +343,7 @@ class TargetNode:
             return SetResultPropertyValueReceiver(
                 result_index=self.parent.result_definition.index,
                 index=self.accessor.index,
-                property=(self.accessor.make_transformer_property(True) if self.accessor.index >= self.parent.result_definition.constructor_args else None)
+                property=self.accessor.make_transformer_property(True) #TODO if self.accessor.index >= self.parent.result_definition.constructor_args else None)
             )
         else:
             return SetPropertyValueReceiver(property=self.accessor.make_transformer_property(True))
