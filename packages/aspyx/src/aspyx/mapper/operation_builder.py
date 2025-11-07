@@ -55,6 +55,7 @@ class MapList2List(MapperProperty):
     def set(self, instance, value, context):
         if value is None:
             return
+
         lst = list(value)
         result = self.factory()
         if self.polymorphic:

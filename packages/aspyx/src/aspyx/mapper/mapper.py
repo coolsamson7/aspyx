@@ -8,10 +8,7 @@ from dataclasses import dataclass
 from .convert import Convert
 from .operation_builder import MapperException, MapperProperty, IntermediateResultDefinition, OperationBuilder
 from .transformer import Transformer
-from ..reflection.reflection import TypeDescriptor
-
-
-
+from ..reflection.reflection import TypeDescriptor, is_list_type, get_list_element_type
 
 
 # Property implementations used by Accessors
@@ -104,13 +101,13 @@ class Accessor:
         raise NotImplementedError
 
     def is_container(self):
-        return False
+        return is_list_type(self.type)
 
     def get_element_type(self):
-        return self.type
+        return get_list_element_type(self.type)
 
     def get_container_constructor(self):
-        return None
+        return list if self.is_container() else None # TODO just list now
 
 class ConstantAccessor(Accessor):
     def __init__(self, value):
@@ -149,11 +146,11 @@ class PropertyAccessor(Accessor):
         else:
             return ValidatingPropertyProperty(self.field) if self.validate else PropertyProperty(self.field)
 
-    def get_container_constructor(self):
-        return getattr(self.field, 'factory_constructor', None)
+    #def get_container_constructor(self):
+    #    return getattr(self.field, 'factory_constructor', None)
 
-    def get_element_type(self):
-        return getattr(self.field, 'element_type', getattr(self.field, 'type', object))
+    #def get_element_type(self):
+    #    return getattr(self.field, 'element_type', getattr(self.field, 'type', object))
 
     def resolve(self, typ: Type, write: bool):
         descriptor = TypeDescriptor.for_type(typ)

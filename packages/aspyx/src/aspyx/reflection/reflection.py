@@ -11,7 +11,7 @@ from inspect import signature
 import threading
 from types import FunctionType
 
-from typing import Callable, get_type_hints, Type, Dict, Optional, Any
+from typing import Callable, get_type_hints, Type, Dict, Optional, Any, get_origin, List, get_args
 from weakref import WeakKeyDictionary
 
 from pydantic import BaseModel
@@ -69,6 +69,33 @@ def get_method_class(method):
             if inspect.isclass(cls):
                 return cls
 
+    return None
+
+def is_list_type(typ) -> bool:
+    """
+    Returns True if the given type hint represents a list-like container.
+    Handles typing.List, list, and parameterized generics like list[int].
+    """
+    if typ is None:
+        return False
+
+    origin = get_origin(typ) or typ
+    return origin in (list, List)
+
+def get_list_element_type(typ) -> Any:
+    """
+    Returns the element type if `typ` is a list-like type.
+    Examples:
+        list[int]        -> int
+        List[str]        -> str
+        list[Any]        -> Any
+        list             -> Any
+        not a list       -> None
+    """
+    origin = get_origin(typ)
+    if origin in (list, List):
+        args = get_args(typ)
+        return args[0] if args else Any
     return None
 
 class DecoratorDescriptor:
