@@ -1,9 +1,10 @@
 """
 Test cases for the TypeDescriptor and Decorators functionality in aspyx.reflection.
 """
-from __future__ import annotations
-
 import unittest
+from dataclasses import dataclass, fields
+
+from pydantic import BaseModel
 
 from aspyx.reflection import TypeDescriptor, Decorators
 
@@ -35,7 +36,27 @@ class Derived(Base):
     def derived(self, message: str) -> str:
         pass
 
+class Normal:
+    def __init__(self, id: str):
+        self.id = id
+
+@dataclass
+class Dataclass:
+    id: str
+
+class Pydantic(BaseModel):
+    id: str
+
 class TestReflection(unittest.TestCase):
+    def test_properties(self):
+        #normal_descriptor = TypeDescriptor.for_type(Normal)
+        dataclass_descriptor = TypeDescriptor.for_type(Dataclass)
+        #pydantic_descriptor = TypeDescriptor.for_type(Pydantic)
+
+        fs = fields(Dataclass)
+
+        print(1)
+
     def test_decorators(self):
         base_descriptor = TypeDescriptor.for_type(Base)
 

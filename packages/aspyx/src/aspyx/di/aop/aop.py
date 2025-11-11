@@ -243,6 +243,8 @@ class MethodAspectTarget(AspectTarget):
 
         method_descriptor = descriptor.get_method(func.__name__)
 
+        if method_descriptor is None:
+            return False # WTF TODO
         # classes
 
         if self.belonging_to:

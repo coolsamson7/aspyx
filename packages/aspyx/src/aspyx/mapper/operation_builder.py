@@ -275,6 +275,8 @@ class SourceTree:
 
 class Buffer:
     def __init__(self, definition, n_args, constructor_args):
+        constructor_args = n_args # TODO WTF
+        ###
         self.definition = definition
         self.n_args = n_args
         self.constructor_args = constructor_args

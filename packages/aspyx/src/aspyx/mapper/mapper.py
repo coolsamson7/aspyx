@@ -448,13 +448,15 @@ class Mapper:
         if m is None:
             raise MapperException(f"No mapping found for <{source}, {target}>")
         return m
-    def map(self, source, context: Optional[MappingContext]=None, mapping: Optional[Mapping]=None):
+
+    def map(self, source, target: Optional[Any] = None, context: Optional[MappingContext]=None, mapping: Optional[Mapping]=None):
         if source is None:
             return None
         # if mapping not provided, try to infer by source runtime type and a registered mapping
         mapping = mapping or self.get_source_mapping(type(source))
         context = context or MappingContext(self)
-        target = context.mapped_object(source)
+        if target is None:
+            target = context.mapped_object(source)
         lazy_create = False
         if target is None:
             lazy_create = mapping.lazy
@@ -463,6 +465,7 @@ class Mapper:
             else:
                 target = mapping.new_instance()
                 context.remember(source, target)
+
         state = mapping.setup_context(context)
         try:
             mapping.transform_target(source, target, context)
@@ -471,6 +474,8 @@ class Mapper:
                 context.remember(source, target)
         finally:
             state.restore(context)
+
         for finalizer in mapping.finalizer:
             finalizer(source, target)
+
         return target

@@ -4,18 +4,38 @@ including their methods, decorators, and type hints. It supports caching for per
 """
 from __future__ import annotations
 
-import inspect
 from abc import ABC, abstractmethod
-from dataclasses import is_dataclass, fields
+import inspect
 from inspect import signature
 import threading
 from types import FunctionType
 
-from typing import Callable, get_type_hints, Type, Dict, Optional, Any, get_origin, List, get_args
+from typing import Callable, get_type_hints, Type, Dict, Any, get_origin, List, get_args
 from weakref import WeakKeyDictionary
 
-from pydantic import BaseModel
-from sqlalchemy.orm import class_mapper, ColumnProperty
+from aspyx.validation import AbstractType, IntType
+from aspyx.validation.validation import DoubleType, StringType, BoolType, ListType
+
+import dataclasses
+from dataclasses import MISSING, is_dataclass, fields
+from typing import Any, Optional, Type
+from pydantic import BaseModel, Field
+
+
+try:
+    from pydantic import Field
+except ImportError:
+    Field = None
+
+def is_pydantic_model(cls: type) -> bool:
+    return hasattr(cls, "__fields__")
+
+def is_sqlalchemy_entity(cls: type) -> bool:
+    # All mapped SQLAlchemy classes have a __mapper__ attribute
+    return hasattr(cls, "__mapper__")
+
+def is_dataclass(cls: type) -> bool:
+    return hasattr(cls, "__dataclass_fields__")
 
 def get_safe_type_hints(obj) -> Dict[str, Any]:
     """
@@ -174,6 +194,13 @@ class Decorators:
         #return getattr(func_or_class, '__decorators__', []) #will return inherited as well
         return func_or_class.__dict__.get('__decorators__', [])
 
+
+def attribute(*, primary_key: bool = False, type_property: Optional[Any] = None,
+              default=MISSING, **extra):
+    metadata = {"primary_key": primary_key, "type_property": type_property}
+    metadata.update(extra)
+    return dataclasses.field(default=default, metadata=metadata)
+
 class PropertyExtractor(ABC):
     """Base interface for all property extraction strategies."""
 
@@ -192,27 +219,37 @@ class PydanticPropertyExtractor(PropertyExtractor):
 
         props = {}
         for name, field in cls.model_fields.items():
-            props[name] = TypeDescriptor.PropertyDescriptor(
-                cls,
-                name,
-                field.annotation,
-                field.default if field.default is not None else None
-            )
-        return props
+            typ = field.annotation
+            default = field.default if field.default is not None else None
 
+            # Pydantic metadata support
+            extra = field.json_schema_extra or {}
+            p = TypeDescriptor.PropertyDescriptor(cls, name, typ, default)
+            p.primary_key = extra.get("primary_key", False)
+            p.type_property = extra.get("type_property", None)
+            props[name] = p
+
+        return props
 class DataclassPropertyExtractor(PropertyExtractor):
     def extract(self, cls: Type):
         if not is_dataclass(cls):
             return None
 
+        type_hints = get_type_hints(cls)
         props = {}
-        for field in fields(cls):
-            props[field.name] = TypeDescriptor.PropertyDescriptor(
-                cls,
-                field.name,
-                field.type,
-                field.default if field.default is not field.default_factory else None
-            )
+        for f in fields(cls):
+            meta = getattr(f, "metadata", {})
+            typ = type_hints.get(f.name, f.type)  # <-- resolve "str" -> str
+
+            default = None
+            if f.default is not f.default_factory and f.default is not dataclasses.MISSING:
+                default = f.default
+
+            prop = TypeDescriptor.PropertyDescriptor(cls, f.name, typ, default)
+            prop.primary_key = meta.get("primary_key", False)
+            prop.type_property = meta.get("type_property", None)
+            props[f.name] = prop
+
         return props
 
 class DefaultPropertyExtractor(PropertyExtractor):
@@ -276,11 +313,39 @@ class TypeDescriptor:
         """
         Describes a class property (field) — can be read and written via reflection.
         """
-        def __init__(self, cls: Type, name: str, typ: Optional[Type] = None, default: Any = None):
+        def __init__(self, cls: Type, name: str, typ: Optional[Type] = None, default: Any = None, type_property: Optional[AbstractType] = None):
             self.clazz = cls
             self.name = name
             self.type = typ or object
             self.default = default
+            self.type_property = type_property
+            if self.type_property is None:
+                self.type_property = self._infer_type_property(self.type)
+
+        def _infer_type_property(self, typ: Any):
+            """
+            Try to infer an AbstractType from Python type hints.
+            This provides automatic mapping when no explicit type_property is set.
+            """
+            origin = get_origin(typ)
+
+            if typ is int:
+                return IntType()
+            elif typ is float:
+                return DoubleType()
+            elif typ is str:
+                return StringType()
+            elif typ is bool:
+                return BoolType()
+            elif origin in (list, List):
+                args = get_args(typ)
+                elem_type = args[0] if args else Any
+                element_spec = self._infer_type_property(elem_type)
+                return ListType(element_spec)
+            #TODO elif inspect.isclass(typ):
+                # For complex/nested objects
+            #    return ObjectType(typ)
+            return None
 
         def get(self, instance):
             return getattr(instance, self.name, self.default)
@@ -453,11 +518,13 @@ class TypeDescriptor:
         def make(**kwargs: Any) -> object:
             return cls(**kwargs)
 
-        return make
+        def new():
+                return cls.__new__(cls)
 
-        #    # For other classes, fallback to bypassing __init__
-        #    def constructor():
-        #        return cls.__new__(cls)
+        if is_dataclass(cls):# or is_sqlalchemy_entity(cls):
+            return new
+
+        return make
 
     def _get_local_members(self, cls):
         #return [
@@ -481,6 +548,12 @@ class TypeDescriptor:
         return False
 
     def has_default_constructor(self) -> bool:
+        #if is_sqlalchemy_entity(self.cls):
+        #    return True
+
+        if is_dataclass(self.cls):
+            return True
+
         return False
 
     # public

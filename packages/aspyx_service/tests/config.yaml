@@ -5,6 +5,8 @@ http:
 channel:
   backoff_base: 0.2
   max_attempts: 3
+db:
+  url: postgresql+psycopg2://postgres:postgres@localhost:5432/postgres
 consul:
   watchdog:
     interval: 5

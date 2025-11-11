@@ -149,6 +149,7 @@ class TestMapper(unittest.TestCase):
         )
 
         res = mapper.map(TestMapper.deep)
+        print(res)
 
     def test_wildcards(self):
         mapper = Mapper(
@@ -200,7 +201,7 @@ class TestMapper(unittest.TestCase):
 
         # benchmark
 
-        loops = 10000
+        loops = 100000
 
         def map_manual():
             deep = TestMapper.deep
