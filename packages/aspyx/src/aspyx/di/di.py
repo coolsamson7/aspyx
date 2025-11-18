@@ -1210,7 +1210,8 @@ class Environment:
         for result_type, provider in self.providers.items():
             if isinstance(provider, EnvironmentInstanceProvider):
                 if cast(EnvironmentInstanceProvider, provider).environment is self:
-                    builder.append(f"- {result_type.__name__}: {provider.report()}\n")
+                    cast(EnvironmentInstanceProvider, provider).print_tree()
+                    #builder.append(f"- {result_type.__name__}: {provider.report()}\n")
 
         # instances
 

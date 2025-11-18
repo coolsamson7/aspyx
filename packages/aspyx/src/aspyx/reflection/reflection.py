@@ -521,8 +521,8 @@ class TypeDescriptor:
         def new():
                 return cls.__new__(cls)
 
-        if is_dataclass(cls):# or is_sqlalchemy_entity(cls):
-            return new
+        #if is_dataclass(cls):# or is_sqlalchemy_entity(cls):
+        #    return new
 
         return make
 
@@ -551,8 +551,8 @@ class TypeDescriptor:
         #if is_sqlalchemy_entity(self.cls):
         #    return True
 
-        if is_dataclass(self.cls):
-            return True
+        #if is_dataclass(self.cls):
+        #    return True
 
         return False
 
