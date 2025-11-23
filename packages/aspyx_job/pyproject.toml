@@ -11,6 +11,7 @@ requires-python = ">=3.9"
 dependencies = [
     "aspyx>=1.9.1",
     "python-qpid-proton >=0.40.0",
+    "apscheduler>=3.10.0",
     "stomp.py>=8.2.0"
 ]
 
