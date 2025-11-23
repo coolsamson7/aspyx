@@ -2,7 +2,7 @@
 
 [project]
 name = "aspyx_job"
-version = "0.1.1"
+version = "0.1.2"
 description = "Aspyx job framework"
 authors = [{ name = "Andreas Ernst", email = "andreas.ernst7@gmail.com" }]
 readme = "README.md"
@@ -23,7 +23,7 @@ build-backend = "hatchling.build"
 source = "src"
 
 [tool.hatch.build.targets.wheel]
-packages = ["aspyx_job"]
+packages = ["src/aspyx_job"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
