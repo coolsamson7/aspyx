@@ -160,7 +160,10 @@ class TestMapper(unittest.TestCase):
         res = mapper.map(TestMapper.types)
         #self.assertEqual(res.id, TestMapper.c.id)
 
-    def xtest_path(self): # TODO
+    def test_path(self): # TODO
+        d1 = TypeDescriptor.for_type(Product)
+        d2 = TypeDescriptor.for_type(Money)
+
         mapper = Mapper(
             MappingDefinition(source=Product, target=Product)
             .map(from_="name", to="name")

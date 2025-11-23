@@ -123,7 +123,7 @@ class ExceptionManager:
         # analyze methods
 
         for method in type_descriptor.get_methods():
-            if method.has_decorator(handle):
+            if method.has_decorator(handle) or method.has_decorator(catch):
                 if len(method.param_types) == 1:
                     exception_type = method.param_types[0]
 
