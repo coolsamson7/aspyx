@@ -300,7 +300,7 @@ class RestChannel(HTTPXChannel):
         try:
             result = None
             if call.type in ["get", "put", "delete"]:
-                result = self.request("get", self.get_url() + url, params=query_params, timeout=self.timeout)
+                result = self.request(call.type, self.get_url() + url, params=query_params, timeout=self.timeout)
 
             elif call.type == "post":
                 result = self.request( "post", self.get_url() + url, params=query_params, json=body, timeout=self.timeout)

@@ -1,7 +1,7 @@
 """
 Common test stuff
 """
-from __future__ import annotations
+#from __future__ import annotations
 
 import logging
 import re
@@ -9,34 +9,34 @@ import time
 from datetime import datetime, timedelta, timezone
 
 import jwt
+from aspyx_service.restchannel import BodyMarker
 from fastapi import HTTPException, FastAPI
 
 from abc import abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Any, Callable
+from typing import Optional, Any, Annotated
 
 from jwt import ExpiredSignatureError, InvalidTokenError
 
 import pytest
 from pydantic import BaseModel
 
-from aspyx.mapper import MappingDefinition, Mapper, matching_properties
-from aspyx.reflection import Decorators, TypeDescriptor
-from aspyx.reflection.reflection import PropertyExtractor
+from aspyx.reflection import Decorators
+
 from aspyx_service import service, Service, component, Component, \
     implementation, health, AbstractComponent, ChannelAddress, inject_service, \
     FastAPIServer, Server, ServiceModule, ServiceManager, \
     HealthCheckManager, get, post, rest, put, delete, Body, SessionManager, RequestContext, \
     TokenContextMiddleware, ProtobufManager
-from aspyx.di.aop import advice, error, Invocation, around, methods, classes
+from aspyx.di.aop import advice, error, Invocation
 from aspyx.exception import ExceptionManager, handle
 from aspyx.util import Logger
 from aspyx_service.server import ResponseContext
 from aspyx_service.service import LocalComponentRegistry, component_services, AuthorizationException, ComponentRegistry
 from aspyx.di import module, create, injectable, on_running, Environment
 from aspyx.di.configuration import YamlConfigurationSource
-from .other import EmbeddedPydantic
+#from .other import EmbeddedPydantic
 
 # configure logging
 
@@ -57,11 +57,11 @@ class EmbeddedDataClass:
     bool_attr: bool
     str_attr: str
 
-#class EmbeddedPydantic(BaseModel):
-#    int_attr: int
-#    float_attr: float
-#    bool_attr: bool
-#    str_attr: str
+class EmbeddedPydantic(BaseModel):
+    int_attr: int
+    float_attr: float
+    bool_attr: bool
+    str_attr: str
 
 class Pydantic(BaseModel):
     int_attr : int
@@ -179,282 +179,6 @@ class TokenManager:
 
 # service
 
-# TEST TODO
-
-from sqlalchemy import create_engine, Column, String
-from sqlalchemy.orm import sessionmaker, declarative_base
-
-
-#@injectable()
-class DatabaseEngine:
-    def __init__(self, url: str):
-        self.engine = create_engine(url, echo=False, future=True)
-
-    def get_engine(self):
-        return self.engine
-
-@injectable()
-class SessionFactory:
-    def __init__(self, engine: DatabaseEngine):
-        self._maker = sessionmaker(bind=engine.get_engine(), autoflush=False, autocommit=False)
-
-    def create_session(self):
-        return self._maker()
-
-def transactional():
-    def decorator(func):
-        Decorators.add(func, transactional)
-        return func #
-
-    return decorator
-
-from contextvars import ContextVar
-from sqlalchemy.orm import Session
-
-_current_session: ContextVar[Session] = ContextVar("_current_session", default=None)
-
-def get_current_session():
-    return _current_session.get()
-
-@advice
-@injectable()
-class TransactionalAdvice:
-    # constructor
-
-    def __init__(self, factory: SessionFactory):
-        self.session_factory = factory
-
-    # internal
-
-    # advice
-
-    @around(methods().decorated_with(transactional), classes().decorated_with(transactional))
-    def call_transactional1(self, invocation: Invocation):
-        session = self.session_factory.create_session()
-        token = _current_session.set(session)
-
-        try:
-            result = invocation.proceed()
-            session.commit()
-            return result
-        except Exception:
-            session.rollback()
-            raise
-        finally:
-            session.close()
-            _current_session.reset(token)
-
-Base = declarative_base()
-
-class PydanticUser(BaseModel):
-    name: str
-
-class UserEntity(Base):
-    __tablename__ = "user_profile"
-
-    user_id = Column(String, primary_key=True)
-    #name = Column(String)
-    #email = Column(String)
-    locale = Column(String)
-
-    def __repr__(self):
-        return f"<User(id={self.user_id}, locale={self.locale})>"
-
-@dataclass()
-class User:
-    user_id : str
-    locale: str
-
-# TODO wohin -> ??
-
-
-from sqlalchemy.orm import DeclarativeMeta, class_mapper, ColumnProperty
-
-class SQLAlchemyPropertyExtractor(PropertyExtractor):
-    def extract(self, cls: Type):
-        if not isinstance(cls, DeclarativeMeta):
-            return None
-
-        mapper = class_mapper(cls)
-        props = {}
-        for prop in mapper.attrs:
-            if isinstance(prop, ColumnProperty):
-                name = prop.key
-                column = prop.columns[0]
-                typ = getattr(column.type, "python_type", object)
-                props[name] = TypeDescriptor.PropertyDescriptor(
-                    cls,
-                    name,
-                    typ,
-                    getattr(cls, name, None)
-                )
-        return props
-
-TypeDescriptor.register_extractor(SQLAlchemyPropertyExtractor())
-
-
-pydantic_desc = TypeDescriptor.for_type(PydanticUser)
-
-type_desc = TypeDescriptor.for_type(User)
-entity_desc = TypeDescriptor.for_type(UserEntity)
-
-user_user_entity_mapper = Mapper(
-    MappingDefinition(source=User, target=UserEntity)
-        .map(from_="user_id", to="user_id")
-        .map(from_="locale", to="locale")
-    )
-
-user_entity_user_mapper = Mapper(
-    MappingDefinition(source=UserEntity, target=User)
-        .map(from_="user_id", to="user_id")
-        .map(from_="locale", to="locale")
-        #.map(all=matching_properties())
-)
-
-@service(name="user-service", description="cool")
-class UserService(Service):
-    @abstractmethod
-    def create(self, user: User) -> User:
-        pass
-
-    @abstractmethod
-    def read(self, id: str) -> User:
-        pass
-
-from typing import Generic, Type, TypeVar
-from sqlalchemy.orm import Session
-
-T = TypeVar("T")
-
-def query():
-    """
-    Methods decorated with `@query` are queries.
-    """
-    def decorator(func):
-        Decorators.add(func, query)
-
-        return func
-
-    return decorator
-
-class BaseRepository(Generic[T]):
-    # instance data
-
-    _query_cache: dict[str, Callable[..., Any]] = {}
-
-    # constructor
-
-    def __init__(self, model: Type[T]):
-        self.model = model
-
-    # internal
-
-    def _invoke_dynamic_query(self, method_name: str, *args, **kwargs):
-        cache_key = method_name
-        if cache_key not in self._query_cache:
-            # parse the method name
-            self._query_cache[cache_key] = self._create_query_func(method_name)
-        func = self._query_cache[cache_key]
-        return func(self, *args, **kwargs)
-
-    def _create_query_func(self, method_name: str) -> Callable[..., Any]:
-        """
-        Converts method names like find_by_name_and_locale into a query function.
-        """
-        m = re.match(r"find_by_(.+)", method_name)
-        if not m:
-            raise ValueError(f"Cannot parse method name {method_name}")
-        fields = m.group(1).split("_and_")
-
-        def query_func(instance: "BaseRepository", *args, **kwargs):
-            if len(args) > 0:
-                # map positional args to field names
-                query_kwargs = dict(zip(fields, args))
-            else:
-                query_kwargs = kwargs
-            return instance.filter(**query_kwargs)
-
-        return query_func
-
-    # public
-
-    def get_current_session(self):
-        return _current_session.get()
-
-    # query stuff
-
-    def find(self, id_, mapper: Optional[Mapper] = None) -> T | None:
-        result = self.get_current_session().get(self.model, id_)
-        if result is not None:
-            return mapper.map(result) if mapper is not None else result
-
-    def get(self, id_, mapper: Optional[Mapper] = None) -> T:
-        result = self.get_current_session().get(self.model, id_)
-        if result is not None:
-            return mapper.map(result) if mapper is not None else result
-
-    def find_all(self, mapper: Optional[Mapper] = None) -> list[T]:
-        return list(self.get_current_session().query(self.model))
-
-    def save(self, entity: T) -> T:
-        self.get_current_session().add(entity)
-
-        return entity
-
-    def delete(self, entity: T):
-        self.get_current_session().delete(entity)
-
-    def filter(self, **kwargs) -> list[T]:
-        return self.get_current_session().query(self.model).filter_by(**kwargs).all()
-
-    def exists(self, **kwargs) -> bool:
-        return self.get_current_session().query(self.get_current_session().query(self.model)
-                                  .filter_by(**kwargs)
-                                  .exists()).scalar()
-
-@injectable()
-class UserRepository(BaseRepository[UserEntity]):
-    # constructor
-
-    def __init__(self, factory: SessionFactory):
-        super().__init__(UserEntity)
-
-        self.session_factory = factory
-
-    # public
-
-    @query()
-    def find_by_locale(self):
-        ...
-
-    def find_by_id(self, user_id: str, mapper: Optional[Mapper] = None):
-        return self.find(user_id, mapper=mapper)
-
-@advice
-@injectable()
-class QueryAdvice:
-    # constructor
-
-    def __init__(self):
-        pass
-
-    # internal
-
-    # advice
-
-    @around(methods().decorated_with(query))
-    def call_query(self, invocation: Invocation):
-        func = invocation.func
-        instance = invocation.args[0]
-        args = invocation.args
-        kwargs = invocation.kwargs
-
-        method_name = func.__name__
-        result = instance._invoke_dynamic_query(method_name, *args[1:], **kwargs)
-        return result
-
-# TEST
-
 @service(name="test-service", description="cool")
 class TestService(Service):
     @abstractmethod
@@ -516,7 +240,7 @@ class TestRestService(Service):
         pass
 
     @post("/post_data/{message}")
-    def post_data(self, message: str, data: Body(Data)) -> Data:
+    def post_data(self, message: str, data:Body(Data)) -> Data:
         pass
 
     @delete("/delete/{message}")
@@ -549,7 +273,6 @@ class TestAsyncRestService(Service):
 
 @component(services =[
     TestService,
-    UserService,
     TestAsyncService,
     TestRestService,
     TestAsyncRestService
@@ -558,27 +281,6 @@ class TestComponent(Component): # pylint: disable=abstract-method
     pass
 
 # implementation classes
-
-@implementation()
-class UserServiceImpl(UserService):
-    # constructor
-
-    def __init__(self, user_repository: UserRepository):
-        self.user_repository = user_repository
-
-    # implement
-
-    @transactional()
-    def create(self, user: User) -> User:
-        self.user_repository.save(user_user_entity_mapper.map(user))
-
-        return user
-
-    @transactional()
-    def read(self, id: str) -> User:
-        self.user_repository.find_by_locale("en-DE")
-        # TEST
-        return self.user_repository.find_by_id(id, mapper=user_entity_user_mapper)
 
 @implementation()
 class TestServiceImpl(TestService):
@@ -609,9 +311,9 @@ class TestAsyncServiceImpl(TestAsyncService):
 class TestRestServiceImpl(TestRestService):
     @requires_response()
     def get(self, message: str) -> str:
-        response = ResponseContext.get()
+        #TODO response = ResponseContext.get()
 
-        response.set_cookie("name", "value")
+        # TODO response.set_cookie("name", "value")
 
         return message
 
@@ -713,8 +415,8 @@ fastapi.add_middleware(TokenContextMiddleware)
 @module(imports=[ServiceModule])
 class Module:
     @create()
-    def create_server(self,  service_manager: ServiceManager, component_registry: ComponentRegistry, protobuf_manager: ProtobufManager) -> FastAPIServer:
-        return FastAPIServer(fastapi, service_manager, component_registry, protobuf_manager)
+    def create_server(self,  service_manager: ServiceManager, component_registry: ComponentRegistry) -> FastAPIServer:
+        return FastAPIServer(fastapi, service_manager, component_registry)
 
     @create()
     def create_session_storage(self) -> SessionManager.Storage:
@@ -731,10 +433,6 @@ class Module:
     @create()
     def create_registry(self, source: YamlConfigurationSource) -> LocalComponentRegistry:
         return LocalComponentRegistry()
-
-    @create()
-    def create_engine(self,  source: YamlConfigurationSource) -> DatabaseEngine:
-        return DatabaseEngine(url="postgresql+psycopg2://postgres:postgres@localhost:5432/postgres")
 
 # main
 

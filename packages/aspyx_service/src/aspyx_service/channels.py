@@ -178,6 +178,14 @@ class HTTPXChannel(Channel):
 
         try:
             response = self.get_client().request(http_method, url, params=params, json=json, headers=headers, timeout=timeout, content=content)
+
+            #print("\n=== Response ===")
+            #print("Status Code:", response.status_code)
+            #try:
+            #    print("Body:", json.dumps(response.json(), indent=2))
+            #except Exception:
+            #    print("Body (raw):", response.text)
+
             response.raise_for_status()
         except httpx.RequestError as e:
             raise ServiceCommunicationException(str(e)) from e
