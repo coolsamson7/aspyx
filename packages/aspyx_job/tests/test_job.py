@@ -1,7 +1,7 @@
 """
 test for events
 """
-from __future__ import annotations
+#from __future__ import annotations
 
 import logging
 import threading
