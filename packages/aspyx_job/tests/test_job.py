@@ -8,8 +8,8 @@ import threading
 
 from aspyx.exception import ExceptionManager, catch
 from aspyx.util import Logger
-from packages.aspyx_job.src.aspyx_job import JobModule, scheduled, interval, cron
-from packages.aspyx_job.src.aspyx_job.job import Scheduler
+from aspyx_job import JobModule, scheduled, interval, cron
+from aspyx_job.job import Scheduler
 
 Logger.configure(default_level=logging.INFO, levels={
     "httpx": logging.ERROR,
