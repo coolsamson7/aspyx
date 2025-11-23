@@ -5,9 +5,8 @@ from __future__ import annotations
 
 import logging
 import threading
-import time
 
-from aspyx.exception import ExceptionManager, handle_exception
+from aspyx.exception import ExceptionManager, catch
 from aspyx.util import Logger
 from packages.aspyx_job.src.aspyx_job import JobModule, scheduled, interval, cron
 from packages.aspyx_job.src.aspyx_job.job import Scheduler
@@ -67,7 +66,7 @@ class Module:
 
     # handlers
 
-    @handle_exception()
+    @catch()
     def handle_exception(self, exception: Exception):
         print(exception)
 

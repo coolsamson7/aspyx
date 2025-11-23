@@ -2,14 +2,14 @@
 
 [project]
 name = "aspyx_job"
-version = "0.1.0"
+version = "0.1.1"
 description = "Aspyx job framework"
 authors = [{ name = "Andreas Ernst", email = "andreas.ernst7@gmail.com" }]
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.9"
 dependencies = [
-    "aspyx>=1.8.0",
+    "aspyx>=1.9.1",
     "python-qpid-proton >=0.40.0",
     "stomp.py>=8.2.0"
 ]

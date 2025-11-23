@@ -3,6 +3,7 @@ event management
 """
 from __future__ import annotations
 
+import inspect
 from threading import Semaphore
 from typing import Optional
 
@@ -12,9 +13,31 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
 from aspyx.exception import ExceptionManager
-from aspyx.reflection import Decorators, get_method_class
+from aspyx.reflection import Decorators
+#get_method_class
 
 from aspyx.di import Environment, inject_environment, on_destroy, on_init
+
+def get_method_class(method):
+    """
+    return the class of the specified method
+    Args:
+        method: the method
+
+    Returns:
+        the class of the specified method
+
+    """
+    if inspect.ismethod(method) or inspect.isfunction(method):
+        qualname = method.__qualname__
+        module = inspect.getmodule(method)
+        if module:
+            cls_name = qualname.split('.<locals>', 1)[0].rsplit('.', 1)[0]
+            cls = getattr(module, cls_name, None)
+            if inspect.isclass(cls):
+                return cls
+
+    return None
 
 # utility
 

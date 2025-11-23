@@ -10,19 +10,6 @@
 
 ![image](https://github.com/user-attachments/assets/e808210a-b1a4-4fd0-93f1-b5f9845fa520)
 
-- [Eventing](#eventing)
-  - [Introduction](#introduction)
-  - [Features](#features)
-  - [Installation](#installation)
-- [API](#api)
-  - [Event](#event)
-  - [EventListener](#event-listener)
-  - [EnvelopePipeline](#envelope-pipeline)
-  - [EventManager](#event-maneger)
-  - [Providers](#providers)
-    - [AMQP](#amqp)
-- [Version History](#version-history)
-- 
 # Job
 
 ## Introduction
