@@ -43,10 +43,10 @@ class SessionPipeline(AbstractEnvelopePipeline):
 
     # implement
 
-    def send(self, envelope: EventManager.Envelope, event_descriptor: EventManager.EventDescriptor):
+    async def send(self, envelope: EventManager.Envelope, event_descriptor: EventManager.EventDescriptor):
         envelope.set("session", "session")
 
-        self.proceed_send(envelope, event_descriptor)
+        await self.proceed_send(envelope, event_descriptor)
 
     def handle(self, envelope: EventManager.Envelope, event_listener_descriptor: EventManager.EventListenerDescriptor):
         #session = envelope.get("session")

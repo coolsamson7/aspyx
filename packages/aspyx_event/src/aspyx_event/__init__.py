@@ -5,6 +5,7 @@ from aspyx.di import module
 from .event import EventManager, EventListener, event, event_listener, envelope_pipeline, AbstractEnvelopePipeline
 from .event_stomp import StompProvider
 from .event_amqp import AMQPProvider
+from .event_nsq import NSQProvider
 
 @module()
 class EventModule:
@@ -29,5 +30,9 @@ __all__ = [
 
     # amqp
 
-    "AMQPProvider"
+    "AMQPProvider",
+
+    # event_nsq
+
+    "NSQProvider"
 ]

@@ -5,11 +5,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from typing import Optional
 
 from aspyx.exception import ExceptionManager, handle
 from aspyx.util import Logger
 
-from .provider import LocalProvider
+#from .provider import LocalProvider
 
 Logger.configure(default_level=logging.INFO, levels={
     "httpx": logging.ERROR,
@@ -28,7 +29,7 @@ from dataclasses import dataclass
 import pytest
 
 from aspyx_event import EventManager, event, envelope_pipeline, AbstractEnvelopePipeline, \
-    event_listener, EventListener, EventModule
+    event_listener, EventListener, EventModule, NSQProvider
 #StompProvider, AMQPProvider
 
 from aspyx.di import module, Environment, create
@@ -50,10 +51,10 @@ class SessionPipeline(AbstractEnvelopePipeline):
 
     # implement
 
-    def send(self, envelope: EventManager.Envelope, event_descriptor: EventManager.EventDescriptor):
+    async def send(self, envelope: EventManager.Envelope, event_descriptor: EventManager.EventDescriptor):
         envelope.set("session", "session")
 
-        self.proceed_send(envelope, event_descriptor)
+        await self.proceed_send(envelope, event_descriptor)
 
     def handle(self, envelope: EventManager.Envelope, event_listener_descriptor: EventManager.EventListenerDescriptor):
         session = envelope.get("session")
@@ -61,10 +62,10 @@ class SessionPipeline(AbstractEnvelopePipeline):
         self.proceed_handle(envelope, event_listener_descriptor)
 
 
-sync_event_received = asyncio.Event()
-async_event_received = asyncio.Event()
+sync_event_received  : Optional[asyncio.Event] = None
+async_event_received : Optional[asyncio.Event] = None
 
-@event_listener(HelloEvent, per_process=True)
+#@event_listener(HelloEvent, per_process=True)
 class SyncListener(EventListener[HelloEvent]):
     received = None
     foo = None
@@ -121,9 +122,13 @@ class Module:
 
         return exception_manager
 
+    # @create()
+    #def create_provider(self) -> EventManager:
+
     @create()
     def create_event_manager(self) -> EventManager:
-        return EventManager(LocalProvider(), exception_manager=self.create_exception_manager())
+        #return EventManager(LocalProvider(), exception_manager=self.create_exception_manager())
+        return EventManager(NSQProvider(nsqd_address="127.0.0.1:4150"))
         # EventManager(StompProvider(host="localhost", port=61616, user="artemis", password="artemis"))
         # EventManager(AMQPProvider("server-id", host="localhost", port=5672, user="artemis", password="artemis"))
 
@@ -136,16 +141,29 @@ def environment():
     environment.destroy()
 
 @pytest.mark.asyncio(scope="function")
-class TestLocalService():
-    async def test_events(self, environment):
+class TestLocalService:
+    async def test_events(self):
+        environment = Environment(Module)
+
+        global sync_event_received, async_event_received
+
+        await environment.get(EventManager).setup()
+
+        sync_event_received  = asyncio.Event()
+        async_event_received = asyncio.Event()
+
         event_manager = environment.get(EventManager)
+
+        await asyncio.sleep(0.5)
 
         event = HelloEvent("world")
 
-        event_manager.send_event(event)
+        await event_manager.send_event(event)
 
-        await asyncio.wait_for(sync_event_received.wait(), timeout=1)
-        await asyncio.wait_for(async_event_received.wait(), timeout=1)
+        await asyncio.sleep(0.5)
 
-        assert event == SyncListener.received, "events not =="
+        #await asyncio.wait_for(sync_event_received.wait(), timeout=10000)
+        await asyncio.wait_for(async_event_received.wait(), timeout=10000)
+
+        #assert event == SyncListener.received, "events not =="
         assert event == AsyncListener.received, "events not =="

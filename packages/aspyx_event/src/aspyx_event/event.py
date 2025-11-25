@@ -107,12 +107,30 @@ class EventManager:
                 str: the value
            """
 
+    class AbstractEnvelope(Envelope):
+        # constructor
+
+        def __init__(self, body="", headers=None):
+            self.body = body
+            self.headers = headers or {}
+
+        # implement envelope
+
+        def get_body(self) -> str:
+            return self.body
+
+        def set(self, key: str, value: str):
+            self.headers[key] = value
+
+        def get(self, key: str) -> str:
+            return self.headers.get(key,"")
+
     class EnvelopePipeline(ABC):
         """
         An interceptor for sending and receiving events
         """
         @abstractmethod
-        def send(self, envelope: EventManager.Envelope, event_descriptor: EventManager.EventDescriptor):
+        async def send(self, envelope: EventManager.Envelope, event_descriptor: EventManager.EventDescriptor):
             """
             interceptor on the sending side
             Args:
@@ -212,7 +230,7 @@ class EventManager:
 
         provider.manager = self
 
-        self.setup()
+        #self.setup()
 
     # inject
 
@@ -249,10 +267,10 @@ class EventManager:
     def listen_to(self, listener: EventManager.EventListenerDescriptor):
         self.provider.listen_to(listener)
 
-    def setup(self):
+    async def setup(self):
         # start
 
-        self.provider.start()
+        await self.provider.start()
 
         # listeners
 
@@ -309,7 +327,7 @@ class EventManager:
 
     # public
 
-    def send_event(self, event: Any) -> None:
+    async def send_event(self, event: Any) -> None:
         """
         send an event.
 
@@ -320,7 +338,7 @@ class EventManager:
 
         envelope = self.provider.create_envelope(body=self.to_json(event), headers={})
 
-        self.pipeline.send(envelope, descriptor)
+        await self.pipeline.send(envelope, descriptor)
 
 def event(name="", broadcast=False, durable=False):
     """
@@ -389,8 +407,8 @@ class AbstractEnvelopePipeline(EventManager.EnvelopePipeline):
 
     # public
 
-    def proceed_send(self, envelope: EventManager.Envelope, event_descriptor: EventManager.EventDescriptor):
-        self.next.send(envelope, event_descriptor)
+    async def proceed_send(self, envelope: EventManager.Envelope, event_descriptor: EventManager.EventDescriptor):
+        await self.next.send(envelope, event_descriptor)
 
     def proceed_handle(self, envelope: EventManager.Envelope, descriptor: EventManager.EventListenerDescriptor):
         self.next.handle(envelope, descriptor)
