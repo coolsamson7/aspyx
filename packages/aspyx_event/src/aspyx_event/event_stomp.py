@@ -69,7 +69,7 @@ class StompProvider(EventManager.Provider, stomp.ConnectionListener):
 
         event_descriptor = EventManager.events_by_name.get(event_name, None)
 
-        envelope = self.create_envelope(body=body, headers=headers)
+        envelope = self.create_receiver_envelope(frame) #TODO
 
         self.manager.pipeline.handle(envelope, event_descriptor)
 
@@ -94,8 +94,8 @@ class StompProvider(EventManager.Provider, stomp.ConnectionListener):
 
     # implement Provider
 
-    def create_envelope(self, body="", headers = None) -> EventManager.Envelope:
-        return StompProvider.StompEnvelope(body=body, headers=headers)
+    #def create_envelope(self, body="", headers = None) -> EventManager.Envelope:
+    #TODO    return StompProvider.StompEnvelope(body=body, headers=headers)
 
     def listen_to(self, listener: EventManager.EventListenerDescriptor) -> None:
         self.connection.subscribe(destination=f"/queue/{listener.event.name}", id=f"id-{listener.event.name}", ack="auto")

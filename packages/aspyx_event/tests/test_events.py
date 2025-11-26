@@ -9,6 +9,7 @@ from typing import Optional
 
 from aspyx.exception import ExceptionManager, handle
 from aspyx.util import Logger
+from packages.aspyx_event.tests.provider import LocalProvider
 
 #from .provider import LocalProvider
 
@@ -127,18 +128,10 @@ class Module:
 
     @create()
     def create_event_manager(self) -> EventManager:
-        #return EventManager(LocalProvider(), exception_manager=self.create_exception_manager())
-        return EventManager(NSQProvider(nsqd_address="127.0.0.1:4150"))
+        return EventManager(LocalProvider(), exception_manager=self.create_exception_manager())
+        #return EventManager(NSQProvider(nsqd_address="127.0.0.1:4150", encoding="cbor"))
         # EventManager(StompProvider(host="localhost", port=61616, user="artemis", password="artemis"))
         # EventManager(AMQPProvider("server-id", host="localhost", port=5672, user="artemis", password="artemis"))
-
-@pytest.fixture(scope="session")
-def environment():
-    environment = Environment(Module)  # start server
-
-    yield environment
-
-    environment.destroy()
 
 @pytest.mark.asyncio(scope="function")
 class TestLocalService:

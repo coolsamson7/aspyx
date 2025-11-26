@@ -1,8 +1,7 @@
-from typing import Optional
+from typing import Optional, Any
 
 from aspyx.di import Environment, inject_environment
 from aspyx_event import EventManager
-
 
 class LocalProvider(EventManager.Provider):
     """
@@ -10,17 +9,21 @@ class LocalProvider(EventManager.Provider):
     """
     # local classes
 
-    class TestEnvelope(EventManager.Envelope):
+    class LocalEnvelope(EventManager.Envelope[Any]):
         # constructor
 
-        def __init__(self, body="", headers=None):
-            self.body = body
-            self.headers = headers or {}
+        def __init__(self, event: Any):
+            super().__init__(event)
+
+            self.headers = {}
 
         # implement envelope
 
-        def get_body(self) -> str:
-            return self.body
+        def encode(self) -> Any:
+            return self.event
+
+        def decode(self, message) -> Any:
+            return message
 
         def set(self, key: str, value: str):
             self.headers[key] = value
@@ -28,10 +31,22 @@ class LocalProvider(EventManager.Provider):
         def get(self, key: str) -> str:
             return self.headers.get(key,"")
 
+    class LocalEnvelopeFactory(EventManager.EnvelopeFactory):
+        def __init__(self):
+            pass
+
+        # implement
+
+        def for_send(self, provider: EventManager.Provider, event: Any) -> EventManager.Envelope:
+            return LocalProvider.LocalEnvelope(event)
+
+        def for_receive(self,  provider: EventManager.Provider, message: Any, descriptor: EventManager.EventDescriptor) -> EventManager.Envelope:
+            return LocalProvider.LocalEnvelope(message)
+
     # constructor
 
     def __init__(self):
-        super().__init__()
+        super().__init__(LocalProvider.LocalEnvelopeFactory())
 
         self.environment : Optional[Environment] = None
         self.listeners : list[EventManager.EventListenerDescriptor] = []
@@ -44,18 +59,15 @@ class LocalProvider(EventManager.Provider):
 
     # implement Provider
 
-    def create_envelope(self, body="", headers = None) -> EventManager.Envelope:
-        return LocalProvider.TestEnvelope(body=body, headers=headers)
-
     def listen_to(self, listener: EventManager.EventListenerDescriptor) -> None:
         self.listeners.append(listener)
 
     # implement EnvelopePipeline
 
-    def send(self, envelope: EventManager.Envelope, event_descriptor: EventManager.EventDescriptor):
+    async def send(self, envelope: EventManager.Envelope, event_descriptor: EventManager.EventDescriptor):
         for listener in self.listeners:
             if listener.event is event_descriptor:
                 self.manager.pipeline.handle(envelope, listener)
 
     def handle(self, envelope: EventManager.Envelope, event_listener_descriptor: EventManager.EventListenerDescriptor):
-        self.manager.dispatch_event(event_listener_descriptor, envelope.get_body())
+        self.manager.dispatch_event(event_listener_descriptor, envelope.event)

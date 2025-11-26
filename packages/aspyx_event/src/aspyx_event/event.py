@@ -9,7 +9,7 @@ import json
 import logging
 
 from abc import ABC, abstractmethod
-from typing import Type, TypeVar, Generic, Any, Optional, Coroutine
+from typing import Type, TypeVar, Generic, Any, Optional, Coroutine, Dict
 
 from aspyx.exception import ExceptionManager
 from aspyx.reflection import Decorators
@@ -72,18 +72,39 @@ class EventManager:
             self.group = group
             self.per_process = per_process
 
-    class Envelope(ABC):
+    T = TypeVar("T")
+
+    class Envelope(Generic[T], ABC):
         """
         Wrapper around an event while being received or sent.
         """
-        @abstractmethod
-        def get_body(self) -> str:
-            """
-            return the body as a str
 
-            Returns:
-                str: the body
-            """
+        # constructor
+
+        def __init__(self, event: Optional[Any] = None):
+            self.event = event
+
+        # encoding
+
+        @abstractmethod
+        def encode(self) -> T:
+            ...
+
+        @abstractmethod
+        def decode(self, message) -> Any:
+            ...
+
+        # convenience methods
+
+        def to_json(self, obj) -> str:
+            dict = get_serializer(type(obj))(obj)
+
+            return json.dumps(dict)
+
+        def from_json(self, json_str: str, type: Type) -> str:
+            return get_deserializer(type)(json.loads(json_str))
+
+        # header methods
 
         @abstractmethod
         def set(self, key: str, value: str) -> None:
@@ -125,6 +146,15 @@ class EventManager:
         def get(self, key: str) -> str:
             return self.headers.get(key,"")
 
+    class EnvelopeFactory(ABC):
+        @abstractmethod
+        def for_send(self, provider: EventManager.Provider, event: Any) -> EventManager.Envelope:
+            pass
+
+        @abstractmethod
+        def for_receive(self,  provider: EventManager.Provider, message: Any, descriptor: EventManager.EventDescriptor) -> EventManager.Envelope:
+            pass
+
     class EnvelopePipeline(ABC):
         """
         An interceptor for sending and receiving events
@@ -151,22 +181,33 @@ class EventManager:
         """
         The bridge to a low-level queuing library.
         """
+
+        # slots
+
+        __slots__ = [
+            "manager",
+            "envelope_factory"
+        ]
+
         # constructor
 
-        def __init__(self):
+        def __init__(self, envelope_factory: EventManager.EnvelopeFactory):
             self.manager : Optional[EventManager] = None
+            self.envelope_factory = envelope_factory
 
         # abstract
 
-        def start(self):
+        async def start(self):
             pass
 
         def stop(self):
             pass
 
-        @abstractmethod
-        def create_envelope(self, body="", headers = None) -> EventManager.Envelope:
-            pass
+        def create_sender_envelope(self, event: Any) -> EventManager.Envelope:
+            return self.envelope_factory.for_send(self, event)
+
+        def create_receiver_envelope(self, message: Any, descriptor: EventManager.EventDescriptor) -> EventManager.Envelope:
+            return self.envelope_factory.for_receive(self, message, descriptor=descriptor)
 
         @abstractmethod
         def listen_to(self, listener: EventManager. EventListenerDescriptor) -> None:
@@ -292,8 +333,8 @@ class EventManager:
 
         return json.dumps(dict)
 
-    def dispatch_event(self, descriptor: EventManager.EventListenerDescriptor, body: Any):
-        event = get_deserializer(descriptor.event.type)(json.loads(body))
+    def dispatch_event(self, descriptor: EventManager.EventListenerDescriptor, event: Any):
+        #event = get_deserializer(descriptor.event.type)(json.loads(body)) # TODO!!!!!!!!
 
         listener = self.get_listener(descriptor.type)
 
@@ -336,7 +377,7 @@ class EventManager:
         """
         descriptor = self.get_event_descriptor(type(event))
 
-        envelope = self.provider.create_envelope(body=self.to_json(event), headers={})
+        envelope = self.provider.create_sender_envelope(event)
 
         await self.pipeline.send(envelope, descriptor)
 

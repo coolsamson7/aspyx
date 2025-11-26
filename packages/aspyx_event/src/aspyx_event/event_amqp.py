@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 import threading
+from typing import Any, Dict, Optional
 
 from proton import Message, Event, Handler, Sender, Receiver
 from proton.handlers import MessagingHandler
@@ -27,17 +28,26 @@ class AMQPProvider(MessagingHandler, EventManager.Provider):
 
             self.provider = provider
 
-    class AMQPEnvelope(EventManager.Envelope):
+    class AMQPEnvelope(EventManager.Envelope[str]):
         # constructor
 
-        def __init__(self, body="", headers=None):
-            self.body = body
-            self.headers = headers or {}
+        def __init__(self, provider: EventManager.Provider, from_event: Optional[Any] = None, from_message: Optional[Any] = None):
+            super().__init__(from_event)
+
+            self.provider = provider
+            self.event = from_event
+            self.headers : Dict[str,Any] = {}
+            if from_message is not None:
+                self.event = self.decode(from_message)
 
         # implement envelope
 
-        def get_body(self) -> str:
-            return self.body
+        def encode(self) -> str:
+            return self.provider.to_json(self.event)
+
+        def decode(self, message: Any):
+            self.headers = message.properties
+            self.event =  self.provider.from_json(message.body)
 
         def set(self, key: str, value: str):
             self.headers[key] = value
@@ -45,11 +55,25 @@ class AMQPProvider(MessagingHandler, EventManager.Provider):
         def get(self, key: str) -> str:
             return self.headers.get(key,"")
 
+    class AMQEnvelopeFactory(EventManager.EnvelopeFactory):
+        # implement
+
+        def for_send(self,  provider: EventManager.Provider, event: Any) -> EventManager.Envelope:
+            #body = self.to_json(event), headers = {}
+            return AMQPProvider.AMQEnvelope(provider, from_event=event)
+
+        def for_receive(self,  provider: EventManager.Provider, message: Any, descriptor: EventManager.EventDescriptor) -> EventManager.Envelope:
+            return AMQPProvider.AMQEnvelope(provider, from_message=message)
+
     # constructor
 
     def __init__(self, server_name: str,  host="localhost", port=61616, user = "", password = ""):
+        super().__init__(AMQPProvider.AMQEnvelopeFactory())
+
+        # TODO WTF?
+
         MessagingHandler.__init__(self)
-        EventManager.Provider.__init__(self)
+        #EventManager.Provider.__init__(self)
 
         self.server_name = server_name
         self.host = host
@@ -115,7 +139,7 @@ class AMQPProvider(MessagingHandler, EventManager.Provider):
     def dispatch(self, event: Event, listener: EventManager.EventListenerDescriptor):
         AMQPProvider.logger.debug("on_message")
 
-        envelope = self.AMQPEnvelope(body=event.message.body, headers = event.message.properties)
+        envelope = self.envelope_factory.for_receive(event.message)
 
         try:
             self.manager.pipeline.handle(envelope, listener)
@@ -187,11 +211,8 @@ class AMQPProvider(MessagingHandler, EventManager.Provider):
 
     # implement Provider
 
-    def start(self):
+    async def start(self):
         self.thread.start()
-
-    def create_envelope(self, body="", headers = None) -> EventManager.Envelope:
-        return AMQPProvider.AMQPEnvelope(body=body, headers=headers)
 
     def listen_to(self, listener: EventManager.EventListenerDescriptor) -> None:
         self._ready.wait(timeout=5)
