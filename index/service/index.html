@@ -1,0 +1,2244 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Aspyx is a lightweight DI and AOP framework for Python.">
+      
+      
+        <meta name="author" content="Andreas Ernst">
+      
+      
+        <link rel="canonical" href="https://coolsamson7.github.io/aspyx/index/service/">
+      
+      
+        <link rel="prev" href="../threading/">
+      
+      
+        <link rel="next" href="../event/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+    
+    
+      
+        <title>Service - Aspyx</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.618322db.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#service" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Aspyx" class="md-header__button md-logo" aria-label="Aspyx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Aspyx
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Service
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/coolsamson7/aspyx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../introduction/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Home
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../api/util/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  API Reference
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Aspyx" class="md-nav__button md-logo" aria-label="Aspyx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Aspyx
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/coolsamson7/aspyx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_1" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_1" id="__nav_1_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_1_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Home
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../introduction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../environment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../aop/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AOP
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reflection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reflection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../threading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threading
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Service
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#introduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Introduction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#service-and-component-declaration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Service and Component declaration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#service-and-component-implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Service and Component implementation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#health-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Health Checks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#service-manager" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Service Manager
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#component-registry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Component Registry
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#channels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Channels
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Channels">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#performance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rest-calls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rest Calls
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#intercepting-calls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Intercepting calls
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fastapi-server" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FastAPI server
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#session" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Session
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authorization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authorization
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementing-channels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementing Channels
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../event/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../versions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Version History
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_1" id="__nav_2_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/util/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Util
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/reflection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reflection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/threading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threading
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/exception/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exception
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/di/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/aop/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AOP
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_2" id="__nav_2_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Service
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Service
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/server/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/registries/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Registries
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/channels/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Channels
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/healthcheck/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Health Checks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/session/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Session
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/authorization.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Authorization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/event/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#introduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Introduction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#service-and-component-declaration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Service and Component declaration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#service-and-component-implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Service and Component implementation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#health-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Health Checks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#service-manager" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Service Manager
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#component-registry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Component Registry
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#channels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Channels
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Channels">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#performance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rest-calls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rest Calls
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#intercepting-calls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Intercepting calls
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fastapi-server" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FastAPI server
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#session" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Session
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authorization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authorization
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementing-channels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementing Channels
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="service">Service<a class="headerlink" href="#service" title="Permanent link">&para;</a></h1>
+<h2 id="introduction">Introduction<a class="headerlink" href="#introduction" title="Permanent link">&para;</a></h2>
+<p>The Aspyx service library is built on top of the DI core framework and adds a microservice based architecture,
+that lets you deploy, discover and call services with different remoting protocols and pluggable discovery services.</p>
+<p>The basic design consists of four different concepts:</p>
+<div class="admonition info">
+<p class="admonition-title">Service</p>
+</div>
+<p>defines a group of methods that can be called either locally or remotely. 
+  These methods represent the functional interface exposed to clients — similar to an interface in traditional programming</p>
+<div class="admonition info">
+<p class="admonition-title">Component</p>
+</div>
+<p>a component bundles one or more services and declares the channels (protocols) used to expose them.
+  Think of a component as a deployment unit or module.</p>
+<div class="admonition info">
+<p class="admonition-title">Component Registry </p>
+</div>
+<p>acts as the central directory for managing available components.
+  It allows the framework to register, discover, and resolve components and their services.</p>
+<div class="admonition info">
+<p class="admonition-title">Channel</p>
+</div>
+<p>is a pluggable transport layer that defines how service method invocations are transmitted and handled.</p>
+<p>Let's look at the "interface" layer first.</p>
+<p><strong>Example</strong>:
+<div class="highlight"><pre><span></span><code><span class="nd">@service</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;test-service&quot;</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;test service&quot;</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">TestService</span><span class="p">(</span><span class="n">Service</span><span class="p">):</span>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">hello</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">pass</span>
+
+<span class="nd">@component</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;test-component&quot;</span><span class="p">,</span> <span class="n">services</span> <span class="o">=</span><span class="p">[</span><span class="n">TestService</span><span class="p">])</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">TestComponent</span><span class="p">(</span><span class="n">Component</span><span class="p">):</span>
+    <span class="k">pass</span>
+</code></pre></div></p>
+<p>After booting the DI infrastructure with a main module we could already call a service:</p>
+<p><strong>Example</strong>:</p>
+<div class="highlight"><pre><span></span><code><span class="nd">@module</span><span class="p">(</span><span class="n">imports</span><span class="o">=</span><span class="p">[</span><span class="n">ServiceModule</span><span class="p">])</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Module</span><span class="p">:</span>
+    <span class="nd">@create</span><span class="p">()</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">create_registry</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ConsulComponentRegistry</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">ConsulComponentRegistry</span><span class="p">(</span><span class="n">Server</span><span class="o">.</span><span class="n">port</span><span class="p">,</span> <span class="n">Consul</span><span class="p">(</span><span class="n">host</span><span class="o">=</span><span class="s2">&quot;localhost&quot;</span><span class="p">,</span> <span class="n">port</span><span class="o">=</span><span class="mi">8500</span><span class="p">))</span>  <span class="c1"># a consul based registry!</span>
+
+
+<span class="n">environment</span> <span class="o">=</span> <span class="n">Environment</span><span class="p">(</span><span class="n">Module</span><span class="p">)</span>
+<span class="n">service_manager</span> <span class="o">=</span> <span class="n">environment</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">ServiceManager</span><span class="p">)</span>
+
+<span class="n">service</span> <span class="o">=</span> <span class="n">service_manager</span><span class="o">.</span><span class="n">get_service</span><span class="p">(</span><span class="n">TestService</span><span class="p">)</span>
+
+<span class="n">service</span><span class="o">.</span><span class="n">hello</span><span class="p">(</span><span class="s2">&quot;world&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p>The technical details are completely transparent, as a dynamic proxy encapsulates the internals.</p>
+<p>As we can also host implementations, lets look at this side as well:</p>
+<div class="highlight"><pre><span></span><code><span class="nd">@implementation</span><span class="p">()</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">TestComponentImpl</span><span class="p">(</span><span class="n">AbstractComponent</span><span class="p">,</span> <span class="n">TestComponent</span><span class="p">):</span>
+    <span class="c1"># implement Component</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_addresses</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">port</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">ChannelAddress</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">ChannelAddress</span><span class="p">(</span><span class="s2">&quot;dispatch-json&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;http://</span><span class="si">{</span><span class="n">Server</span><span class="o">.</span><span class="n">get_local_ip</span><span class="p">()</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">port</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)]</span>
+
+<span class="nd">@implementation</span><span class="p">()</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">TestServiceImpl</span><span class="p">(</span><span class="n">TestService</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">hello</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;hello </span><span class="si">{</span><span class="n">message</span><span class="si">}</span><span class="s2">&quot;</span>
+</code></pre></div>
+<p>The interesting part if the <code>get_addresses</code> method that return a list of channel addresses, that can be used to execute remote calls.
+In this case a channel is used that exposes a single http endpoint, that will dispatch to the correct service method.
+This information is registered with the appropriate component registry and is used by other processes. </p>
+<p>The required - <code>FastAPI</code> - infrastructure to expose those services requires:</p>
+<ul>
+<li>a <code>FastAPI</code> instance</li>
+<li>an injectable <code>FastAPIServer</code></li>
+<li>and a final <code>boot</code> call with the root module, which will return an <code>Environment</code></li>
+</ul>
+<div class="highlight"><pre><span></span><code><span class="n">fast_api</span> <span class="o">=</span> <span class="n">FastAPI</span><span class="p">()</span> <span class="c1"># so you can run it with uvivorn from command-line</span>
+
+<span class="nd">@module</span><span class="p">(</span><span class="n">imports</span><span class="o">=</span><span class="p">[</span><span class="n">ServiceModule</span><span class="p">])</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Module</span><span class="p">:</span>
+    <span class="nd">@create</span><span class="p">()</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">create_server</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>  <span class="n">service_manager</span><span class="p">:</span> <span class="n">ServiceManager</span><span class="p">,</span> <span class="n">component_registry</span><span class="p">:</span> <span class="n">ComponentRegistry</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FastAPIServer</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">FastAPIServer</span><span class="p">(</span><span class="n">fastapi</span><span class="p">,</span> <span class="n">service_manager</span><span class="p">,</span> <span class="n">component_registry</span><span class="p">)</span>
+
+
+<span class="n">environment</span> <span class="o">=</span> <span class="n">FastAPIServer</span><span class="o">.</span><span class="n">boot</span><span class="p">(</span><span class="n">Module</span><span class="p">,</span> <span class="n">host</span><span class="o">=</span><span class="s2">&quot;0.0.0.0&quot;</span><span class="p">,</span> <span class="n">port</span><span class="o">=</span><span class="mi">8000</span><span class="p">)</span>
+</code></pre></div>
+<p>Of course, service can also be called locally. In case of multiple possible channels, a keyword argument is used to 
+determine a specific channel. As a local channel has the name "local", the appropriate call is:</p>
+<div class="highlight"><pre><span></span><code> <span class="n">service</span> <span class="o">=</span> <span class="n">service_manager</span><span class="o">.</span><span class="n">get_service</span><span class="p">(</span><span class="n">TestService</span><span class="p">,</span> <span class="n">preferred_channel</span><span class="o">=</span><span class="s2">&quot;local&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="features">Features<a class="headerlink" href="#features" title="Permanent link">&para;</a></h2>
+<p>The library offers:</p>
+<ul>
+<li>sync and async support</li>
+<li>multiple and extensible channel implementations supporting dataclasses and pydantic data models.</li>
+<li>ability to intercept http calls via the AOP abilities ( think of bearer tokens ) </li>
+<li><code>fastapi</code> based channels covering simple rest endpoints including <code>msgpack</code> support.</li>
+<li>thread-safe <code>httpx</code> based clients for dispatching channels and simple rest endpoint with the help of low-level decorators.</li>
+<li>registry implementation based on <code>consul</code></li>
+<li>support for configurable health checks</li>
+</ul>
+<p>As well as the DI and AOP core, all mechanisms are heavily optimized.
+A simple benchmark resulted in message round-trips in significantly under a ms per call.</p>
+<p>Let's see some details</p>
+<h2 id="service-and-component-declaration">Service and Component declaration<a class="headerlink" href="#service-and-component-declaration" title="Permanent link">&para;</a></h2>
+<p>Every service needs to inherit from the "tagging interface" <code>Service</code></p>
+<div class="highlight"><pre><span></span><code><span class="nd">@service</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;test-service&quot;</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;test service&quot;</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">TestService</span><span class="p">(</span><span class="n">Service</span><span class="p">):</span>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">hello</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">pass</span>
+</code></pre></div>
+<p>The decorator can add a name and a description. If <code>name</code> is not set, the class name converted to snake case is used.</p>
+<p>A component needs to derive from <code>Component</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="nd">@component</span><span class="p">(</span><span class="n">services</span> <span class="o">=</span><span class="p">[</span><span class="n">TestService</span><span class="p">])</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">TestComponent</span><span class="p">(</span><span class="n">Component</span><span class="p">):</span>
+    <span class="k">pass</span>
+</code></pre></div>
+<p>The <code>services</code> argument references a list of service interfaces that are managed by this component, meaning that they all are 
+exposed by the same channels.</p>
+<p><code>Component</code> defines the abstract methods:</p>
+<ul>
+<li>
+<p><code>def startup(self) -&gt; None</code>
+   called initially after booting the system</p>
+</li>
+<li>
+<p><code>def shutdown(self) -&gt; None:</code>
+   called before shutting fown the system</p>
+</li>
+<li>
+<p><code>def get_addresses(self, port: int) -&gt; list[ChannelAddress]:</code>
+   return  a list of available <code>ChannelAddress</code>es that this component exposes</p>
+</li>
+<li>
+<p><code>def get_status(self) -&gt; ComponentStatus:</code>
+   return the status of this component ( one of the <code>ComponentStatus</code> enums <code>VIRGIN</code>, <code>RUNNING</code>, and <code>STOPPED</code>)</p>
+</li>
+<li>
+<p><code>async def get_health(self) -&gt; HealthCheckManager.Health:</code>
+   return the health status of a component implementation.</p>
+</li>
+</ul>
+<h2 id="service-and-component-implementation">Service and Component implementation<a class="headerlink" href="#service-and-component-implementation" title="Permanent link">&para;</a></h2>
+<p>Service implementations implement the corresponding interface and are decorated with <code>@implementation</code></p>
+<div class="highlight"><pre><span></span><code><span class="nd">@implementation</span><span class="p">()</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">TestServiceImpl</span><span class="p">(</span><span class="n">TestService</span><span class="p">):</span>
+    <span class="o">...</span>
+</code></pre></div>
+<p>The constructor is required since the instances are managed by the DI framework.</p>
+<p>Component implementations derive from the interface and the abstract base class <code>AbstractComponent</code></p>
+<div class="highlight"><pre><span></span><code><span class="nd">@implementation</span><span class="p">()</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">TestComponentImpl</span><span class="p">(</span><span class="n">AbstractComponent</span><span class="p">,</span> <span class="n">TestComponent</span><span class="p">):</span>
+    <span class="c1"># implement Component</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_addresses</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">port</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">ChannelAddress</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">ChannelAddress</span><span class="p">(</span><span class="s2">&quot;dispatch-json&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;http://</span><span class="si">{</span><span class="n">Server</span><span class="o">.</span><span class="n">get_local_ip</span><span class="p">()</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">port</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)]</span>
+</code></pre></div>
+<p>As a minimum you have to declare the constructor and the <code>get_addresses</code> method, that exposes channel addresses</p>
+<h2 id="health-checks">Health Checks<a class="headerlink" href="#health-checks" title="Permanent link">&para;</a></h2>
+<p>Every component can declare a HTTP health endpoint and the corresponding logic to compute the current status.</p>
+<p>Two additional things have to be done:</p>
+<ul>
+<li>adding a <code>@health(&lt;endpoint&gt;)</code> decorator to the class</li>
+<li>implementing the <code>get_health()</code> method that returns a <code>HealthCheckManager.Health</code></li>
+</ul>
+<p>While you can instantiate the <code>Health</code> class directly via</p>
+<div class="highlight"><pre><span></span><code>HealthCheckManager.Health(HealtStatus.OK)
+</code></pre></div>
+<p>it typically makes more sense to let the system execute a number of configured checks and compute the overall result automatically.</p>
+<p>For this purpose injectable classes can be decorated with <code>@health_checks()</code> that contain methods in turn decorated with <code>@health_check</code></p>
+<p><strong>Example</strong>:</p>
+<div class="highlight"><pre><span></span><code><span class="nd">@health_checks</span><span class="p">()</span>
+<span class="nd">@injectable</span><span class="p">()</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Checks</span><span class="p">:</span>
+    <span class="nd">@health_check</span><span class="p">(</span><span class="n">fail_if_slower_than</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">check_performance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">result</span><span class="p">:</span> <span class="n">HealthCheckManager</span><span class="o">.</span><span class="n">Result</span><span class="p">):</span>
+        <span class="o">...</span> <span class="c1"># should be done in under a second</span>
+
+    <span class="nd">@health_check</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;check&quot;</span><span class="p">,</span> <span class="n">cache</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">check</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">result</span><span class="p">:</span> <span class="n">HealthCheckManager</span><span class="o">.</span><span class="n">Result</span><span class="p">):</span>
+        <span class="n">ok</span> <span class="o">=</span> <span class="o">...</span>
+        <span class="n">result</span><span class="o">.</span><span class="n">set_status</span><span class="p">(</span><span class="k">if</span> <span class="n">ok</span> <span class="n">HealthStatus</span><span class="o">.</span><span class="n">OK</span> <span class="k">else</span> <span class="n">HealthStatus</span><span class="o">.</span><span class="n">ERROR</span><span class="p">)</span>
+</code></pre></div>
+<p>The methods are expected to have a single parameter of type <code>HealthCheckManager.Result</code> that can be used to set the status including detail information with</p>
+<div class="highlight"><pre><span></span><code>set_status(status: HealthStatus, details = &quot;&quot;)
+</code></pre></div>
+<p>When called, the default is already <code>OK</code>.</p>
+<p>The decorator accepts a couple of parameters:</p>
+<ul>
+<li><code>fail_if_slower_than=0</code> 
+   time in <code>s</code> that the check is expected to take as a maximum. As soon as the time is exceeded, the status is set to <code>ERROR</code></li>
+<li><code>cache</code>
+   time in 's' that the last result is cached. This is done in order to prevent health-checks putting even more strain on a heavily used system.</li>
+</ul>
+<h2 id="service-manager">Service Manager<a class="headerlink" href="#service-manager" title="Permanent link">&para;</a></h2>
+<p><code>ServiceManager</code> is the central class used to retrieve service proxies.</p>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_service</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">service_type</span><span class="p">:</span> <span class="n">Type</span><span class="p">[</span><span class="n">T</span><span class="p">],</span> <span class="n">preferred_channel</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">T</span>
+</code></pre></div>
+<ul>
+<li><code>type</code> is the requested service interface</li>
+<li><code>preferred_channel</code> the name of the preferred channel.</li>
+</ul>
+<p>If not specified, the first registered channel is used, which btw. is a local channel - called <code>local</code> -  in case of implementing services.</p>
+<p>The default can be set globally with the method <code>set_preferred_channel(channel: str)</code></p>
+<p>Injecting services is also possible via the decorator <code>@inject_service()</code></p>
+<p><strong>Example</strong>:</p>
+<div class="highlight"><pre><span></span><code><span class="nd">@inject_service</span><span class="p">()</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">set_service</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">service</span><span class="p">:</span> <span class="n">TestService</span><span class="p">)</span>
+   <span class="bp">self</span><span class="o">.</span><span class="n">service</span> <span class="o">=</span> <span class="n">service</span>
+</code></pre></div>
+<p>The decorator accepts a <code>preferred_channel</code> keyword.</p>
+<h2 id="component-registry">Component Registry<a class="headerlink" href="#component-registry" title="Permanent link">&para;</a></h2>
+<p>The component registry is the place where component implementations are registered together with their supported channel addresses.
+Regular health checks guarantee, that the retrieved addresses relate to healthy servers only.</p>
+<p>Once a client binds to a specific address, the infrastructure will notify the established channels about any changes in form of added or removed URLs,
+giving them the chance to react accordingly.</p>
+<p>In addition to a <code>LocalComponentRegistry</code> ( which is used for testing purposes ) the only implementation is</p>
+<p><code>ConsulComponentRegistry</code></p>
+<p>Constructor arguments are</p>
+<ul>
+<li><code>port: int</code> the own port</li>
+<li><code>consul: Consul</code> the consul instance</li>
+</ul>
+<p><strong>Example</strong>:</p>
+<div class="highlight"><pre><span></span><code><span class="n">ConsulComponentRegistry</span><span class="p">(</span><span class="n">Server</span><span class="o">.</span><span class="n">port</span><span class="p">,</span> <span class="n">consul</span><span class="o">.</span><span class="n">Consul</span><span class="p">(</span><span class="n">host</span><span class="o">=</span><span class="s2">&quot;localhost&quot;</span><span class="p">,</span> <span class="n">port</span><span class="o">=</span><span class="mi">8500</span><span class="p">))</span>
+</code></pre></div>
+<p>Several configuration values are respected:</p>
+<table>
+<thead>
+<tr>
+<th>Configuration</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>consul.watchdog.interval</td>
+<td>Time in s, that consul is polled.</td>
+<td>5s</td>
+</tr>
+<tr>
+<td>consul.healthcheck:interval</td>
+<td>Interval in which health checks are executed</td>
+<td>10s</td>
+</tr>
+<tr>
+<td>consul.healthcheck:timeout</td>
+<td>Health check timeout</td>
+<td>5s</td>
+</tr>
+<tr>
+<td>consul.healthcheck:deregister</td>
+<td>Time period after which unhealthy instances are removed</td>
+<td>5m</td>
+</tr>
+</tbody>
+</table>
+<h2 id="channels">Channels<a class="headerlink" href="#channels" title="Permanent link">&para;</a></h2>
+<p>Channels implement the possible transport layer protocols. In the sense of a dynamic proxy, they are the invocation handlers!</p>
+<p>Several channels are implemented:</p>
+<ul>
+<li><code>dispatch-json</code>
+   channel that dispatches generic <code>Request</code> objects via a generic <code>invoke</code> POST-call</li>
+<li><code>dispatch-msgpack</code>
+   channel that dispatches generic <code>Request</code> objects via a generic <code>invoke</code> POST-call after packing the json with msgpack</li>
+<li><code>dispatch-protobuf</code>
+   channel that dispatches binary parameters via a generic <code>invoke</code> POST-call after packing the parameters with protobuf</li>
+<li><code>rest</code>
+  channel that executes regular rest-calls as defined by a couple of decorators.</li>
+</ul>
+<p>All channels react on changed URLs as provided by the component registry.</p>
+<p>A so called <code>URLSelector</code> is used internally to provide URLs for every single call. Two subclasses exist that offer a different logic</p>
+<ul>
+<li><code>FirstURLSelector</code> always returns the first URL of the list of possible URLs</li>
+<li><code>RoundRobinURLSelector</code> switches sequentially between all URLs.</li>
+</ul>
+<p>To customize the behavior, an <code>around</code> advice can be implemented easily:</p>
+<p><strong>Example</strong>:</p>
+<div class="highlight"><pre><span></span><code><span class="nd">@advice</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">ChannelAdvice</span><span class="p">:</span>
+    <span class="nd">@around</span><span class="p">(</span><span class="n">methods</span><span class="p">()</span><span class="o">.</span><span class="n">named</span><span class="p">(</span><span class="s2">&quot;customize&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">of_type</span><span class="p">(</span><span class="n">Channel</span><span class="p">))</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">customize_channel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">invocation</span><span class="p">:</span> <span class="n">Invocation</span><span class="p">):</span>
+        <span class="n">channel</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">Channel</span><span class="p">,</span> <span class="n">invocation</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+        <span class="n">channel</span><span class="o">.</span><span class="n">select_round_robin</span><span class="p">()</span> <span class="c1"># or select_first_url()</span>
+
+        <span class="k">return</span> <span class="n">invocation</span><span class="o">.</span><span class="n">proceed</span><span class="p">()</span>
+</code></pre></div>
+<p>Several configuration values are respected:</p>
+<ul>
+<li><code>http.timeout</code>: timeout in s. Defaults to 1</li>
+</ul>
+<h3 id="performance">Performance<a class="headerlink" href="#performance" title="Permanent link">&para;</a></h3>
+<p>I benchmarked the different implementations with a recursive dataclass as an argument and return value.
+The avg response times - on a local server - where all below 1ms per call.</p>
+<ul>
+<li>rest calls are the slowest ( about 0.7ms )</li>
+<li>dispatching-json 20% faster</li>
+<li>dispatching-msgpack 30% faster</li>
+</ul>
+<p>The biggest advantage of the dispatching flavors is, that you don't have to worry about the additional decorators!</p>
+<h3 id="rest-calls">Rest Calls<a class="headerlink" href="#rest-calls" title="Permanent link">&para;</a></h3>
+<p>Invoking rest calls requires decorators and some marker annotations.</p>
+<p><strong>Example</strong>:</p>
+<div class="highlight"><pre><span></span><code><span class="nd">@service</span><span class="p">()</span>
+<span class="nd">@rest</span><span class="p">(</span><span class="s2">&quot;/api&quot;</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">TestService</span><span class="p">(</span><span class="n">Service</span><span class="p">):</span>
+    <span class="nd">@get</span><span class="p">(</span><span class="s2">&quot;/hello/</span><span class="si">{message}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">hello</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">pass</span>
+
+    <span class="nd">@post</span><span class="p">(</span><span class="s2">&quot;/post/&quot;</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Body</span><span class="p">(</span><span class="n">Data</span><span class="p">))</span> <span class="o">-&gt;</span> <span class="n">Data</span><span class="p">:</span>
+        <span class="k">pass</span>
+</code></pre></div>
+<p>The decorators <code>get</code>,  <code>put</code>,  <code>post</code> and  <code>delete</code> specify the methods.</p>
+<p>If the class is decorated with <code>@rest(&lt;prefix&gt;)</code>, the corresponding prefix will be appended at the beginning.</p>
+<p>Additional annotations are
+- <code>Body</code> the post body
+- <code>QueryParam</code>marked for query params</p>
+<p>You can skip the annotations, assuming the following heuristic:</p>
+<ul>
+<li>if no body is marked it will pick the first parameter which is a dataclass or a pydantic model</li>
+<li>all parameters which are not in the path or equal to the body are assumed to be query params.</li>
+</ul>
+<h3 id="intercepting-calls">Intercepting calls<a class="headerlink" href="#intercepting-calls" title="Permanent link">&para;</a></h3>
+<p>The client side HTTP calling is done with <code>httpx</code> instances of type <code>Httpx.Client</code> or <code>Httpx.AsyncClient</code>.</p>
+<p>To add the possibility to add interceptors - for token handling, etc. - the channel base class <code>HTTPXChannel</code> defines
+the methods <code>make_client()</code> and <code>make_async_client</code> that can be modified with an around advice.</p>
+<p><strong>Example</strong>:</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">InterceptingClient</span><span class="p">(</span><span class="n">httpx</span><span class="o">.</span><span class="n">Client</span><span class="p">):</span>
+    <span class="c1"># constructor</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">token_provider</span> <span class="o">=</span> <span class="o">...</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="c1"># override</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">request</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">url</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">headers</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;headers&quot;</span><span class="p">,</span> <span class="p">{})</span>
+        <span class="n">headers</span><span class="p">[</span><span class="s2">&quot;Authorization&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Bearer </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">token_provider</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;headers&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">headers</span>
+
+        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">request</span><span class="p">(</span><span class="n">method</span><span class="p">,</span> <span class="n">url</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+<span class="nd">@advice</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">ChannelAdvice</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">pass</span>
+
+    <span class="nd">@around</span><span class="p">(</span><span class="n">methods</span><span class="p">()</span><span class="o">.</span><span class="n">named</span><span class="p">(</span><span class="s2">&quot;make_client&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">of_type</span><span class="p">(</span><span class="n">HTTPXChannel</span><span class="p">))</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">make_client</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">invocation</span><span class="p">:</span> <span class="n">Invocation</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">InterceptingClient</span><span class="p">()</span>
+</code></pre></div>
+<h2 id="fastapi-server">FastAPI server<a class="headerlink" href="#fastapi-server" title="Permanent link">&para;</a></h2>
+<p>In order to expose components via HTTP, the corresponding infrastructure in form of a FastAPI server needs to be setup. </p>
+<div class="highlight"><pre><span></span><code><span class="n">fast_api</span> <span class="o">=</span> <span class="n">FastAPI</span><span class="p">()</span> <span class="c1"># so you can run it with uvicorn from command-line</span>
+
+<span class="nd">@module</span><span class="p">()</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Module</span><span class="p">:</span>
+    <span class="nd">@create</span><span class="p">()</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">create_server</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>  <span class="n">service_manager</span><span class="p">:</span> <span class="n">ServiceManager</span><span class="p">,</span> <span class="n">component_registry</span><span class="p">:</span> <span class="n">ComponentRegistry</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FastAPIServer</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">FastAPIServer</span><span class="p">(</span><span class="n">fastapi</span><span class="p">,</span> <span class="n">service_manager</span><span class="p">,</span> <span class="n">component_registry</span><span class="p">)</span>
+
+<span class="n">environment</span> <span class="o">=</span> <span class="n">FastAPIServer</span><span class="o">.</span><span class="n">boot</span><span class="p">(</span><span class="n">Module</span><span class="p">,</span> <span class="n">host</span><span class="o">=</span><span class="s2">&quot;0.0.0.0&quot;</span><span class="p">,</span> <span class="n">port</span><span class="o">=</span><span class="mi">8000</span><span class="p">)</span>
+</code></pre></div>
+<p>This setup will also expose all service interfaces decorated with the corresponding http decorators!
+No need to add any FastAPI decorators, since the mapping is already done internally! </p>
+<h2 id="session">Session<a class="headerlink" href="#session" title="Permanent link">&para;</a></h2>
+<p>TODO</p>
+<h2 id="authorization">Authorization<a class="headerlink" href="#authorization" title="Permanent link">&para;</a></h2>
+<p>TODO</p>
+<h2 id="implementing-channels">Implementing Channels<a class="headerlink" href="#implementing-channels" title="Permanent link">&para;</a></h2>
+<p>To implement a new channel, you only need to derive from one of the possible base classes ( <code>Channel</code> or <code>HTTPXChannel</code> that already has a <code>httpx</code> client)
+and decorate it with <code>@channel(&lt;name&gt;)</code></p>
+<p>The main methods to implement are <code>ìnvoke</code> and <code>ìnvoke_async</code></p>
+<p><strong>Example</strong>:</p>
+<div class="highlight"><pre><span></span><code><span class="nd">@channel</span><span class="p">(</span><span class="s2">&quot;fancy&quot;</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">FancyChannel</span><span class="p">(</span><span class="n">Channel</span><span class="p">):</span>
+    <span class="c1"># override</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">invoke</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">invocation</span><span class="p">:</span> <span class="n">DynamicProxy</span><span class="o">.</span><span class="n">Invocation</span><span class="p">):</span>
+        <span class="k">return</span> <span class="o">...</span>
+
+     <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">invoke_async</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">invocation</span><span class="p">:</span> <span class="n">DynamicProxy</span><span class="o">.</span><span class="n">Invocation</span><span class="p">):</span>
+        <span class="k">return</span> <span class="k">await</span> <span class="o">...</span>
+</code></pre></div>
+<h1 id="version-history">Version History<a class="headerlink" href="#version-history" title="Permanent link">&para;</a></h1>
+<p><strong>0.10.0</strong></p>
+<ul>
+<li>first release version</li>
+</ul>
+<p><strong>0.11.0</strong></p>
+<ul>
+<li>added protobuf support</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.indexes", "content.code.copy", "palette.toggle", "search.suggest", "search.highlight"], "search": "../../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      
+    
+  </body>
+</html>
