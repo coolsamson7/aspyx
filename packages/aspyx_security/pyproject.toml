@@ -1,0 +1,39 @@
+
+
+[project]
+name = "aspyx_security"
+version = "0.1.2"
+description = "Aspyx security framework"
+authors = [{ name = "Andreas Ernst", email = "andreas.ernst7@gmail.com" }]
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.9"
+dependencies = [
+    "aspyx>=1.9.1"
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build]
+source = "src"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/aspyx_security"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+
+[tool.hatch.envs.test]
+dependencies = [
+  ".",
+  "pytest",
+  "pytest-cov",
+  "pytest-asyncio",
+  "anyio",
+  "PyJWT"
+]
+
+[tool.hatch.metadata]
+allow-direct-references = true

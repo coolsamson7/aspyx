@@ -7,7 +7,8 @@ ASPYX_PATH="$ROOT_DIR/packages/aspyx"
 ASPYX_SERVICE_PATH="$ROOT_DIR/packages/aspyx_service"
 ASPYX_EVENT_PATH="$ROOT_DIR/packages/aspyx_event"
 ASPYX_JOB_PATH="$ROOT_DIR/packages/aspyx_job"
-ASSAIA_PATH="$ROOT_DIR/packages/assaia"
+ASPYX_PERSISTENCE_PATH="$ROOT_DIR/packages/aspyx_persistence"
+ASPYX_SECURITY_PATH="$ROOT_DIR/packages/aspyx_security"
 
 echo "Installing aspyx..."
 pip install -e "$ASPYX_PATH"
@@ -20,5 +21,11 @@ pip install -e "$ASPYX_EVENT_PATH"
 
 echo "Installing aspyx_job..."
 pip install -e "$ASSAIA_JOB_PATH"
+
+echo "Installing aspyx_security..."
+pip install -e "$ASSAIA_SECURITY_PATH"
+
+echo "Installing aspyx_persistence..."
+pip install -e "$ASSAIA_PERSISTENCE_PATH"
 
 echo "All done!"

@@ -14,6 +14,8 @@ projects = [
     "packages/aspyx_service",
     "packages/aspyx_event",
     "packages/aspyx_job",
+    "packages/aspyx_persistence",
+    "packages/aspyx_security",
 ]
 
 [tool.hatch.envs.default]
@@ -21,11 +23,6 @@ dependencies = [
     "pytest",
     "pytest-asyncio"
 ]
-
-#    "aspyx @ packages/aspyx",
-#    "aspyx_service @ packages/aspyx_service"
-
-
 
 [tool.hatch.envs.default.scripts]
 test = "pytest"
@@ -36,6 +33,8 @@ aspyx = "pytest packages/aspyx/tests"
 service = "pytest packages/aspyx_service/tests"
 event = "pytest packages/aspyx_event/tests"
 job = "pytest packages/aspyx_job/tests"
+security = "pytest packages/aspyx_security/tests"
+persistence = "pytest packages/aspyx_persistence/tests"
 all = "pytest packages"
 
 [tool.hatch.metadata]
@@ -45,4 +44,4 @@ allow-direct-references = true
 all-extras = true
 
 [tool.hatch.envs.default.env-vars]
-PYTHONPATH = "packages/aspyx_job/src:packages/aspyx/src:packages/aspyx_service/src:packages/aspyx_event/src:packages/aspyx_event/performance"
+PYTHONPATH = "packages/aspyx_persistence/src:packages/aspyx_security/src:packages/aspyx_job/src:packages/aspyx/src:packages/aspyx_service/src:packages/aspyx_event/src:packages/aspyx_event/performance"
