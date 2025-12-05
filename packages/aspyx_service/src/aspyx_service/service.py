@@ -159,6 +159,8 @@ class AbstractComponent(Component, ABC):
     def __init__(self):
         self.status = ComponentStatus.VIRGIN
 
+    # implement
+
     def startup(self) -> None:
         self.status = ComponentStatus.RUNNING
 
