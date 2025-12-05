@@ -512,6 +512,11 @@ class FancyChannel(Channel):
 
 - added protobuf support
 
+**0.11.3**
+
+- service manager caches need to be properties
+
+
 
 
 

@@ -640,11 +640,11 @@ class ServiceManager:
 
     descriptors_by_name: dict[str, BaseDescriptor] = {}
     descriptors: dict[Type, BaseDescriptor] = {}
-    channel_cache : dict[TypeAndChannel, Channel] = {}
-    proxy_cache: dict[TypeAndChannel, DynamicProxy[T]] = {}
-    lock: threading.Lock = threading.Lock()
 
-    instances : dict[Type, BaseDescriptor] = {}
+    #channel_cache : dict[TypeAndChannel, Channel] = {}
+    #proxy_cache: dict[TypeAndChannel, DynamicProxy[T]] = {}
+    #lock: threading.Lock = threading.Lock()
+    #instances : dict[Type, BaseDescriptor] = {}
 
     # class methods
 
@@ -684,6 +684,11 @@ class ServiceManager:
         self.channel_factory = channel_factory
         self.environment : Optional[Environment] = None
         self.preferred_channel = ""
+
+        self.channel_cache: dict[TypeAndChannel, Channel] = {}
+        self.proxy_cache: dict[TypeAndChannel, DynamicProxy] = {}
+        self.lock: threading.Lock = threading.Lock()
+        self.instances: dict[Type, BaseDescriptor] = {}
 
         self.ip = Server.get_local_ip()
 
