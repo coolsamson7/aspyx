@@ -144,6 +144,60 @@ class RequiresFeatureEnabled:
         self.name = "feature-service"
         self.test = test  # Store for verification
 
+# @inject with config() test classes
+
+@injectable()
+class ServiceWithInjectConfig:
+    def __init__(self):
+        self.host = None
+        self.port = None
+
+    @inject()
+    def set_config(self, host: config(str, "database.host", "localhost"), port: config(int, "database.port", 5432)):
+        self.host = host
+        self.port = port
+
+@module()
+class InjectConfigTestModule:
+    pass
+
+# Automatic Environment injection test classes
+
+@injectable()
+class ServiceWithEnvironment:
+    def __init__(self, env: Environment):
+        self.env = env
+
+@module()
+class AutoEnvironmentTestModule:
+    pass
+
+@injectable()
+class EnvironmentDependency:
+    def __init__(self):
+        self.name = "dependency"
+
+@injectable()
+class ServiceWithMixed:
+    def __init__(self, dep: EnvironmentDependency, env: Environment, value: config(str, "test.value", "default")):
+        self.dep = dep
+        self.env = env
+        self.value = value
+
+@module()
+class AutoEnvironmentMixedTestModule:
+    pass
+
+@injectable()
+class FactoryWithEnvironment:
+    @create()
+    def create_service(self, env: Environment) -> str:
+        return f"created-in-{env.type.__name__}"
+
+@module()
+class AutoEnvironmentFactoryTestModule:
+    pass
+
 @injectable()
 @conditional(requires_configuration_value("feature.enabled", False))
 class RequiresFeatureDisabled:
@@ -565,6 +619,53 @@ class TestDI(unittest.TestCase):
         self.assertEqual(args[0], float)
         self.assertEqual(args[1].key, "server.timeout")
         self.assertEqual(args[1].default, 30.0)
+
+    def test_inject_with_config(self):
+        """Test that @inject() works with config() annotation-based parameters"""
+
+        env = Environment(InjectConfigTestModule)
+
+        # Get service and verify config was injected via @inject method
+        # Values come from TestConfigSource which is created in SimpleModule
+        service = env.get(ServiceWithInjectConfig)
+        self.assertIsNotNone(service)
+        # TestConfigSource provides these values
+        self.assertEqual(service.host, "localhost")
+        self.assertEqual(service.port, 5432)
+
+    def test_automatic_environment_injection(self):
+        """Test that Environment type parameters are automatically injected"""
+
+        env = Environment(AutoEnvironmentTestModule)
+
+        # Get service and verify environment was injected
+        service = env.get(ServiceWithEnvironment)
+        self.assertIsNotNone(service)
+        self.assertIsInstance(service.env, Environment)
+        self.assertIs(service.env, env)  # Should be the exact same instance
+
+    def test_automatic_environment_injection_with_other_params(self):
+        """Test Environment injection works alongside other DI parameters"""
+
+        env = Environment(AutoEnvironmentMixedTestModule)
+
+        # Get service and verify all parameters were injected correctly
+        service = env.get(ServiceWithMixed)
+        self.assertIsNotNone(service)
+        self.assertIsInstance(service.dep, EnvironmentDependency)
+        self.assertEqual(service.dep.name, "dependency")
+        self.assertIsInstance(service.env, Environment)
+        self.assertIs(service.env, env)
+        self.assertEqual(service.value, "default")
+
+    def test_automatic_environment_injection_in_factory_methods(self):
+        """Test Environment injection in @create factory methods"""
+
+        env = Environment(AutoEnvironmentFactoryTestModule)
+
+        # Get the created string
+        result = env.get(str)
+        self.assertEqual(result, f"created-in-{AutoEnvironmentFactoryTestModule.__name__}")
 
 
 if __name__ == '__main__':

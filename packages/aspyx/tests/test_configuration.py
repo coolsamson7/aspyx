@@ -7,9 +7,9 @@ import unittest
 from pathlib import Path
 
 from aspyx.di.configuration import ConfigurationSource, ConfigurationManager, inject_value, EnvConfigurationSource, \
-    YamlConfigurationSource
+    YamlConfigurationSource, config
 
-from aspyx.di import injectable, Environment, module, create
+from aspyx.di import injectable, Environment, module, create, inject
 
 
 @module()
@@ -50,8 +50,8 @@ class Foo:
         self.value1 = None
         self.value2 = None
 
-    @inject_value("b.d", 0)
-    def set_value(self, value: int):
+    @inject()#_value("b.d", 0)
+    def set_value(self, value : config(int, "server.port", 0)): # config(str, "server.host", "localhost")
         self.value = value
 
     # will coerce
