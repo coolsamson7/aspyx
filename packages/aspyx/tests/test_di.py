@@ -35,7 +35,9 @@ configure_logging({"aspyx.di": logging.DEBUG})
 
 
 from aspyx.di import DIException, injectable, order, on_init, on_running, on_destroy, inject_environment, inject, \
-    Factory, create, module, Environment, PostProcessor, factory, requires_feature, conditional, requires_class
+    Factory, create, module, Environment, PostProcessor, factory, requires_feature, conditional, requires_class, \
+    requires_configuration, requires_configuration_value
+from aspyx.di.configuration import ConfigurationSource, ConfigurationManager
 
 
 
@@ -99,6 +101,44 @@ class ProdClass(ConditionalBase):
 class RequiresBase:
     def __init__(self, base: ConditionalBase):
         pass
+
+# Configuration conditional test classes
+
+class TestConfigSource(ConfigurationSource):
+    def load(self) -> dict:
+        return {
+            "database": {
+                "host": "localhost",
+                "port": 5432
+            },
+            "feature": {
+                "enabled": True
+            }
+        }
+
+@injectable()
+@conditional(requires_configuration("database"))
+class RequiresDatabaseConfig:
+    def __init__(self):
+        self.name = "database-service"
+
+@injectable()
+@conditional(requires_configuration("database.host"))
+class RequiresDatabaseHostConfig:
+    def __init__(self):
+        self.name = "database-host-service"
+
+@injectable()
+@conditional(requires_configuration_value("feature.enabled", True))
+class RequiresFeatureEnabled:
+    def __init__(self):
+        self.name = "feature-service"
+
+@injectable()
+@conditional(requires_configuration_value("feature.enabled", False))
+class RequiresFeatureDisabled:
+    def __init__(self):
+        self.name = "feature-disabled-service"
 
 class Base:
     def __init__(self):
@@ -186,6 +226,10 @@ class SimpleModule:
     @create()
     def create_config(self) -> EnvConfigurationSource:
         return EnvConfigurationSource()
+
+    @create()
+    def create_test_config(self) -> TestConfigSource:
+        return TestConfigSource()
 
     # TES
 
@@ -394,6 +438,35 @@ class TestDI(unittest.TestCase):
 
         avg_ms = ((end - start) / 1000000) * 1000
         print(f"Average time per Bar creation: {avg_ms:.3f} ms")
+
+    def test_configuration_conditional(self):
+        """Test requires_configuration and requires_configuration_value conditionals"""
+        # Create a fresh environment to pick up the test config
+        env = Environment(SimpleModule, features=["dev"])
+
+        # Test requires_configuration with inner node
+        db_service = env.get(RequiresDatabaseConfig)
+        self.assertIsNotNone(db_service)
+        self.assertEqual(db_service.name, "database-service")
+
+        # Test requires_configuration with leaf value
+        db_host_service = env.get(RequiresDatabaseHostConfig)
+        self.assertIsNotNone(db_host_service)
+        self.assertEqual(db_host_service.name, "database-host-service")
+
+        # Test requires_configuration_value with matching value
+        feature_service = env.get(RequiresFeatureEnabled)
+        self.assertIsNotNone(feature_service)
+        self.assertEqual(feature_service.name, "feature-service")
+
+        # Test requires_configuration_value with non-matching value (should not be registered)
+        try:
+            env.get(RequiresFeatureDisabled)
+            self.fail("RequiresFeatureDisabled should not be registered")
+        except DIException:
+            pass  # Expected
+
+        env.destroy()
 
 
 if __name__ == '__main__':

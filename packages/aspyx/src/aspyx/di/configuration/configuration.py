@@ -6,7 +6,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Optional, Type, TypeVar
 
-from aspyx.di import injectable, Environment, LifecycleCallable, Lifecycle
+from aspyx.di.di import injectable, Environment, LifecycleCallable, Lifecycle
 from aspyx.di.di import order, inject
 from aspyx.reflection import Decorators, DecoratorDescriptor, TypeDescriptor
 
@@ -62,6 +62,43 @@ class ConfigurationManager:
             return result
 
         self._data = merge_dicts(self._data, source.load())
+
+    def has(self, path: str) -> bool:
+        """
+        Check if a configuration path exists (either as a value or an inner node).
+
+        Args:
+            path (str): The path to check, e.g. "database" or "database.host".
+
+        Returns:
+            bool: True if the path exists (as a value or dict node), False otherwise.
+        """
+        keys = path.split(".")
+        current = self._data
+        for key in keys:
+            if not isinstance(current, dict) or key not in current:
+                return False
+            current = current[key]
+        return True
+
+    def get_raw(self, path: str, default=None):
+        """
+        Retrieve a raw configuration value without type coercion.
+
+        Args:
+            path (str): The path to the configuration value, e.g. "database.host".
+            default: The default value to return if the path is not found.
+
+        Returns:
+            The raw configuration value, or the default value if not found.
+        """
+        keys = path.split(".")
+        current = self._data
+        for key in keys:
+            if not isinstance(current, dict) or key not in current:
+                return default
+            current = current[key]
+        return current
 
     def get(self, path: str, type: Type[T], default : Optional[T]=None) -> T:
         """

@@ -13,7 +13,7 @@ import time
 from abc import abstractmethod, ABC
 from enum import Enum
 import threading
-from typing import Type, Dict, TypeVar, Generic, Optional, cast, Callable, TypedDict
+from typing import Type, Dict, TypeVar, Generic, Optional, cast, Callable, TypedDict, Any
 
 from aspyx.util import StringBuilder
 from aspyx.reflection import Decorators, TypeDescriptor, DecoratorDescriptor
@@ -645,22 +645,17 @@ class Providers:
         Providers.check.clear()
 
     @classmethod
-    def filter(cls, environment: Environment, provider_filter: Callable) -> Dict[Type,AbstractInstanceProvider]:
+    def filter(cls, environment: Environment, provider_filter: Callable) -> tuple[dict[Any, Any], list[Any]]:
         cache: Dict[Type,AbstractInstanceProvider] = {}
-
-        context: ConditionContext = {
-            "requires_feature": environment.has_feature,
-            "requires_class": lambda clazz : cache.get(clazz, None) is not None # ? only works if the class is in the cache already?
-        }
 
         Providers.check_factories() # check for additional factories
 
         # local methods
 
-        def filter_type(clazz: Type) -> Optional[AbstractInstanceProvider]:
+        def filter_type(clazz: Type, deferred_phase: bool = False) -> Optional[AbstractInstanceProvider]:
             result = None
             for provider in Providers.providers[clazz]:
-                if provider_applies(provider):
+                if provider_applies(provider, deferred_phase):
                     if result is not None:
                         raise ProviderCollisionException(f"type {clazz.__name__} already registered", result, provider)
 
@@ -668,7 +663,7 @@ class Providers:
 
             return result
 
-        def provider_applies(provider: AbstractInstanceProvider) -> bool:
+        def provider_applies(provider: AbstractInstanceProvider, deferred_phase: bool = False) -> bool:
             # is it in the right module?
 
             if not provider_filter(provider):
@@ -680,7 +675,11 @@ class Providers:
             if descriptor.has_decorator(conditional):
                 conditions: list[Condition] = [*descriptor.get_decorator(conditional).args]
                 for condition in conditions:
-                    if not condition.apply(context):
+                    # skip deferred checks , like the configuration logic
+                    if condition.evaluate_on_scan() != (not deferred_phase):
+                        continue
+
+                    if not condition.apply(environment, cache):
                         return False
 
                 return True
@@ -721,9 +720,18 @@ class Providers:
 
         # filter conditional providers and fill base classes as well
 
+        deferred_providers = []  # Track providers with deferred conditions
         for provider_type, _ in Providers.providers.items():
-            matching_provider = filter_type(provider_type)
+            matching_provider = filter_type(provider_type, deferred_phase=False)
             if matching_provider is not None:
+                descriptor = TypeDescriptor.for_type(matching_provider.get_host())
+                if descriptor.has_decorator(conditional):
+                    conditions: list[Condition] = [*descriptor.get_decorator(conditional).args]
+                    has_deferred = any(not c.evaluate_on_scan() for c in conditions)
+                    if has_deferred:
+                        deferred_providers.append((provider_type, matching_provider))
+                        continue  # Don't cache yet
+
                 cache_provider_for_type(matching_provider, provider_type)
 
         # replace by EnvironmentInstanceProvider
@@ -750,7 +758,7 @@ class Providers:
 
         # done
 
-        return result
+        return result, deferred_providers
 
 def register_factories(cls: Type):
     descriptor = TypeDescriptor.for_type(cls)
@@ -885,38 +893,101 @@ def inject_environment():
 
 # conditional stuff
 
-class ConditionContext(TypedDict):
-    requires_feature: Callable[[str], bool]
-    requires_class: Callable[[Type], bool]
-
 class Condition(ABC):
+    def dependencies(self) -> list[Type]:
+        """Return list of types this condition depends on"""
+        return []
+
+    def evaluate_on_scan(self) -> bool:
+        """Return True if condition can be evaluated during scan, False to defer until instantiation"""
+        return True
+
     @abstractmethod
-    def apply(self, context: ConditionContext) -> bool:
+    def apply(self, environment: Environment, cache: Optional[Dict[Type, AbstractInstanceProvider]] = None) -> bool:
+        """
+        Apply the condition.
+
+        Args:
+            environment: The environment instance
+            cache: Optional cache dict used during scanning phase (contains providers being filtered)
+        """
         pass
 
 class FeatureCondition(Condition):
     def __init__(self, feature: str):
         super().__init__()
-
         self.feature = feature
 
-    def apply(self, context: ConditionContext) -> bool:
-        return context["requires_feature"](self.feature)
+    def apply(self, environment: Environment, cache: Optional[Dict[Type, AbstractInstanceProvider]] = None) -> bool:
+        return environment.has_feature(self.feature)
 
 class ClassCondition(Condition):
     def __init__(self, clazz: Type):
         super().__init__()
-
         self.clazz = clazz
 
-    def apply(self, context: ConditionContext) -> bool:
-        return context["requires_class"](self.clazz)
+    def evaluate_on_scan(self) -> bool:
+        """Defer evaluation until after all providers are registered"""
+        return False
+
+    def dependencies(self) -> list[Type]:
+        """Declare dependency on the required class"""
+        return [self.clazz]
+
+    def apply(self, environment: Environment, cache: Optional[Dict[Type, AbstractInstanceProvider]] = None) -> bool:
+        # Check the environment (called during deferred phase)
+        return environment.is_registered_type(self.clazz)
+
+class ConfigCondition(Condition):
+    def __init__(self, key: str):
+        super().__init__()
+        self.key = key
+
+    def evaluate_on_scan(self) -> bool:
+        """Return True if condition can be evaluated during scan, False to defer until instantiation"""
+        return False
+
+    def dependencies(self) -> list[Type]:
+        """Return list of types this condition depends on"""
+        from aspyx.di.configuration import ConfigurationManager
+        return [ConfigurationManager]
+
+    def apply(self, environment: Environment, cache: Optional[Dict[Type, AbstractInstanceProvider]] = None) -> bool:
+        from aspyx.di.configuration import ConfigurationManager
+        config = environment.get(ConfigurationManager)
+        return config.has(self.key)
+
+class ConfigValueCondition(Condition):
+    def __init__(self, key: str, value: Any = None):
+        super().__init__()
+        self.key = key
+        self.value = value
+
+    def evaluate_on_scan(self) -> bool:
+        """Return True if condition can be evaluated during scan, False to defer until instantiation"""
+        return False
+
+    def dependencies(self) -> list[Type]:
+        """Return list of types this condition depends on"""
+        from aspyx.di.configuration import ConfigurationManager
+        return [ConfigurationManager]
+
+    def apply(self, environment: Environment, cache: Optional[Dict[Type, AbstractInstanceProvider]] = None) -> bool:
+        from aspyx.di.configuration import ConfigurationManager
+        config = environment.get(ConfigurationManager)
+        return config.get_raw(self.key) == self.value
 
 def requires_feature(feature: str):
     return FeatureCondition(feature)
 
 def requires_class(clazz: Type):
     return ClassCondition(clazz)
+
+def requires_configuration(key: str):
+    return ConfigCondition(key)
+
+def requires_configuration_value(key: str, value: Any = None):
+    return ConfigValueCondition(key, value)
 
 def conditional(*conditions: Condition):
     def decorator(cls):
@@ -1126,7 +1197,54 @@ class Environment:
 
             return False
 
-        self.providers.update(Providers.filter(self, filter_provider))
+        filtered_providers, deferred_providers = Providers.filter(self, filter_provider)
+        self.providers.update(filtered_providers)
+
+        # Phase 1: Collect dependencies from deferred conditions
+        deferred_dependencies = set()
+        for provider_type, provider in deferred_providers:
+            descriptor = TypeDescriptor.for_type(provider.get_host())
+            if descriptor.has_decorator(conditional):
+                conditions: list[Condition] = [*descriptor.get_decorator(conditional).args]
+                for condition in conditions:
+                    if not condition.evaluate_on_scan():
+                        deferred_dependencies.update(condition.dependencies())
+
+        # Phase 2: Create dependency instances first
+        for provider in set(self.providers.values()):
+            if provider.is_eager() and provider.get_type() in deferred_dependencies:
+                provider.create(self)
+
+        # Phase 3: Evaluate deferred providers (dependencies now available)
+        for provider_type, provider in deferred_providers:
+            descriptor = TypeDescriptor.for_type(provider.get_host())
+            if descriptor.has_decorator(conditional):
+                conditions: list[Condition] = [*descriptor.get_decorator(conditional).args]
+                all_pass = True
+                for condition in conditions:
+                    if not condition.evaluate_on_scan():
+                        # Now dependencies are available, evaluate the condition
+                        if not condition.apply(self):
+                            all_pass = False
+                            break
+
+                if all_pass:
+                    # Wrap and add to providers
+                    env_provider = EnvironmentInstanceProvider(self, provider)
+
+                    # Include parent providers in resolve context
+                    providers = self.providers
+                    if self.parent is not None:
+                        providers = providers | self.parent.providers
+
+                    env_provider.resolve(Providers.ResolveContext(providers))
+                    self.providers[provider_type] = env_provider
+
+                    # Add base classes
+                    for super_class in provider_type.__bases__:
+                        if super_class not in [object, ABC] and not inspect.isabstract(super_class):
+                            if super_class not in self.providers:
+                                self.providers[super_class] = env_provider
 
         # construct eager objects for local providers
 
