@@ -4,9 +4,9 @@ Configuration handling module.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Optional, Type, TypeVar
+from typing import Optional, Type, TypeVar, Any, Annotated
 
-from aspyx.di.di import injectable, Environment, LifecycleCallable, Lifecycle
+from aspyx.di.di import injectable, Environment, LifecycleCallable, Lifecycle, AnnotationResolver, AnnotationResolvers
 from aspyx.di.di import order, inject
 from aspyx.reflection import Decorators, DecoratorDescriptor, TypeDescriptor
 
@@ -181,3 +181,72 @@ class ConfigurationLifecycleCallable(LifecycleCallable):
 
     def args(self, decorator: DecoratorDescriptor, method: TypeDescriptor.MethodDescriptor, environment: Environment):
         return [self.manager.get(decorator.args[0], method.param_types[0], decorator.args[1])]
+
+# Annotation-based configuration injection
+
+class ConfigValue:
+    """
+    Annotation metadata for configuration value injection.
+    Usage: host: Annotated[str, config("server.host")]
+    """
+    __slots__ = ['key', 'default']
+
+    def __init__(self, key: str, default: Any = None):
+        self.key = key
+        self.default = default
+
+    def __str__(self):
+        return f"config('{self.key}')"
+
+    def __repr__(self):
+        return f"ConfigValue(key='{self.key}', default={self.default})"
+
+def config(typ: Type[T], key: str, default: T = None) -> T:
+    """
+    Shorthand for configuration value injection with type annotation.
+
+    Usage:
+        from aspyx.di.configuration import config
+
+        @injectable()
+        class MyService:
+            def __init__(
+                self,
+                host: config(str, "server.host", "localhost"),
+                port: config(int, "server.port", 8080),
+                enabled: config(bool, "feature.enabled", False)
+            ):
+                self.host = host
+                self.port = port
+                self.enabled = enabled
+
+    This is equivalent to:
+        host: Annotated[str, ConfigValue("server.host", "localhost")]
+
+    But much more concise!
+
+    Args:
+        typ: The type of the configuration value (str, int, bool, float, etc.)
+        key: The configuration key path (e.g., "database.host")
+        default: The default value if the key is not found
+
+    Returns:
+        An Annotated type that triggers configuration injection
+    """
+    return Annotated[typ, ConfigValue(key, default)]
+
+class ConfigAnnotationResolver(AnnotationResolver):
+    """Resolver for @config() annotations"""
+
+    def __init__(self):
+        super().__init__(ConfigValue)
+
+    def dependencies(self) -> list[Type]:
+        return [ConfigurationManager]
+
+    def resolve(self, annotation_value: ConfigValue, param_type: Type, environment: Environment, *deps) -> Any:
+        config_manager = deps[0]  # ConfigurationManager
+        return config_manager.get(annotation_value.key, param_type, annotation_value.default)
+
+# Register the resolver statically (not as a bean, just as a resolver)
+AnnotationResolvers.register(ConfigAnnotationResolver())

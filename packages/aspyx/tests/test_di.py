@@ -37,7 +37,8 @@ configure_logging({"aspyx.di": logging.DEBUG})
 from aspyx.di import DIException, injectable, order, on_init, on_running, on_destroy, inject_environment, inject, \
     Factory, create, module, Environment, PostProcessor, factory, requires_feature, conditional, requires_class, \
     requires_configuration, requires_configuration_value
-from aspyx.di.configuration import ConfigurationSource, ConfigurationManager
+from aspyx.di.configuration import ConfigurationSource, ConfigurationManager, config
+from typing import Annotated
 
 
 
@@ -113,6 +114,14 @@ class TestConfigSource(ConfigurationSource):
             },
             "feature": {
                 "enabled": True
+            },
+            "server": {
+                "host": "0.0.0.0",
+                "port": 8080,
+                "timeout": 30
+            },
+            "api": {
+                "key": "test-api-key-123"
             }
         }
 
@@ -131,14 +140,17 @@ class RequiresDatabaseHostConfig:
 @injectable()
 @conditional(requires_configuration_value("feature.enabled", True))
 class RequiresFeatureEnabled:
-    def __init__(self):
+    def __init__(self, test: config(bool, "feature.enabled")):
         self.name = "feature-service"
+        self.test = test  # Store for verification
 
 @injectable()
 @conditional(requires_configuration_value("feature.enabled", False))
 class RequiresFeatureDisabled:
     def __init__(self):
         self.name = "feature-disabled-service"
+
+# Annotation-based injection test classes - NOT injectable, we'll test them separately
 
 class Base:
     def __init__(self):
@@ -458,6 +470,9 @@ class TestDI(unittest.TestCase):
         feature_service = env.get(RequiresFeatureEnabled)
         self.assertIsNotNone(feature_service)
         self.assertEqual(feature_service.name, "feature-service")
+        # Verify config value was injected correctly
+        self.assertEqual(feature_service.test, True)
+        self.assertIsInstance(feature_service.test, bool)
 
         # Test requires_configuration_value with non-matching value (should not be registered)
         try:
@@ -467,6 +482,89 @@ class TestDI(unittest.TestCase):
             pass  # Expected
 
         env.destroy()
+
+    def test_annotation_injection(self):
+        """Test annotation-based configuration injection using new config() shortcut"""
+        # Test get_annotated_params with new config(type, key) syntax
+        from aspyx.reflection import TypeDescriptor
+        from aspyx.di.configuration import config, ConfigValue
+
+        # Create a proper class with annotated method using new syntax
+        class TestClass:
+            def test_method(
+                self,
+                host: config(str, "server.host"),
+                port: config(int, "server.port"),
+                regular_param: str
+            ):
+                pass
+
+        descriptor = TypeDescriptor.for_type(TestClass)
+        method_desc = descriptor.get_method("test_method")
+
+        annotated_params = method_desc.get_annotated_params()
+
+        # Verify we got 3 parameters
+        self.assertEqual(len(annotated_params), 3)
+
+        # First param should have ConfigValue metadata
+        self.assertEqual(annotated_params[0].name, "host")
+        self.assertEqual(annotated_params[0].type, str)
+        self.assertEqual(len(annotated_params[0].metadata), 1)
+        self.assertIsInstance(annotated_params[0].metadata[0], ConfigValue)
+        self.assertEqual(annotated_params[0].metadata[0].key, "server.host")
+
+        # Second param should have ConfigValue metadata
+        self.assertEqual(annotated_params[1].name, "port")
+        self.assertEqual(annotated_params[1].type, int)
+        self.assertEqual(len(annotated_params[1].metadata), 1)
+        self.assertIsInstance(annotated_params[1].metadata[0], ConfigValue)
+        self.assertEqual(annotated_params[1].metadata[0].key, "server.port")
+
+        # Third param should have no metadata
+        self.assertEqual(annotated_params[2].name, "regular_param")
+        self.assertEqual(annotated_params[2].type, str)
+        self.assertEqual(len(annotated_params[2].metadata), 0)
+
+    def test_config_shortcuts(self):
+        """Test that config() shortcut works correctly with type parameter"""
+        # Test config() with type parameter
+        from aspyx.di.configuration import config, ConfigValue
+        from typing import get_origin, get_args
+        import typing
+
+        # Test config(str, ...)
+        str_type = config(str, "server.host", "localhost")
+        self.assertEqual(get_origin(str_type), typing.Annotated)
+        args = get_args(str_type)
+        self.assertEqual(args[0], str)  # Base type
+        self.assertIsInstance(args[1], ConfigValue)  # Metadata
+        self.assertEqual(args[1].key, "server.host")
+        self.assertEqual(args[1].default, "localhost")
+
+        # Test config(int, ...)
+        int_type = config(int, "server.port", 8080)
+        self.assertEqual(get_origin(int_type), typing.Annotated)
+        args = get_args(int_type)
+        self.assertEqual(args[0], int)
+        self.assertEqual(args[1].key, "server.port")
+        self.assertEqual(args[1].default, 8080)
+
+        # Test config(bool, ...)
+        bool_type = config(bool, "feature.enabled", False)
+        self.assertEqual(get_origin(bool_type), typing.Annotated)
+        args = get_args(bool_type)
+        self.assertEqual(args[0], bool)
+        self.assertEqual(args[1].key, "feature.enabled")
+        self.assertEqual(args[1].default, False)
+
+        # Test config(float, ...)
+        float_type = config(float, "server.timeout", 30.0)
+        self.assertEqual(get_origin(float_type), typing.Annotated)
+        args = get_args(float_type)
+        self.assertEqual(args[0], float)
+        self.assertEqual(args[1].key, "server.timeout")
+        self.assertEqual(args[1].default, 30.0)
 
 
 if __name__ == '__main__':

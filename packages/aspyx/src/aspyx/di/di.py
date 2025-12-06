@@ -385,7 +385,8 @@ class ClassInstanceProvider(InstanceProvider):
     """
 
     __slots__ = [
-        "params"
+        "params",
+        "param_providers"
     ]
 
     # constructor
@@ -394,6 +395,38 @@ class ClassInstanceProvider(InstanceProvider):
         super().__init__(t, t, eager, scope)
 
         self.params = 0
+        self.param_providers: list[Optional[AnnotationInstanceProvider]] = []
+        self._param_providers_initialized = False
+
+    def _init_param_providers(self):
+        """Lazy initialization of parameter providers (called on first get_dependencies)"""
+        if self._param_providers_initialized:
+            return
+
+        init = TypeDescriptor.for_type(self.type).get_method("__init__")
+        if init is not None:
+            annotated_params = init.get_annotated_params()
+            self.params = len(annotated_params)
+
+            for param in annotated_params:
+                provider = None
+
+                # Check for annotation metadata
+                for meta in param.metadata:
+                    resolver = AnnotationResolvers.get_resolver(type(meta))
+                    if resolver:
+                        # Create annotation provider for this parameter
+                        # Store tuple: (provider, param_type) so we can reconstruct dependencies
+                        provider = (AnnotationInstanceProvider(resolver, meta, param.type), param.type)
+                        break
+
+                if provider is None:
+                    # Normal DI: store tuple (None, param_type)
+                    provider = (None, param.type)
+
+                self.param_providers.append(provider)
+
+        self._param_providers_initialized = True
 
     # implement
 
@@ -401,15 +434,21 @@ class ClassInstanceProvider(InstanceProvider):
         register_factories(self.host)
 
     def get_dependencies(self) -> (list[Type],int):
+        # Lazy init: compute param_providers on first call
+        self._init_param_providers()
+
         types : list[Type] = []
 
-        # check constructor
-
-        init = TypeDescriptor.for_type(self.type).get_method("__init__")
-        if init is not None:
-            self.params = len(init.param_types)
-            for param in init.param_types:
-                types.append(param)
+        # Compute dependencies from param_providers
+        for entry in self.param_providers:
+            if entry:
+                provider, param_type = entry
+                if provider:
+                    # Annotation-based: add resolver's dependencies
+                    types.extend(provider.get_dependencies()[0])
+                else:
+                    # Normal DI: add parameter type directly
+                    types.append(param_type)
 
         # check @inject
 
@@ -427,7 +466,28 @@ class ClassInstanceProvider(InstanceProvider):
     def create(self, environment: Environment, *args):
         Environment.logger.debug("%s create class %s", self, self.type.__qualname__)
 
-        return environment.created(self.type(*args[:self.params]))
+        # If no param_providers, use old simple logic
+        if not self.param_providers:
+            return environment.created(self.type(*args[:self.params]))
+
+        # Build constructor args from param_providers
+        # args contains resolved dependencies (for annotations) or direct values (for normal DI)
+        final_args = []
+        dep_index = 0
+
+        for provider, param_type in self.param_providers:
+            if provider:
+                # Annotation-based: call provider to resolve the value
+                dep_count = len(provider.get_dependencies()[0])
+                value = provider.create(environment, *args[dep_index:dep_index + dep_count])
+                dep_index += dep_count
+                final_args.append(value)
+            else:
+                # Normal DI: use the dependency directly
+                final_args.append(args[dep_index])
+                dep_index += 1
+
+        return environment.created(self.type(*final_args))
 
     def report(self) -> str:
         return f"{self.host.__name__}.__init__"
@@ -443,7 +503,8 @@ class FunctionInstanceProvider(InstanceProvider):
     """
 
     __slots__ = [
-        "method"
+        "method",
+        "param_providers"
     ]
 
     # constructor
@@ -452,16 +513,85 @@ class FunctionInstanceProvider(InstanceProvider):
         super().__init__(clazz, method.return_type, eager, scope)
 
         self.method : TypeDescriptor.MethodDescriptor = method
+        self.param_providers: list[tuple[Optional[AnnotationInstanceProvider], Type]] = []
+        self._param_providers_initialized = False
+
+    def _init_param_providers(self):
+        """Lazy initialization of parameter providers (called on first get_dependencies)"""
+        if self._param_providers_initialized:
+            return
+
+        annotated_params = self.method.get_annotated_params()
+
+        for param in annotated_params:
+            provider = None
+
+            # Check for annotation metadata
+            for meta in param.metadata:
+                resolver = AnnotationResolvers.get_resolver(type(meta))
+                if resolver:
+                    # Create annotation provider for this parameter
+                    provider = (AnnotationInstanceProvider(resolver, meta, param.type), param.type)
+                    break
+
+            if provider is None:
+                # Normal DI: store tuple (None, param_type)
+                provider = (None, param.type)
+
+            self.param_providers.append(provider)
+
+        self._param_providers_initialized = True
 
     # implement
 
     def get_dependencies(self) -> (list[Type],int):
-        return [self.host, *self.method.param_types], 1 + len(self.method.param_types)
+        # Lazy init: compute param_providers on first call
+        self._init_param_providers()
+
+        types = [self.host]  # First dependency is always the host class instance
+
+        # Compute dependencies from param_providers
+        for entry in self.param_providers:
+            provider, param_type = entry
+            if provider:
+                # Annotation-based: add resolver's dependencies
+                types.extend(provider.get_dependencies()[0])
+            else:
+                # Normal DI: add parameter type directly
+                types.append(param_type)
+
+        return types, 1 + len(self.param_providers)
 
     def create(self, environment: Environment, *args):
         Environment.logger.debug("%s create class %s", self, self.type.__qualname__)
 
-        instance = self.method.method(*args) # args[0]=self
+        # If no param_providers (no parameters), use args directly
+        if not self.param_providers:
+            instance = self.method.method(*args) # args[0]=self
+            return environment.created(instance)
+
+        # args[0] is the host instance (self)
+        host_instance = args[0]
+        dep_index = 1  # Start after host instance
+
+        # Build argument list for the method using pre-computed param_providers
+        method_args = []
+        for entry in self.param_providers:
+            provider, param_type = entry
+            if provider:
+                # Annotation-based: resolve using the provider
+                dep_count = len(provider.get_dependencies()[0])
+                provider_args = args[dep_index:dep_index + dep_count]
+                dep_index += dep_count
+
+                value = provider.create(environment, *provider_args)
+                method_args.append(value)
+            else:
+                # Normal DI: use next dependency directly
+                method_args.append(args[dep_index])
+                dep_index += 1
+
+        instance = self.method.method(host_instance, *method_args)
 
         return environment.created(instance)
 
@@ -890,6 +1020,105 @@ def inject_environment():
         return func
 
     return decorator
+
+# Annotation-based injection
+
+class AnnotationResolver(ABC):
+    """
+    Base class for resolving annotated parameter values.
+    Similar to PostProcessor, but for parameter injection.
+    """
+
+    __slots__ = ['annotation_type']
+
+    def __init__(self, annotation_type: Type):
+        self.annotation_type = annotation_type
+
+    @abstractmethod
+    def dependencies(self) -> list[Type]:
+        """Return types this resolver depends on"""
+        pass
+
+    @abstractmethod
+    def resolve(self, annotation_value: Any, param_type: Type, environment: Environment, *deps) -> Any:
+        """
+        Resolve the actual value to inject.
+
+        Args:
+            annotation_value: The annotation instance (e.g., ConfigValue("key"))
+            param_type: The actual parameter type (e.g., str, int)
+            environment: The DI environment
+            *deps: Resolved dependencies from dependencies()
+
+        Returns:
+            The resolved value to inject
+        """
+        pass
+
+class AnnotationResolvers:
+    """Global registry for annotation resolvers"""
+
+    resolvers: Dict[Type, AnnotationResolver] = {}
+
+    @classmethod
+    def register(cls, resolver: AnnotationResolver):
+        """Register an annotation resolver"""
+        cls.resolvers[resolver.annotation_type] = resolver
+
+    @classmethod
+    def get_resolver(cls, annotation_type: Type) -> Optional[AnnotationResolver]:
+        """Get resolver for an annotation type"""
+        return cls.resolvers.get(annotation_type)
+
+class AnnotationInstanceProvider(AbstractInstanceProvider):
+    """
+    Provider that resolves a parameter value based on annotation metadata.
+    Similar to how FactoryInstanceProvider wraps a Factory.
+    """
+
+    __slots__ = ['resolver', 'annotation_value', 'param_type', 'dependencies']
+
+    def __init__(self, resolver: AnnotationResolver, annotation_value: Any, param_type: Type):
+        self.resolver = resolver
+        self.annotation_value = annotation_value
+        self.param_type = param_type
+        self.dependencies: list[Type] = []
+
+    def get_module(self) -> str:
+        return type(self.resolver).__module__
+
+    def get_type(self) -> Type:
+        return self.param_type
+
+    def get_host(self) -> Type:
+        return type(self.resolver)
+
+    def is_eager(self) -> bool:
+        return False  # Resolved on-demand
+
+    def get_scope(self) -> str:
+        return "request"  # Always resolve fresh
+
+    def get_dependencies(self) -> (list[Type], int):
+        deps = self.resolver.dependencies()
+        return deps, len(deps)
+
+    def resolve(self, context: 'Providers.ResolveContext'):
+        """Resolve dependencies for this annotation provider"""
+        self.dependencies = []
+        for dep_type in self.resolver.dependencies():
+            provider = context.require_provider(dep_type)
+            self.dependencies.append(dep_type)
+
+    def create(self, environment: Environment, *args) -> Any:
+        # args are the resolver's dependencies
+        return self.resolver.resolve(self.annotation_value, self.param_type, environment, *args)
+
+    def report(self) -> str:
+        return f"Annotation({self.annotation_value} -> {self.param_type.__name__})"
+
+    def __str__(self):
+        return f"AnnotationInstanceProvider({self.annotation_value} -> {self.param_type.__name__})"
 
 # conditional stuff
 
@@ -1558,7 +1787,27 @@ class InjectLifecycleCallable(LifecycleCallable):
     # override
 
     def args(self, decorator: DecoratorDescriptor,  method: TypeDescriptor.MethodDescriptor, environment: Environment):
-        return [environment.get(type) for type in method.param_types]
+        annotated_params = method.get_annotated_params()
+        result = []
+
+        for param in annotated_params:
+            # Check for annotations
+            resolver_found = False
+            for meta in param.metadata:
+                resolver = AnnotationResolvers.get_resolver(type(meta))
+                if resolver:
+                    # Resolve dependencies
+                    deps = [environment.get(dep) for dep in resolver.dependencies()]
+                    value = resolver.resolve(meta, param.type, environment, *deps)
+                    result.append(value)
+                    resolver_found = True
+                    break
+
+            if not resolver_found:
+                # Normal DI
+                result.append(environment.get(param.type))
+
+        return result
 
 def scope(name: str, register=True):
     def decorator(cls):

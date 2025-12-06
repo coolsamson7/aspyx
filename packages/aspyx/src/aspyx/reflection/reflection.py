@@ -10,7 +10,7 @@ from inspect import signature
 import threading
 from types import FunctionType
 
-from typing import Callable, get_type_hints, Type, Dict, Any, get_origin, List, get_args
+from typing import Callable, get_type_hints, Type, Dict, Any, get_origin, List, get_args, Annotated
 from weakref import WeakKeyDictionary
 
 from aspyx.validation import AbstractType, IntType
@@ -309,6 +309,25 @@ class TypeDescriptor:
             self.name = name
             self.type = type
 
+    class AnnotatedParam:
+        """
+        Describes a parameter with its type and annotation metadata.
+        Used for analyzing Annotated[Type, metadata...] parameters.
+        """
+        __slots__ = ['name', 'type', 'metadata', 'has_default', 'default']
+
+        def __init__(self, name: str, type: Type, metadata: tuple, has_default: bool, default: Any = inspect.Parameter.empty):
+            self.name = name
+            self.type = type  # The actual type (from Annotated[str, ...])
+            self.metadata = metadata  # Tuple of metadata items
+            self.has_default = has_default
+            self.default = default
+
+        def __str__(self):
+            meta_str = f", metadata={self.metadata}" if self.metadata else ""
+            default_str = f", default={self.default}" if self.has_default else ""
+            return f"AnnotatedParam({self.name}: {getattr(self.type, '__name__', self.type)}{meta_str}{default_str})"
+
     class PropertyDescriptor:
         """
         Describes a class property (field) — can be read and written via reflection.
@@ -445,6 +464,54 @@ class TypeDescriptor:
                     return True
 
             return False
+
+        def get_annotated_params(self) -> list['TypeDescriptor.AnnotatedParam']:
+            """
+            Extract annotated parameters with their metadata.
+            Returns a list of AnnotatedParam objects containing parameter name, type, and metadata.
+
+            Returns:
+                list[AnnotatedParam]: List of annotated parameters
+            """
+            params = []
+            sig = inspect.signature(self.method)
+
+            # Use get_type_hints with include_extras=True to preserve Annotated metadata
+            try:
+                type_hints = get_type_hints(self.method, globalns=self.method.__globals__, include_extras=True)
+            except Exception:
+                # Fallback to annotations
+                type_hints = getattr(self.method, '__annotations__', {})
+
+            for param_name, param in sig.parameters.items():
+                if param_name == 'self':
+                    continue
+
+                annotation = type_hints.get(param_name, param.annotation)
+                if annotation == inspect.Parameter.empty:
+                    annotation = object
+
+                # Check if it's Annotated
+                if get_origin(annotation) is Annotated:
+                    actual_type, *metadata = get_args(annotation)
+                    params.append(TypeDescriptor.AnnotatedParam(
+                        name=param_name,
+                        type=actual_type,
+                        metadata=tuple(metadata),
+                        has_default=param.default != inspect.Parameter.empty,
+                        default=param.default
+                    ))
+                else:
+                    # Regular parameter (no metadata)
+                    params.append(TypeDescriptor.AnnotatedParam(
+                        name=param_name,
+                        type=annotation,
+                        metadata=(),
+                        has_default=param.default != inspect.Parameter.empty,
+                        default=param.default
+                    ))
+
+            return params
 
         def __str__(self):
             return f"Method({self.method.__name__})"
