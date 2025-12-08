@@ -84,6 +84,8 @@ __all__ = [
 
     # persistent_unit
 
+    "PersistentUnit",
+
     # repository
 
     "BaseRepository",

@@ -2,7 +2,7 @@
 
 [project]
 name = "aspyx_persistence"
-version = "0.1.4"
+version = "0.1.5"
 description = "Aspyx persistence framework"
 authors = [{ name = "Andreas Ernst", email = "andreas.ernst7@gmail.com" }]
 readme = "README.md"
