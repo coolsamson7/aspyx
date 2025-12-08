@@ -50,8 +50,8 @@ class Foo:
         self.value1 = None
         self.value2 = None
 
-    @inject()#_value("b.d", 0)
-    def set_value(self, value : config(int, "server.port", 0)): # config(str, "server.host", "localhost")
+    @inject()
+    def set_value(self, value : config(int, "b.d", 0)):
         self.value = value
 
     # will coerce
@@ -72,7 +72,7 @@ class TestConfiguration(unittest.TestCase):
         config = env.get(ConfigurationManager)
 
         port = config.get("server.port", int)
-        self.assertEqual(port, 8000)
+        self.assertEqual(port, 8080)
 
     def test_env(self):
         env = TestConfiguration.testEnvironment
