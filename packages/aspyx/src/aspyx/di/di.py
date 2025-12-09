@@ -1448,7 +1448,16 @@ class Environment:
         filtered_providers, deferred_providers = Providers.filter(self, filter_provider)
         self.providers.update(filtered_providers)
 
-        # Phase 1: Collect dependencies from deferred conditions
+        # Phase 1: Create module instances and their @create() products to ensure config sources are loaded
+        for provider in set(self.providers.values()):
+            if provider.is_eager():
+                # Get the actual provider (unwrap EnvironmentInstanceProvider)
+                actual_provider = cast(EnvironmentInstanceProvider, provider).provider if isinstance(provider, EnvironmentInstanceProvider) else provider
+                descriptor = TypeDescriptor.for_type(actual_provider.get_host())
+                if descriptor.has_decorator(module):
+                    provider.create(self)
+
+        # Phase 2: Collect dependencies from deferred conditions
         deferred_dependencies = set()
         for provider_type, provider in deferred_providers:
             descriptor = TypeDescriptor.for_type(provider.get_host())
@@ -1458,12 +1467,12 @@ class Environment:
                     if not condition.evaluate_on_scan():
                         deferred_dependencies.update(condition.dependencies())
 
-        # Phase 2: Create dependency instances first
+        # Phase 3: Create dependency instances (e.g., ConfigurationManager)
         for provider in set(self.providers.values()):
             if provider.is_eager() and provider.get_type() in deferred_dependencies:
                 provider.create(self)
 
-        # Phase 3: Evaluate deferred providers (dependencies now available)
+        # Phase 4: Evaluate deferred providers (dependencies now available)
         for provider_type, provider in deferred_providers:
             descriptor = TypeDescriptor.for_type(provider.get_host())
             if descriptor.has_decorator(conditional):
@@ -1494,23 +1503,12 @@ class Environment:
                             if super_class not in self.providers:
                                 self.providers[super_class] = env_provider
 
-        # construct eager objects for local providers
-        # First create module instances to ensure config sources are loaded
-
+        # Phase 5: Create remaining eager singletons (module instances already created in Phase 1)
         for provider in set(self.providers.values()):
             if provider.is_eager():
-                # Check if this is a module instance
+                # Skip if already created (module instances and deferred dependencies)
                 descriptor = TypeDescriptor.for_type(provider.get_host())
-                if descriptor.has_decorator(module):
-                    provider.create(self)
-
-        # Then create remaining eager singletons
-
-        for provider in set(self.providers.values()):
-            if provider.is_eager():
-                # Skip if already created (module instances)
-                descriptor = TypeDescriptor.for_type(provider.get_host())
-                if not descriptor.has_decorator(module):
+                if not descriptor.has_decorator(module) and provider.get_type() not in deferred_dependencies:
                     provider.create(self)
 
         # running callback
