@@ -390,9 +390,6 @@ class FastAPIServer(Server):
             wrapper.__signature__ = new_sig
             wrapper.__annotations__ = annotations
 
-            print("WRAPPER SIGNATURE:", wrapper.__name__, wrapper.__signature__)
-            print("WRAPPER ANNOTATIONS:", wrapper.__annotations__)
-
             return wrapper
 
         # iterate over all service descriptors
@@ -416,6 +413,7 @@ class FastAPIServer(Server):
                         None,
                     )
                     if decorator is not None:
+
                         self.router.add_api_route(
                             path=prefix + decorator.args[0],
                             endpoint=wrap_service_method(
@@ -424,6 +422,9 @@ class FastAPIServer(Server):
                             methods=[decorator.decorator.__name__],
                             name=f"{descriptor.get_component_descriptor().name}.{descriptor.name}.{method.get_name()}",
                             response_model=method.return_type,
+                            summary=decorator.kwargs.get("summary"),
+                            description=decorator.kwargs.get("description"),
+                            tags=decorator.kwargs.get("tags"),
                         )
 
     def start_server(self, host: str):
