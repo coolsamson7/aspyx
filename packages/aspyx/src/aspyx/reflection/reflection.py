@@ -124,38 +124,44 @@ class DecoratorDescriptor:
     """
     __slots__ = [
         "decorator",
-        "args"
+        "args",
+        "kwargs"
     ]
 
-    def __init__(self, decorator: Callable, *args):
+    def __init__(self, decorator: Callable, *args, **kwargs):
         self.decorator = decorator
         self.args = args
+        self.kwargs = kwargs
 
     def __str__(self):
-        return f"@{self.decorator.__name__}({', '.join(map(str, self.args))})"
+        parts = [*map(str, self.args)]
+        parts += [f"{k}={v}" for k, v in self.kwargs.items()]
+
+        return f"@{self.decorator.__name__}({', '.join(parts)})"
 
 class Decorators:
     """
     Utility class that caches decorators ( Python does not have a feature for this )
     """
     @classmethod
-    def add(cls, func_or_class, decorator: Callable, *args):
+    def add(cls, func_or_class, decorator: Callable, *args, **kwargs):
         """
         Remember the decorator
         Args:
             func_or_class: a function or class
             decorator: the decorator
-            *args: any arguments supplied to the decorator
+            *args: positional arguments supplied to the decorator
+            **kwargs: keyword arguments supplied to the decorator
         """
         current = func_or_class.__dict__.get('__decorators__')
+        desc = DecoratorDescriptor(decorator, *args, **kwargs)
         if current is None:
-            setattr(func_or_class, '__decorators__', [DecoratorDescriptor(decorator, *args)])
+            setattr(func_or_class, '__decorators__', [desc])
         else:
-            # Avoid mutating inherited list
             if '__decorators__' not in func_or_class.__dict__:
                 current = list(current)
                 setattr(func_or_class, '__decorators__', current)
-            current.append(DecoratorDescriptor(decorator, *args))
+            current.append(desc)
 
     @classmethod
     def has_decorator(cls, func_or_class, callable: Callable) -> bool:
