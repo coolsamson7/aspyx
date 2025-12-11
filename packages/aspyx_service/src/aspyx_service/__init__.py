@@ -9,7 +9,7 @@ from .channels import HTTPXChannel, DispatchJSONChannel, TokenContext
 from .registries import ConsulComponentRegistry
 from .server import FastAPIServer, RequestContext, ResponseContext, TokenContextMiddleware
 from .healthcheck import health_checks, health_check, HealthCheckManager, HealthStatus
-from .restchannel import RestChannel, post, get, put, delete, QueryParam, Body, rest
+from .restchannel import RestChannel, post, get, put, delete, QueryParam, PathParam, Body, rest
 from .session import Session, SessionManager, SessionContext
 from .authorization import AuthorizationManager, AbstractAuthorizationFactory
 from .protobuf import ProtobufManager
@@ -90,6 +90,7 @@ __all__ = [
     "delete",
     "rest",
     "QueryParam",
+    "PathParam",
     "Body",
 
     # registries
