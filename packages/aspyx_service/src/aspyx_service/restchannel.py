@@ -1,11 +1,13 @@
 """
 rest channel implementation
 """
+from __future__ import annotations
+
 import inspect
 import re
 from dataclasses import is_dataclass
 
-from typing import get_type_hints, TypeVar, Annotated, Callable, get_origin, get_args, Type
+from typing import get_type_hints, TypeVar, Annotated, Callable, get_origin, get_args, Type, Optional, Sequence, Any
 from pydantic import BaseModel
 
 from aspyx.reflection import DynamicProxy, Decorators
@@ -16,106 +18,116 @@ from .service import channel, ServiceCommunicationException
 
 T = TypeVar("T")
 
-class BodyMarker:
+
+# --- Parameter markers --- #
+
+class ParamMarker:
+    """
+    Base class for parameter metadata.
+    Similar to FastAPI's Path, Query, Body.
+    """
+    def __init__(self, default=..., *, description: str | None = None, example: Any = None):
+        self.default = default
+        self.description = description
+        self.example = example
+        self.required = default is ...
+
+
+class BodyMarker(ParamMarker):
     pass
 
-Body = lambda t: Annotated[t, BodyMarker]
 
-class QueryParamMarker:
+def Body(t: type, *, description: str | None = None, example: Any = None, default=...):
+    marker = BodyMarker(default=default, description=description, example=example)
+    return Annotated[t, marker]
+
+
+class QueryParamMarker(ParamMarker):
     pass
 
-QueryParam = lambda t: Annotated[t, QueryParamMarker]
 
-# decorators
+def QueryParam(t: type, *, description: str | None = None, example: Any = None, default=...):
+    marker = QueryParamMarker(default=default, description=description, example=example)
+    return Annotated[t, marker]
+
+
+class PathParamMarker(ParamMarker):
+    pass
+
+
+def PathParam(t: type, *, description: str | None = None, example: Any = None):
+    marker = PathParamMarker(default=..., description=description, example=example)
+    return Annotated[t, marker]
+
+
+# --- Decorators --- #
 
 def rest(url=""):
     """
     mark service interfaces to add a url prefix
-
-    Args:
-        url: prefix that will be added to all urls
     """
     def decorator(cls):
         Decorators.add(cls, rest, url)
-
         return cls
     return decorator
 
-def get(url: str):
-    """
-    methods marked with `get` will be executed by calling a http get request.
 
-    Args:
-        url: the url
+def get(url: str, *, description: Optional[str] = None, summary: Optional[str] = None, tags: Optional[Sequence[str]] = None):
+    """
+    mark method as HTTP GET
     """
     def decorator(cls):
-        Decorators.add(cls, get, url)
-
+        Decorators.add(cls, get, url, tags=tags, summary=summary, description=description)
         return cls
     return decorator
 
 
-def post(url: str):
+def post(url: str, *, description: Optional[str] = None, summary: Optional[str] = None, tags: Optional[Sequence[str]] = None):
     """
-    methods marked with `post` will be executed by calling a http get request.
-    The body parameter should be marked with `Body(<param>)`
-
-    Args:
-        url: the url
+    mark method as HTTP POST
     """
     def decorator(cls):
-        Decorators.add(cls, post, url)
-
+        Decorators.add(cls, post, url, tags=tags, summary=summary, description=description)
         return cls
-
     return decorator
 
-def put(url: str):
-    """
-    methods marked with `put` will be executed by calling a http put request.
 
-    Args:
-        url: the url
+def put(url: str, *, description: Optional[str] = None, summary: Optional[str] = None, tags: Optional[Sequence[str]] = None):
+    """
+    mark method as HTTP PUT
     """
     def decorator(cls):
-        Decorators.add(cls, put, url)
-
+        Decorators.add(cls, put, url, tags=tags, summary=summary, description=description)
         return cls
-
     return decorator
 
-def delete(url: str):
-    """
-    methods marked with `delete` will be executed by calling a http delete request.
 
-    Args:
-        url: the url
+def delete(url: str, *, description: Optional[str] = None, summary: Optional[str] = None, tags: Optional[Sequence[str]] = None):
+    """
+    mark method as HTTP DELETE
     """
     def decorator(cls):
-        Decorators.add(cls, delete, url)
-
+        Decorators.add(cls, delete, url, tags=tags, summary=summary, description=description)
         return cls
-
     return decorator
+
 
 def patch(url: str):
     """
-    methods marked with `patch` will be executed by calling a http patch request.
-
-    Args:
-        url: the url
+    mark method as HTTP PATCH
     """
     def decorator(cls):
         Decorators.add(cls, patch, url)
-
         return cls
-
     return decorator
+
+
+# --- RestChannel --- #
 
 @channel("rest")
 class RestChannel(HTTPXChannel):
     """
-    A rest channel executes http requests as specified by the corresponding decorators and annotations,
+    Executes HTTP requests for methods annotated with rest decorators and parameter markers.
     """
     __slots__ = [
         "signature",
@@ -125,189 +137,163 @@ class RestChannel(HTTPXChannel):
         "return_type",
         "path_param_names",
         "query_param_names",
-        "body_param_name"
+        "body_param_name",
+        "body_serializer",
+        "param_metadata"
     ]
 
-    # local class
-
     class Call:
-        # slots
-
         __slots__ = [
             "type",
             "url_template",
             "path_param_names",
-            "body_param_name",
             "query_param_names",
+            "body_param_name",
+            "body_serializer",
             "return_type",
             "signature",
-            "body_serializer"
+            "param_metadata"
         ]
 
-        # constructor
-
-        def __init__(self, type: Type, method : Callable):
+        def __init__(self, cls_type: Type, method: Callable):
             self.signature = inspect.signature(method)
+            type_hints = get_type_hints(method, include_extras=True)
 
-            type_hints = get_type_hints(method)
-
-            param_names = list(self.signature.parameters.keys())
-            param_names.remove("self")
-
+            # URL prefix
             prefix = ""
-            if Decorators.has_decorator(type, rest):
-                prefix = Decorators.get_decorator(type, rest).args[0]
+            if Decorators.has_decorator(cls_type, rest):
+                prefix = Decorators.get_decorator(cls_type, rest).args[0]
 
-            # find decorator
-
+            # Determine HTTP method and url_template
             self.type = "get"
             self.url_template = ""
+            self.param_metadata = {}
 
             decorators = Decorators.get_all(method)
+            for decorator_func in [get, post, put, delete, patch]:
+                descriptor = next((d for d in decorators if d.decorator is decorator_func), None)
+                if descriptor:
+                    self.type = decorator_func.__name__
+                    # normalize joining of prefix and route path
+                    self.url_template = prefix.rstrip("/") + "/" + descriptor.args[0].lstrip("/")
 
-            for decorator in [get, post, put, delete, patch]:
-                descriptor = next((descriptor for descriptor in decorators if descriptor.decorator is decorator), None)
-                if descriptor is not None:
-                    self.type = decorator.__name__
-                    self.url_template = prefix + descriptor.args[0]
-
-            # parameters
-
+            # Path params
             self.path_param_names = set(re.findall(r"{(.*?)}", self.url_template))
+            param_names = set(self.signature.parameters.keys()) - {"self"} - self.path_param_names
 
-            for param_name in self.path_param_names:
-                param_names.remove(param_name)
-
-            hints = get_type_hints(method, include_extras=True)
-
+            # Body and query params
             self.body_param_name = None
             self.query_param_names = set()
 
-            for param_name, hint in hints.items():
-                if get_origin(hint) is Annotated:
-                    metadata = get_args(hint)[1:]
+            for name, hint in type_hints.items():
+                origin = get_origin(hint)
+                if origin is Annotated:
+                    args = get_args(hint)
+                    typ = args[0]
+                    for meta in args[1:]:
+                        if isinstance(meta, BodyMarker):
+                            self.body_param_name = name
+                            self.body_serializer = get_serializer(typ)
+                            param_names.discard(name)
+                            self.param_metadata[name] = meta
+                        elif isinstance(meta, QueryParamMarker):
+                            self.query_param_names.add(name)
+                            param_names.discard(name)
+                            self.param_metadata[name] = meta
+                        elif isinstance(meta, PathParamMarker):
+                            self.param_metadata[name] = meta
 
-                    if BodyMarker in metadata:
-                        self.body_param_name = param_name
-                        self.body_serializer = get_serializer(type_hints[param_name])
-                        param_names.remove(param_name)
-                    elif QueryParamMarker in metadata:
-                        self.query_param_names.add(param_name)
-                        param_names.remove(param_name)
+            # fallback: infer body param if POST/PUT/PATCH
+            if self.body_param_name is None and self.type in ("post", "put", "patch"):
+                for name in param_names.copy():
+                    typ = type_hints.get(name)
+                    if typ is None:
+                        continue
+                    if get_origin(typ) is Annotated:
+                        typ = get_args(typ)[0]
+                    if (isinstance(typ, type) and issubclass(typ, BaseModel)) or is_dataclass(typ):
+                        self.body_param_name = name
+                        self.body_serializer = get_serializer(typ)
+                        param_names.discard(name)
+                        break
 
-            # check if something is missing
+            # remaining params are query params
+            self.query_param_names.update(param_names)
 
-            if param_names:
-                # check body params
-                if self.type in ("post", "put", "patch"):
-                    if self.body_param_name is None:
-                        candidates = [
-                            (name, hint)
-                            for name, hint in hints.items()
-                            if name not in self.path_param_names
-                        ]
-                        # find first dataclass or pydantic argument
-                        for name, hint in candidates:
-                            typ = hint
-                            if get_origin(typ) is Annotated:
-                                typ = get_args(typ)[0]
-                            if (
-                                    (isinstance(typ, type) and issubclass(typ, BaseModel))
-                                    or is_dataclass(typ)
-                            ):
-                                self.body_param_name = name
-                                self.body_serializer = get_serializer(type_hints[name])
-                                param_names.remove(name)
-                                break
+            # Return type
+            self.return_type = type_hints.get("return", None)
 
-            # the rest are query params
+            # debug
+            try:
+                if getattr(method, "__name__", "") == "test_get":
+                    print("[RestChannel.Call] type=", self.type, "url=", self.url_template,
+                          "path_params=", self.path_param_names,
+                          "query_params=", self.query_param_names,
+                          "param_metadata keys=", list(self.param_metadata.keys()))
+            except Exception:
+                pass
 
-            for param in param_names:
-                self.query_param_names.add(param)
-
-            # return type
-
-            self.return_type = type_hints['return']
-
-    # constructor
-
+    # --- RestChannel constructor --- #
     def __init__(self):
         super().__init__()
+        self.calls: dict[Callable, RestChannel.Call] = {}
 
-        self.calls : dict[Callable, RestChannel.Call] = {}
-
-    # internal
-
-    def get_call(self, type: Type ,method: Callable):
-        call = self.calls.get(method, None)
+    # --- Helpers --- #
+    def get_call(self, cls_type: Type, method: Callable) -> Call:
+        call = self.calls.get(method)
         if call is None:
-            call = RestChannel.Call(type, method)
+            call = RestChannel.Call(cls_type, method)
             self.calls[method] = call
-
         return call
 
-    # override
-
-    async def invoke_async(self, invocation: 'DynamicProxy.Invocation'):
+    # --- Async invoke --- #
+    async def invoke_async(self, invocation: DynamicProxy.Invocation):
         call = self.get_call(invocation.type, invocation.method)
-
         bound = call.signature.bind(self, *invocation.args, **invocation.kwargs)
         bound.apply_defaults()
         arguments = bound.arguments
 
-        # url
-
         url = call.url_template.format(**arguments)
+        # ensure there is a slash after '/api' prefix if missing (defensive)
+        url = re.sub(r'^(/api)(?=[^/])', r'\1/', url)
         query_params = {k: arguments[k] for k in call.query_param_names if k in arguments}
         body = {}
-        if call.body_param_name is not None:
-            body = call.body_serializer(arguments.get(call.body_param_name))#self.to_dict(arguments.get(call.body_param_name))
-
-        # call
+        if call.body_param_name:
+            body = call.body_serializer(arguments.get(call.body_param_name))
 
         try:
-            result = None
             if call.type in ["get", "put", "delete"]:
                 result = await self.request_async(call.type, self.get_url() + url, params=query_params, timeout=self.timeout)
-
             elif call.type == "post":
                 result = await self.request_async("post", self.get_url() + url, params=query_params, json=body, timeout=self.timeout)
-
             return self.get_deserializer(invocation.type, invocation.method)(result.json())
         except ServiceCommunicationException:
             raise
-
         except Exception as e:
             raise ServiceCommunicationException(f"communication exception {e}") from e
 
+    # --- Sync invoke --- #
     def invoke(self, invocation: DynamicProxy.Invocation):
         call = self.get_call(invocation.type, invocation.method)
-
-        bound = call.signature.bind(self,*invocation.args, **invocation.kwargs)
+        bound = call.signature.bind(self, *invocation.args, **invocation.kwargs)
         bound.apply_defaults()
         arguments = bound.arguments
 
-        # url
-
         url = call.url_template.format(**arguments)
+        # ensure there is a slash after '/api' prefix if missing (defensive)
+        url = re.sub(r'^(/api)(?=[^/])', r'\1/', url)
         query_params = {k: arguments[k] for k in call.query_param_names if k in arguments}
         body = {}
-        if call.body_param_name is not None:
-            body = call.body_serializer(arguments.get(call.body_param_name))#self.to_dict(arguments.get(call.body_param_name))
-
-        # call
+        if call.body_param_name:
+            body = call.body_serializer(arguments.get(call.body_param_name))
 
         try:
-            result = None
             if call.type in ["get", "put", "delete"]:
                 result = self.request(call.type, self.get_url() + url, params=query_params, timeout=self.timeout)
-
             elif call.type == "post":
-                result = self.request( "post", self.get_url() + url, params=query_params, json=body, timeout=self.timeout)
-
+                result = self.request("post", self.get_url() + url, params=query_params, json=body, timeout=self.timeout)
             return self.get_deserializer(invocation.type, invocation.method)(result.json())
         except ServiceCommunicationException:
             raise
-
         except Exception as e:
             raise ServiceCommunicationException(f"communication exception {e}") from e

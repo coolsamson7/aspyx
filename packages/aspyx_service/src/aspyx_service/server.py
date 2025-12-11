@@ -33,7 +33,8 @@ from .healthcheck import HealthCheckManager
 from .service import Server, ServiceManager
 from .channels import Request, Response, TokenContext
 
-from .restchannel import get, post, put, delete, rest
+from .restchannel import get, post, put, delete, rest, BodyMarker, ParamMarker
+
 
 class ResponseContext:
     response_var = contextvars.ContextVar[Optional['ResponseContext.Response']]("response", default=None)
@@ -245,104 +246,96 @@ class FastAPIServer(Server):
         from fastapi import Body as FastAPI_Body
         from pydantic import BaseModel
 
-        def wrap_service_method(handler, return_type, url_template=""):
+        def wrap_service_method(handler, method_descriptor, return_type, url_template=""):
             """
-            Wrap a service method for FastAPI:
-              - Detects body params (BodyMarker or single dataclass/Pydantic)
-              - Path params inferred from {param} in URL
-              - Query params = everything else
-              - Handles ResponseContext cookies
-              - Supports async/sync methods
-              - Preserves signature and annotations for docs
+            Wraps a service method for FastAPI:
+
+            - Detects BodyMarker, QueryParamMarker, PathParamMarker
+            - Infers body param if none is explicitly annotated
+            - Avoids double-processing manually inferred PathParams
+            - Preserves all metadata for FastAPI docs
             """
+            # `handler` is the implementation bound method (callable)
+            # `method_descriptor.method` is the original interface function that carries Annotated[...] metadata
             sig = inspect.signature(handler)
-            # copy original annotations and we'll patch them below where needed
-            annotations = dict(getattr(handler, "__annotations__", {}))
 
-            # We'll use get_type_hints with include_extras to resolve forward refs and keep Annotated metadata
-            try:
-                type_hints_with_extras = get_type_hints(handler, include_extras=True)
-            except Exception:
-                # fallback: some handlers may fail to resolve; use empty dict to continue
-                type_hints_with_extras = {}
+            # Use interface method type hints (where Annotated metadata lives)
+            type_hints_with_extras = get_type_hints(method_descriptor.method, include_extras=True)
 
-            param_names = [n for n in sig.parameters.keys() if n != "self"]
+            # Collect param metadata
+            param_metadata: dict[str, ParamMarker] = {}
 
-            # path params from url
-            path_param_names = set(re.findall(r"{(.*?)}", url_template))
-            for p in path_param_names:
-                if p in param_names:
-                    param_names.remove(p)
+            body_param_name: str | None = None
+            path_param_names: set[str] = set(re.findall(r"{(.*?)}", url_template))
+            query_param_names: set[str] = set(sig.parameters.keys()) - {"self"} - path_param_names
 
-            # detect body param
-            body_param_name = None
-
-            # 1) explicit Annotated[..., BodyMarker]
-            for name, param in sig.parameters.items():
-                typ = param.annotation
-                if get_origin(typ) is Annotated:
-                    args = get_args(typ)
-                    # metadata are args[1:]
+            # 1) Detect explicitly annotated parameters
+            for name, hint in type_hints_with_extras.items():
+                origin = get_origin(hint)
+                if origin is Annotated:
+                    args = get_args(hint)
+                    typ = args[0]
                     for meta in args[1:]:
-                        # compare by class name to avoid import / identity issues
-                        if getattr(meta, "__class__", None).__name__ == "BodyMarker":
-                            if name in param_names:
-                                param_names.remove(name)
+                        cls_name = getattr(meta, "__class__", None).__name__
+                        param_metadata[name] = meta
+                        if cls_name == "BodyMarker":
                             body_param_name = name
-                            break
-                if body_param_name:
-                    break
+                            query_param_names.discard(name)
+                        elif cls_name == "QueryParamMarker":
+                            query_param_names.add(name)
+                        elif cls_name == "PathParamMarker":
+                            path_param_names.add(name)
+                            query_param_names.discard(name)
 
-            # 2) if none, first Pydantic model or dataclass (resolve forward refs)
-            if body_param_name is None:
-                # resolve forward refs via type_hints_with_extras (keeps Annotated too)
-                for name in param_names[:]:
-                    # try to get resolved hint first
+            # 2) Fallback: infer body param if POST/PUT/PATCH and none annotated
+            if body_param_name is None and getattr(handler, "_http_method", "get").lower() in ("post", "put", "patch"):
+                for name in list(query_param_names):
                     typ = type_hints_with_extras.get(name, sig.parameters[name].annotation)
-                    # if Annotated, unwrap
                     if get_origin(typ) is Annotated:
                         typ = get_args(typ)[0]
-                    # if still a string, try fallback to handler's module globals
-                    if isinstance(typ, str):
-                        # skip unresolved forward refs
-                        continue
-                    # now test
                     if inspect.isclass(typ) and (issubclass(typ, BaseModel) or is_dataclass(typ)):
                         body_param_name = name
-                        param_names.remove(name)
+                        query_param_names.discard(name)
+                        param_metadata[name] = BodyMarker()
                         break
 
-            query_param_names = set(param_names)
-
-            # Build new signature: unwrapped body param annotated to actual type and default=FastAPI Body(...)
+            # 3) Build FastAPI parameters for signature
             new_params = []
+            annotations = dict(getattr(handler, "__annotations__", {}))
+
             for name, param in sig.parameters.items():
                 ann = param.annotation
+                default = param.default
+                meta = param_metadata.get(name)
+
                 if name == body_param_name:
                     typ = ann
                     if get_origin(typ) is Annotated:
-                        typ = get_args(typ)[0]  # unwrap Annotated
-                    # if this was a forward-ref string, try to pull resolved hint
-                    if isinstance(typ, str):
-                        typ = type_hints_with_extras.get(name, typ)
-                    # set FastAPI body default
-                    default = FastAPI_Body(...) if param.default is inspect.Parameter.empty else FastAPI_Body(
-                        param.default)
-                    new_param = param.replace(annotation=typ, default=default)
-                    # also update annotations dict so wrapper.__annotations__ matches the unwrapped type
+                        typ = get_args(typ)[0]
                     annotations[name] = typ
-                else:
-                    # ensure annotation reflects resolved type if available (optional)
-                    resolved = type_hints_with_extras.get(name)
-                    if resolved is not None:
-                        annotations[name] = resolved
-                    new_param = param
-                new_params.append(new_param)
+                    default = FastAPI_Body(...) if default is inspect.Parameter.empty else FastAPI_Body(default)
+                    new_param = param.replace(annotation=typ, default=default)
 
-            # set/ensure return annotation
-            if "return" in annotations:
-                # ensure resolved return if available
-                annotations["return"] = type_hints_with_extras.get("return", annotations["return"])
+                elif name in path_param_names:
+                    typ = ann
+                    if get_origin(typ) is Annotated:
+                        typ = get_args(typ)[0]
+                    annotations[name] = typ
+                    default = inspect.Parameter.empty
+                    new_param = param.replace(annotation=typ, default=default)
+
+                elif name in query_param_names:
+                    typ = ann
+                    if get_origin(typ) is Annotated:
+                        typ = get_args(typ)[0]
+                    annotations[name] = typ
+                    default = param.default if param.default is not inspect.Parameter.empty else None
+                    new_param = param.replace(annotation=typ, default=default)
+
+                else:
+                    new_param = param
+
+                new_params.append(new_param)
 
             new_sig = sig.replace(parameters=new_params)
 
@@ -351,15 +344,13 @@ class FastAPIServer(Server):
                 bound = new_sig.bind(*args, **kwargs)
                 bound.apply_defaults()
 
-                # Call original handler (handler is usually a bound method)
                 result = handler(*bound.args, **bound.kwargs)
                 if inspect.iscoroutine(result):
                     result = await result
 
-                # Serialize result
                 json_response = JSONResponse(get_serializer(return_type)(result))
 
-                # ResponseContext cookie handling (unchanged)
+                # ResponseContext cookie handling
                 local_response = ResponseContext.get()
                 if local_response:
                     for key, value in local_response.delete_cookies.items():
@@ -386,7 +377,6 @@ class FastAPIServer(Server):
 
                 return json_response
 
-            # ensure wrapper annotations match the unwrapped/resolved types
             wrapper.__signature__ = new_sig
             wrapper.__annotations__ = annotations
 
@@ -417,7 +407,7 @@ class FastAPIServer(Server):
                         self.router.add_api_route(
                             path=prefix + decorator.args[0],
                             endpoint=wrap_service_method(
-                                getattr(instance, method.get_name()), method.return_type, decorator.args[0]
+                                getattr(instance, method.get_name()), method, method.return_type, decorator.args[0]
                             ),
                             methods=[decorator.decorator.__name__],
                             name=f"{descriptor.get_component_descriptor().name}.{descriptor.name}.{method.get_name()}",
