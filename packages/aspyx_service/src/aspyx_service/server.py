@@ -18,6 +18,7 @@ import re
 from fastapi import Body as FastAPI_Body
 from fastapi import FastAPI, APIRouter, Request as HttpRequest, Response as HttpResponse, HTTPException
 from fastapi.datastructures import DefaultPlaceholder, Default
+from fastapi.encoders import jsonable_encoder
 
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -33,7 +34,8 @@ from .healthcheck import HealthCheckManager
 from .service import Server, ServiceManager
 from .channels import Request, Response, TokenContext
 
-from .restchannel import get, post, put, delete, rest, BodyMarker, ParamMarker
+from .restchannel import get, post, put, delete, rest, BodyMarker, ParamMarker, QueryParam, PathParam, QueryParamMarker, \
+    PathParamMarker
 
 
 class ResponseContext:
@@ -246,38 +248,36 @@ class FastAPIServer(Server):
         from fastapi import Body as FastAPI_Body
         from pydantic import BaseModel
 
+        from fastapi import Body as FastAPI_Body, Path as FastAPI_Path, Query as FastAPI_Query
+        from fastapi.responses import JSONResponse
+
         def wrap_service_method(handler, method_descriptor, return_type, url_template=""):
             """
-            Wraps a service method for FastAPI:
+            Wrap a service method for FastAPI.
 
-            - Detects BodyMarker, QueryParamMarker, PathParamMarker
-            - Infers body param if none is explicitly annotated
-            - Avoids double-processing manually inferred PathParams
-            - Preserves all metadata for FastAPI docs
+            - Detects BodyMarker, QueryParam, PathParam
+            - Infers body parameter if none is explicitly annotated
+            - Preserves metadata for OpenAPI (description, example)
+            - Preserves docstring
             """
-            # `handler` is the implementation bound method (callable)
-            # `method_descriptor.method` is the original interface function that carries Annotated[...] metadata
-            sig = inspect.signature(handler)
 
-            # Use interface method type hints (where Annotated metadata lives)
+            sig = inspect.signature(handler)
             type_hints_with_extras = get_type_hints(method_descriptor.method, include_extras=True)
 
-            # Collect param metadata
-            param_metadata: dict[str, ParamMarker] = {}
-
+            param_metadata: dict[str, object] = {}
             body_param_name: str | None = None
             path_param_names: set[str] = set(re.findall(r"{(.*?)}", url_template))
             query_param_names: set[str] = set(sig.parameters.keys()) - {"self"} - path_param_names
 
-            # 1) Detect explicitly annotated parameters
+            # 1) Detect annotated parameters
             for name, hint in type_hints_with_extras.items():
                 origin = get_origin(hint)
                 if origin is Annotated:
                     args = get_args(hint)
                     typ = args[0]
                     for meta in args[1:]:
-                        cls_name = getattr(meta, "__class__", None).__name__
                         param_metadata[name] = meta
+                        cls_name = getattr(meta, "__class__", None).__name__
                         if cls_name == "BodyMarker":
                             body_param_name = name
                             query_param_names.discard(name)
@@ -287,7 +287,7 @@ class FastAPIServer(Server):
                             path_param_names.add(name)
                             query_param_names.discard(name)
 
-            # 2) Fallback: infer body param if POST/PUT/PATCH and none annotated
+            # 2) Fallback: infer body param if POST/PUT/PATCH
             if body_param_name is None and getattr(handler, "_http_method", "get").lower() in ("post", "put", "patch"):
                 for name in list(query_param_names):
                     typ = type_hints_with_extras.get(name, sig.parameters[name].annotation)
@@ -299,7 +299,7 @@ class FastAPIServer(Server):
                         param_metadata[name] = BodyMarker()
                         break
 
-            # 3) Build FastAPI parameters for signature
+            # 3) Build new signature with FastAPI params
             new_params = []
             annotations = dict(getattr(handler, "__annotations__", {}))
 
@@ -321,7 +321,10 @@ class FastAPIServer(Server):
                     if get_origin(typ) is Annotated:
                         typ = get_args(typ)[0]
                     annotations[name] = typ
-                    default = inspect.Parameter.empty
+                    if isinstance(meta, PathParamMarker):
+                        default = FastAPI_Path(..., description=meta.description, example=meta.example)
+                    else:
+                        default = FastAPI_Path(...)
                     new_param = param.replace(annotation=typ, default=default)
 
                 elif name in query_param_names:
@@ -329,9 +332,12 @@ class FastAPIServer(Server):
                     if get_origin(typ) is Annotated:
                         typ = get_args(typ)[0]
                     annotations[name] = typ
-                    default = param.default if param.default is not inspect.Parameter.empty else None
+                    if isinstance(meta, QueryParamMarker):
+                        default = FastAPI_Query(default if default is not inspect.Parameter.empty else None,
+                                                description=meta.description, example=meta.example)
+                    else:
+                        default = FastAPI_Query(default if default is not inspect.Parameter.empty else None)
                     new_param = param.replace(annotation=typ, default=default)
-
                 else:
                     new_param = param
 
@@ -348,37 +354,13 @@ class FastAPIServer(Server):
                 if inspect.iscoroutine(result):
                     result = await result
 
-                json_response = JSONResponse(get_serializer(return_type)(result))
+                # Serialize result for FastAPI / Pydantic / dataclass
+                return JSONResponse(jsonable_encoder(result))
 
-                # ResponseContext cookie handling
-                local_response = ResponseContext.get()
-                if local_response:
-                    for key, value in local_response.delete_cookies.items():
-                        json_response.delete_cookie(
-                            key,
-                            path=value["path"],
-                            domain=value["domain"],
-                            secure=value["secure"],
-                            httponly=value["httponly"]
-                        )
-                    for key, value in local_response.cookies.items():
-                        json_response.set_cookie(
-                            key,
-                            value=value["value"],
-                            max_age=value["max_age"],
-                            expires=value["expires"],
-                            path=value["path"],
-                            domain=value["domain"],
-                            secure=value["secure"],
-                            httponly=value["httponly"],
-                            samesite=value.get("samesite", "lax")
-                        )
-                    ResponseContext.reset()
-
-                return json_response
-
+            # preserve signature and docstring
             wrapper.__signature__ = new_sig
             wrapper.__annotations__ = annotations
+            wrapper.__doc__ = handler.__doc__
 
             return wrapper
 
