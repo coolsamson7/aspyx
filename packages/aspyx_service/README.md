@@ -516,6 +516,9 @@ class FancyChannel(Channel):
 
 - service manager caches need to be properties
 
+**0.11.4**
+
+- all meta-data with respect to open-api - via annotations or docstrings - are relayed to FastAPI
 
 
 
