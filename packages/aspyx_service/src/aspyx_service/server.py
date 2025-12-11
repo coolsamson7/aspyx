@@ -38,6 +38,99 @@ from .restchannel import get, post, put, delete, rest, BodyMarker, ParamMarker, 
     PathParamMarker
 
 
+import re
+from typing import Dict, Optional, Tuple
+
+def parse_google_docstring(doc: Optional[str]) -> Dict[str, object]:
+    """
+    Parses a Google-style docstring into summary, description, arg descriptions, and return info.
+    """
+
+    if not doc:
+        return {
+            "summary": None,
+            "description": None,
+            "args": {},
+            "returns": None,
+        }
+
+    lines = doc.strip().split("\n")
+
+    # --- Extract summary (first non-empty line)
+    summary = None
+    for line in lines:
+        if line.strip():
+            summary = line.strip()
+            break
+
+    # --- Normalize indentation
+    cleaned = [line.rstrip() for line in lines]
+
+    # --- Sections detection
+    args_section = []
+    returns_section = []
+    current = "body"
+
+    for line in cleaned:
+        stripped = line.strip()
+
+        # Detect section headers
+        if stripped.startswith("Args:"):
+            current = "args"
+            continue
+        elif stripped.startswith("Returns:"):
+            current = "returns"
+            continue
+
+        # Collect lines
+        if current == "args":
+            args_section.append(stripped)
+        elif current == "returns":
+            returns_section.append(stripped)
+
+    # --- Parse Args ---
+    args: Dict[str, str] = {}
+    arg_pattern = re.compile(r'^(\w+)(\([^)]*\))?:\s*(.*)$')
+
+    current_arg = None
+    for line in args_section:
+        if not line:
+            continue
+
+        m = arg_pattern.match(line)
+        if m:
+            # Start of a new argument
+            current_arg = m.group(1)
+            args[current_arg] = m.group(3).strip()
+        elif current_arg:
+            # Indented continuation line
+            args[current_arg] += " " + line.strip()
+
+    # --- Parse Returns ---
+    return_desc = None
+    if returns_section:
+        # First line contains type + description
+        m = re.match(r'^([^:]+):\s*(.*)$', returns_section[0])
+        if m:
+            return_desc = m.group(2).strip()
+        else:
+            return_desc = returns_section[0].strip()
+
+        # Continuation lines
+        if len(returns_section) > 1:
+            return_desc += " " + " ".join(s.strip() for s in returns_section[1:])
+
+    # --- Full description (body without Args/Returns)
+    description = doc.strip()
+
+    return {
+        "summary": summary,
+        "description": description,
+        "args": args,
+        "returns": return_desc,
+    }
+
+
 class ResponseContext:
     response_var = contextvars.ContextVar[Optional['ResponseContext.Response']]("response", default=None)
 
