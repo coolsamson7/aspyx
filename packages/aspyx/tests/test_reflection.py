@@ -16,7 +16,15 @@ def transactional():
 
     return decorator
 
+def order(prio=0):
+    def decorator(cls):
+        Decorators.add(cls, order, prio=prio)
+        return cls
+    return decorator
+
+
 @transactional()
+@order(1)
 class Base:
     def __init__(self):
         pass
@@ -56,6 +64,12 @@ class TestReflection(unittest.TestCase):
         fs = fields(Dataclass)
 
         print(1)
+
+    def test_decorator_kwargs(self):
+        base_descriptor = TypeDescriptor.for_type(Base)
+
+        decorator = base_descriptor.get_decorator(order)
+        print(decorator.kwargs)
 
     def test_decorators(self):
         base_descriptor = TypeDescriptor.for_type(Base)

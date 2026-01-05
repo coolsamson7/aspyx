@@ -1279,7 +1279,8 @@ class Environment:
         "lifecycle_processors",
         "parent",
         "features",
-        "instances"
+        "instances",
+        "_lifecycle_tasks"
     ]
 
     # constructor
@@ -1313,6 +1314,7 @@ class Environment:
         self.providers: Dict[Type, AbstractInstanceProvider] = {}
         self.instances = []
         self.lifecycle_processors: list[LifecycleProcessor] = []
+        self._lifecycle_tasks = []
 
         if self.parent is not None:
             # inherit providers from parent
@@ -1612,8 +1614,25 @@ class Environment:
         """
         destroy all managed instances by calling the appropriate lifecycle methods
         """
+        import asyncio
+
+        # Clear any previous lifecycle tasks
+        self._lifecycle_tasks.clear()
+
         for instance in self.instances:
             self.execute_processors(Lifecycle.ON_DESTROY, instance)
+
+        # Wait for any async destroy tasks if we're in an async context
+        if self._lifecycle_tasks:
+            try:
+                loop = asyncio.get_running_loop()
+                # Schedule gathering of tasks in the background
+                async def _wait_for_tasks():
+                    await asyncio.gather(*self._lifecycle_tasks, return_exceptions=True)
+                asyncio.create_task(_wait_for_tasks())
+            except RuntimeError:
+                # No running loop, run synchronously
+                asyncio.run(asyncio.gather(*self._lifecycle_tasks, return_exceptions=True))
 
         self.instances.clear() # make the cy happy
 
@@ -1676,7 +1695,19 @@ class AbstractCallableProcessor(LifecycleProcessor):
             self.lifecycle_callable = lifecycle_callable
 
         def execute(self, instance, environment: Environment):
-            self.method.method(instance, *self.lifecycle_callable.args(self.decorator, self.method, environment))
+            result = self.method.method(instance, *self.lifecycle_callable.args(self.decorator, self.method, environment))
+            # If the method is async, we need to handle it
+            if inspect.iscoroutinefunction(self.method.method):
+                import asyncio
+                try:
+                    loop = asyncio.get_running_loop()
+                    # We're in an async context, create a task and track it
+                    task = asyncio.create_task(result)
+                    environment._lifecycle_tasks.append(task)
+                    return task
+                except RuntimeError:
+                    # No running loop, run synchronously (will block)
+                    asyncio.run(result)
 
         def __str__(self):
             return f"MethodCall({self.method.method.__name__})"

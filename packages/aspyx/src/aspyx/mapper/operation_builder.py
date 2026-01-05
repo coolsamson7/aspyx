@@ -2,7 +2,7 @@
 
 """
 from abc import ABC, abstractmethod
-from typing import Any, Callable, List, Optional, Type
+from typing import Any, Callable, List, Optional, Type, get_origin, get_args, Union
 from dataclasses import dataclass
 
 from .convert import TypeConversions
@@ -356,6 +356,15 @@ class TargetNode:
             return conv
         raise MapperException(f"cannot convert {source_type} to {target_type}")
 
+    def normalize_type(self, t):
+        origin = get_origin(t)
+        if origin is Union:
+            args = get_args(t)
+            non_none = [a for a in args if a is not type(None)]
+            if len(non_none) == 1:
+                return non_none[0]
+        return t
+
     def calculate_conversion(self, source_node):
         conversion = self.match.operation.converter
         deep = self.match.operation.deep
@@ -371,7 +380,8 @@ class TargetNode:
                 raise MapperException(f"conversion target type {to_type} does not match {target_type}")
             result = conversion.source_converter()
         elif source_type != target_type and not deep:
-            result = self.try_convert(source_type, target_type)
+            if self.normalize_type(source_type) != self.normalize_type(target_type):
+                result = self.try_convert(source_type, target_type)
         return result
 
     def maybe_convert(self, prop: MapperProperty, conversion):

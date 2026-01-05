@@ -7,6 +7,7 @@ import asyncio
 import logging
 import threading
 import unittest
+from abc import ABC, abstractmethod
 from typing import Dict
 
 from aspyx.di.threading import synchronized
@@ -36,10 +37,19 @@ def transactional():
 class SampleModule:
     pass
 
+@advice
+class Base(ABC):
+    @abstractmethod
+    def say(self, message: str):
+        pass
+    @around(methods().named("say"))
+    def call_around(self, invocation: Invocation):
+        return invocation.proceed()
+
 
 @injectable()
 @transactional()
-class Bar:
+class Bar(Base):
     async def say_async(self, message: str):
         await asyncio.sleep(0.01)
 
@@ -49,8 +59,11 @@ class Bar:
     def say(self, message: str):
         return f"hello {message}"
 
+
+
+
 @injectable(eager=False, scope="request")
-class Foo:
+class Foo(Base):
     def __init__(self, bar: Bar):
         self.bar = bar
 
@@ -124,6 +137,12 @@ class SampleAdvice:
     def call_after1(self, invocation: Invocation):
         self.after_calls += 1
         self.afters.append(1)
+
+    @around(methods().of_type(Base))
+    def call_around_bass(self, invocation: Invocation):
+        print("call_around_base")
+
+        return invocation.proceed()
 
     @around(methods().that_are_async())
     async def call_around_async(self, invocation: Invocation):
