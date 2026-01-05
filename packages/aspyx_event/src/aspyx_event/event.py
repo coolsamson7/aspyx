@@ -7,9 +7,10 @@ import asyncio
 import inspect
 import json
 import logging
+import uuid
 
 from abc import ABC, abstractmethod
-from typing import Type, TypeVar, Generic, Any, Optional, Coroutine, Dict
+from typing import Type, TypeVar, Generic, Any, Optional, Coroutine, Dict, Callable, List
 
 from aspyx.exception import ExceptionManager
 from aspyx.reflection import Decorators
@@ -41,6 +42,28 @@ class EventManager:
     """
     # local classes
 
+    class EventSubscription:
+        """
+        Unified descriptor for all event subscriptions (both decorator-based and runtime).
+        """
+        def __init__(
+            self,
+            subscription_id: str,
+            event_descriptor: 'EventManager.EventDescriptor',
+            callback: Callable,
+            name: str = "",
+            group: str = "",
+            per_process: bool = False,
+            metadata: Optional[Dict[str, Any]] = None
+        ):
+            self.subscription_id = subscription_id
+            self.event_descriptor = event_descriptor
+            self.callback = callback
+            self.name = name if name else f"subscription_{subscription_id[:8]}"
+            self.group = group
+            self.per_process = per_process
+            self.metadata = metadata or {}
+
     class EventDescriptor:
         """
         Covers the meta-data of an event.
@@ -56,21 +79,6 @@ class EventManager:
 
             self.broadcast : bool = args[1]
             self.durable : bool   = args[2]
-
-    class EventListenerDescriptor:
-        """
-       Covers the meta-data of an event listener.
-       """
-        def __init__(self, type: Type, event_type: Type, name: str, group: str, per_process: bool):
-            if name == "":
-                name = type.__name__
-
-            self.type : Type = type
-            self.name = name
-            self.event = EventManager.EventDescriptor(event_type)
-
-            self.group = group
-            self.per_process = per_process
 
     T = TypeVar("T")
 
@@ -168,15 +176,6 @@ class EventManager:
                 event_descriptor: the event descriptor
             """
 
-        @abstractmethod
-        def handle(self, envelope: EventManager.Envelope, event_listener_descriptor: EventManager.EventListenerDescriptor):
-            """
-            interceptor on the handling side
-            Args:
-                envelope: the envelope
-                event_listener_descriptor: the listener descriptor
-            """
-
     class Provider(EnvelopePipeline):
         """
         The bridge to a low-level queuing library.
@@ -210,7 +209,12 @@ class EventManager:
             return self.envelope_factory.for_receive(self, message, descriptor=descriptor)
 
         @abstractmethod
-        def listen_to(self, listener: EventManager. EventListenerDescriptor) -> None:
+        def listen_to_subscription(self, subscription: EventManager.EventSubscription) -> None:
+            """
+            Setup underlying queue/topic subscription for a given EventSubscription.
+            This is called by EventManager.subscribe() and should set up the provider-specific
+            infrastructure (e.g., NSQ reader, AMQP consumer, etc.)
+            """
             pass
 
     # class properties
@@ -220,9 +224,15 @@ class EventManager:
     pipelines: list[Type] = []
 
     events: dict[Type, EventDescriptor] = {}
-    event_listeners: list[EventManager.EventListenerDescriptor] = []
+
+    # Store decorator info as tuples: (listener_class, event_type, name, group, per_process)
+    event_listener_decorators: list[tuple[Type, Type, str, str, bool]] = []
 
     events_by_name: dict[str, EventDescriptor] = {}
+
+    # Instance properties for subscriptions
+    subscriptions: Dict[str, EventSubscription]  # subscription_id -> EventSubscription
+    subscriptions_by_event: Dict[str, List[EventSubscription]]  # event_name -> [subscriptions]
 
     # class methods
 
@@ -237,8 +247,9 @@ class EventManager:
         cls.events_by_name[descriptor.name] = descriptor
 
     @classmethod
-    def register_event_listener(cls, descriptor: EventManager.EventListenerDescriptor):
-        cls.event_listeners.append(descriptor)
+    def register_event_listener_decorator(cls, listener_class: Type, event_type: Type, name: str, group: str, per_process: bool):
+        """Register decorator-based listener info for later conversion to EventSubscription"""
+        cls.event_listener_decorators.append((listener_class, event_type, name, group, per_process))
 
     _loop = None
 
@@ -269,6 +280,10 @@ class EventManager:
         self.pipeline = self.provider
         self.exception_manager = exception_manager
 
+        # Initialize subscription tracking
+        self.subscriptions: Dict[str, EventManager.EventSubscription] = {}
+        self.subscriptions_by_event: Dict[str, List[EventManager.EventSubscription]] = {}
+
         provider.manager = self
 
         #self.setup()
@@ -292,8 +307,8 @@ class EventManager:
     # lifecycle
 
     @on_destroy()
-    def on_destroy(self):
-        self.provider.stop()
+    async def on_destroy(self):
+        await self.provider.stop()
 
     # internal
 
@@ -305,25 +320,169 @@ class EventManager:
 
         return descriptor
 
-    def listen_to(self, listener: EventManager.EventListenerDescriptor):
-        self.provider.listen_to(listener)
+    def get_event_descriptor_by_name(self, event_name: str) -> EventManager.EventDescriptor:
+        descriptor = self.events_by_name.get(event_name, None)
+
+        if descriptor is None:
+            raise EventException(f"No event found with name '{event_name}'")
+
+        return descriptor
+
+    async def subscribe(
+        self,
+        event_type: Type | str,
+        callback: Callable,
+        name: str = "",
+        group: str = "",
+        per_process: bool = False,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> str:
+        """
+        Unified subscription API for both decorator-based and runtime subscriptions.
+
+        Args:
+            event_type: Event class Type or event name string
+            callback: Callable (sync or async) to handle the event
+            name: Subscription name
+            group: Subscription group
+            per_process: If True, only one listener per process handles the event
+            metadata: Optional metadata dictionary
+            is_static: True if this is a decorator-based subscription
+
+        Returns:
+            str: subscription_id for later unsubscribe
+        """
+        # Resolve event descriptor
+        if isinstance(event_type, str):
+            event_descriptor = self.get_event_descriptor_by_name(event_type)
+        else:
+            event_descriptor = self.get_event_descriptor(event_type)
+
+        # Generate unique subscription ID
+        subscription_id = str(uuid.uuid4())
+
+        # Create subscription
+        subscription = EventManager.EventSubscription(
+            subscription_id=subscription_id,
+            event_descriptor=event_descriptor,
+            callback=callback,
+            name=name,
+            group=group,
+            per_process=per_process,
+            metadata=metadata
+        )
+
+        # Store subscription
+        self.subscriptions[subscription_id] = subscription
+
+        # Index by event name
+        event_name = event_descriptor.name
+        if event_name not in self.subscriptions_by_event:
+            self.subscriptions_by_event[event_name] = []
+        self.subscriptions_by_event[event_name].append(subscription)
+
+        # Notify provider to setup underlying queue/topic subscription
+        self.provider.listen_to_subscription(subscription)
+
+        self.logger.info(f"Subscribed to event '{event_name}' with subscription_id={subscription_id}, name={subscription.name}")
+
+        return subscription_id
+
+    async def unsubscribe(self, subscription_id: str) -> bool:
+        """
+        Remove a subscription by ID.
+
+        Args:
+            subscription_id: The subscription ID returned from subscribe()
+
+        Returns:
+            bool: True if subscription was found and removed, False otherwise
+        """
+        subscription = self.subscriptions.get(subscription_id)
+
+        if subscription is None:
+            self.logger.warning(f"Attempted to unsubscribe non-existent subscription: {subscription_id}")
+            return False
+
+        # Remove from event index
+        event_name = subscription.event_descriptor.name
+        if event_name in self.subscriptions_by_event:
+            self.subscriptions_by_event[event_name] = [
+                s for s in self.subscriptions_by_event[event_name]
+                if s.subscription_id != subscription_id
+            ]
+
+        # Remove from main registry
+        del self.subscriptions[subscription_id]
+
+        self.logger.info(f"Unsubscribed subscription_id={subscription_id}, name={subscription.name}")
+
+        return True
+
+    def list_subscriptions(self, event_name: Optional[str] = None) -> List[EventManager.EventSubscription]:
+        """
+        List active subscriptions, optionally filtered by event name.
+
+        Args:
+            event_name: Optional event name to filter subscriptions
+
+        Returns:
+            List of EventSubscription objects
+        """
+        if event_name:
+            return self.subscriptions_by_event.get(event_name, [])
+        else:
+            return list(self.subscriptions.values())
 
     async def setup(self):
         # start
 
         await self.provider.start()
 
-        # listeners
+        # Convert decorator-based listeners to unified subscriptions
 
-        for listener in self.event_listeners:
-            # replace initial object
+        for listener_class, event_type, name, group, per_process in self.event_listener_decorators:
+            # Get the listener instance from DI
+            listener_instance = self.environment.get(listener_class)
 
-            listener.event = self.get_event_descriptor(listener.event.type)
+            if listener_instance is None:
+                self.logger.error(f"Could not get listener instance for {listener_class.__name__}")
+                continue
 
-            # install listener
+            # Resolve name
+            listener_name = name if name else listener_class.__name__
 
-            self.listen_to(listener)
+            # Create wrapper callback that delegates to listener.on()
+            async def create_callback(listener_inst, cls_name):
+                async def callback_wrapper(event):
+                    try:
+                        if inspect.iscoroutinefunction(listener_inst.on):
+                            await listener_inst.on(event)
+                        else:
+                            listener_inst.on(event)
+                    except Exception as e:
+                        if self.exception_manager is not None:
+                            self.exception_manager.handle(e)
+                        else:
+                            self.logger.error(
+                                f"Exception in listener {cls_name}: {e}",
+                                exc_info=True
+                            )
+                            raise e
 
+                return callback_wrapper
+
+            callback = await create_callback(listener_instance, listener_name)
+
+            # Use unified subscribe API
+            await self.subscribe(
+                event_type=event_type,
+                callback=callback,
+                name=listener_name,
+                group=group,
+                per_process=per_process,
+                metadata={"is_static": True, "listener_class": listener_class.__name__}
+            )
 
     def get_listener(self, type: Type) -> Optional[EventListener]:
         return self.environment.get(type)
@@ -333,10 +492,19 @@ class EventManager:
 
         return json.dumps(dict)
 
-    def dispatch_event(self, descriptor: EventManager.EventListenerDescriptor, event: Any):
-        #event = get_deserializer(descriptor.event.type)(json.loads(body)) # TODO!!!!!!!!
+    def dispatch_event(self, event_name: str, event: Any):
+        """
+        Dispatch an event to all subscriptions for that event.
 
-        listener = self.get_listener(descriptor.type)
+        Args:
+            event_name: The name of the event
+            event: The event object
+        """
+        subscriptions = self.subscriptions_by_event.get(event_name, [])
+
+        if not subscriptions:
+            self.logger.warning(f"No subscriptions found for event '{event_name}'")
+            return
 
         def safe_schedule(coro: Coroutine):
             try:
@@ -349,22 +517,32 @@ class EventManager:
             except RuntimeError:
                 asyncio.run(coro)
 
-        async def call_handler(listener, event):
+        async def call_handler(subscription: EventManager.EventSubscription, event: Any):
             try:
-                if inspect.iscoroutinefunction(listener.on):
-                    await listener.on(event)
+                if inspect.iscoroutinefunction(subscription.callback):
+                    await subscription.callback(event)
                 else:
-                    listener.on(event)
+                    subscription.callback(event)
             except Exception as e:
                 if self.exception_manager is not None:
-                    raise self.exception_manager.handle(e)##
+                    try:
+                        self.exception_manager.handle(e)
+                    except Exception as handled_exception:
+                        self.logger.error(
+                            f"Exception in subscription '{subscription.name}' for event '{event_name}': {handled_exception}",
+                            exc_info=True
+                        )
+                        raise handled_exception
+                else:
+                    self.logger.error(
+                        f"Exception in subscription '{subscription.name}' for event '{event_name}': {e}",
+                        exc_info=True
+                    )
+                    raise e
 
-                self.logger.error(f"caught an exception: {e} while dispatching event {descriptor.event.name}")
-                raise e
-
-        # schedule the async wrapper in main loop
-
-        safe_schedule(call_handler(listener, event))
+        # Dispatch to all subscriptions
+        for subscription in subscriptions:
+            safe_schedule(call_handler(subscription, event))
 
     # public
 
@@ -416,7 +594,7 @@ def event_listener(event: Type, name="", group="", per_process = False):
     def decorator(cls):
         Decorators.add(cls, event_listener, event, name, group, per_process)
 
-        EventManager.register_event_listener(EventManager.EventListenerDescriptor(cls, event, name, group, per_process))
+        EventManager.register_event_listener_decorator(cls, event, name, group, per_process)
         Providers.register(ClassInstanceProvider(cls, False))
 
         return cls
@@ -450,6 +628,3 @@ class AbstractEnvelopePipeline(EventManager.EnvelopePipeline):
 
     async def proceed_send(self, envelope: EventManager.Envelope, event_descriptor: EventManager.EventDescriptor):
         await self.next.send(envelope, event_descriptor)
-
-    def proceed_handle(self, envelope: EventManager.Envelope, descriptor: EventManager.EventListenerDescriptor):
-        self.next.handle(envelope, descriptor)

@@ -6,6 +6,7 @@ from .event import EventManager, EventListener, event, event_listener, envelope_
 from .event_stomp import StompProvider
 from .event_amqp import AMQPProvider
 from .event_nsq import NSQProvider
+from .event_ws import WebSocketManager, websocket_endpoint, ClientSubscription
 
 @module()
 class EventModule:
@@ -34,5 +35,15 @@ __all__ = [
 
     # event_nsq
 
-    "NSQProvider"
+    "NSQProvider",
+
+    # websocket
+
+    "WebSocketManager",
+    "websocket_endpoint",
+    "ClientSubscription"
 ]
+
+# Export nested classes for external API usage
+EventSubscription = EventManager.EventSubscription
+__all__.append("EventSubscription")

@@ -112,41 +112,36 @@ class AMQPProvider(MessagingHandler, EventManager.Provider):
 
     # internal
 
-    def create_receiver(self, address: str, listener: EventManager.EventListenerDescriptor) -> Receiver:
+    def create_receiver_for_subscription(self, address: str, subscription: EventManager.EventSubscription) -> Receiver:
+        """Create AMQP receiver for a subscription"""
         class DispatchMessageHandler(MessagingHandler):
-            # constructor
-
-            def __init__(self, provider: AMQPProvider, listener: EventManager.EventListenerDescriptor):
+            def __init__(self, provider: AMQPProvider, subscription: EventManager.EventSubscription):
                 super().__init__()
 
-                self.listener = listener
+                self.subscription = subscription
                 self.provider = provider
 
-            # override
-
             def on_message(self, event: Event):
-                self.provider.dispatch(event, self.listener)
+                self.provider.dispatch_subscription(event, self.subscription)
 
-        self.logger.info("create receiver %s", address)
+        self.logger.info("create receiver for subscription %s at %s", subscription.name, address)
 
-        receiver = self.container.create_receiver(self._connection, address, handler=DispatchMessageHandler(self, listener))
-
-        #source = Source(address=address, durable=Terminus.DELIVERIES)
-        self._receivers[address] = receiver  # if it exists?
+        receiver = self.container.create_receiver(self._connection, address, handler=DispatchMessageHandler(self, subscription))
+        self._receivers[address] = receiver
 
         return receiver
 
-    def dispatch(self, event: Event, listener: EventManager.EventListenerDescriptor):
-        AMQPProvider.logger.debug("on_message")
+    def dispatch_subscription(self, event: Event, subscription: EventManager.EventSubscription):
+        """Dispatch message to subscription"""
+        AMQPProvider.logger.debug("on_message for subscription %s", subscription.name)
 
-        envelope = self.envelope_factory.for_receive(event.message)
+        envelope = self.envelope_factory.for_receive(self, event.message, subscription.event_descriptor)
 
         try:
-            self.manager.pipeline.handle(envelope, listener)
-
+            self.manager.dispatch_event(subscription.event_descriptor.name, envelope.event)
             event.delivery.settle()
         except Exception as e:
-            pass # already handled
+            AMQPProvider.logger.error(f"Error dispatching to subscription {subscription.name}: {e}", exc_info=True)
 
 
     def get_sender(self, address: str) -> Sender:
@@ -214,30 +209,32 @@ class AMQPProvider(MessagingHandler, EventManager.Provider):
     async def start(self):
         self.thread.start()
 
-    def listen_to(self, listener: EventManager.EventListenerDescriptor) -> None:
+    def listen_to_subscription(self, subscription: EventManager.EventSubscription) -> None:
+        """
+        Setup AMQP receiver for a subscription.
+        """
         self._ready.wait(timeout=5)
 
         class CreateReceiverHandler(AMQPProvider.AMQHandler):
-            def __init__(self, provider: AMQPProvider, address: str, listener: EventManager.EventListenerDescriptor):
+            def __init__(self, provider: AMQPProvider, address: str, subscription: EventManager.EventSubscription):
                 super().__init__(provider)
 
                 self.address = address
-                self.listener = listener
+                self.subscription = subscription
 
             def on_timer_task(self, event):
-                self.provider.create_receiver(address, self.listener)
+                self.provider.create_receiver_for_subscription(self.address, self.subscription)
 
-        # <event-name>::<listener-name>[-<server-name>]
-
-        address = listener.event.name + "::" + listener.name
-        if listener.per_process:
+        # <event-name>::<subscription-name>[-<server-name>]
+        address = subscription.event_descriptor.name + "::" + subscription.name
+        if subscription.per_process:
             address = address + f"-{self.server_name}"
 
-        if listener.event.durable:
+        if subscription.event_descriptor.durable:
             address = address + "?durable=true"
 
-        if  self._receivers.get(address, None) is None:
-            self.container.schedule(0, CreateReceiverHandler(self, address, listener))
+        if self._receivers.get(address, None) is None:
+            self.container.schedule(0, CreateReceiverHandler(self, address, subscription))
 
     # implement EnvelopePipeline
 
@@ -264,6 +261,3 @@ class AMQPProvider(MessagingHandler, EventManager.Provider):
 
         self._ready.wait(timeout=5)
         self.container.schedule(0, SendHandler(self, envelope, address))
-
-    def handle(self, envelope: EventManager.Envelope, event_listener_descriptor: EventManager.EventListenerDescriptor):
-        self.manager.dispatch_event(event_listener_descriptor, envelope.get_body())

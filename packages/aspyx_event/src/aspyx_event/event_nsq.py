@@ -72,7 +72,7 @@ class NSQProvider(EventManager.Provider):
 
     # slots
 
-    __slots__ = ["host", "port", "writer", "readers", "loop"]
+    __slots__ = ["host", "port", "writer", "readers", "reader_tasks", "loop"]
 
     # constructor
 
@@ -84,6 +84,7 @@ class NSQProvider(EventManager.Provider):
         self.port = int(port)
         self.writer : Optional[Writer] = None
         self.readers = []
+        self.reader_tasks = []
         self.loop = None
 
     # lifecycle
@@ -97,10 +98,24 @@ class NSQProvider(EventManager.Provider):
 
     @on_destroy()
     async def stop(self):
+        # Cancel all reader loop tasks
+        for task in self.reader_tasks:
+            if not task.done():
+                task.cancel()
+
+        # Wait for tasks to be cancelled
+        if self.reader_tasks:
+            await asyncio.gather(*self.reader_tasks, return_exceptions=True)
+
+        self.reader_tasks.clear()
+
+        # Close all readers
         for reader, _ in self.readers:
             await reader.close()
 
         self.readers.clear()
+
+        # Close writer
         if self.writer:
             await self.writer.close()
             self.writer = None
@@ -113,32 +128,64 @@ class NSQProvider(EventManager.Provider):
 
         await self.writer.pub(descriptor.name, envelope.encode())
 
-    def listen_to(self, listener: EventManager.EventListenerDescriptor):
+    def listen_to_subscription(self, subscription: EventManager.EventSubscription):
+        """
+        Setup NSQ reader for a subscription.
+        """
         if self.loop is None:
             self.loop = asyncio.get_running_loop()
 
         async def _create_reader():
             async def handler(msg: NSQMessage):
-                envelope = self.create_receiver_envelope(msg.body, descriptor=listener.event)
+                envelope = self.create_receiver_envelope(msg.body, descriptor=subscription.event_descriptor)
 
-                self.manager.pipeline.handle(envelope, listener)
+                # Dispatch directly to the event manager with event name
+                self.manager.dispatch_event(subscription.event_descriptor.name, envelope.event)
 
-                await msg.fin() # TODO exception handling?
+                await msg.fin()
+
+            # Use subscription name as NSQ channel
+            # For per_process subscriptions, use the same channel name across processes
+            # For non-per_process, each subscription gets its own channel
+
+            channel_name = subscription.metadata.get("channel", "")
+            if channel_name == "":
+                channel_name = subscription.name if subscription.per_process else f"{subscription.name}_{subscription.subscription_id[:8]}"
+
+            import logging
+            logger = logging.getLogger("aspyx.event.nsq")
+            logger.info(f"Creating NSQ reader - Topic: {subscription.event_descriptor.name}, Channel: {channel_name}, Per-process: {subscription.per_process}")
 
             reader = await ansq.create_reader(
-                topic=listener.event.name,
-                channel=listener.name,  # could just be listener.name or unique per-listener
+                topic=subscription.event_descriptor.name,
+                channel=channel_name,
                 nsqd_tcp_addresses=[f"{self.host}:{self.port}"]
             )
             self.readers.append((reader, handler))
 
-            # launch reader loop
+            # launch reader loop with reconnection
             async def reader_loop():
-                async for msg in reader.messages():
-                    await handler(msg)
-            self.loop.create_task(reader_loop())
+                import logging
+                logger = logging.getLogger("aspyx.event.nsq")
+
+                while True:
+                    try:
+                        async for msg in reader.messages():
+                            await handler(msg)
+                        # If we exit the loop normally, the connection was closed
+                        logger.warning(f"NSQ reader connection closed for {subscription.event_descriptor.name}, reconnecting...")
+                        # Reconnect by creating a new reader
+                        await reader.reconnect()
+                    except asyncio.CancelledError:
+                        # Task was cancelled during shutdown
+                        logger.info(f"NSQ reader for {subscription.event_descriptor.name} cancelled")
+                        break
+                    except Exception as e:
+                        logger.error(f"Error in reader loop for {subscription.event_descriptor.name}: {e}", exc_info=True)
+                        # Wait a bit before reconnecting
+                        await asyncio.sleep(1)
+
+            task = self.loop.create_task(reader_loop())
+            self.reader_tasks.append(task)
 
         self.loop.create_task(_create_reader())
-
-    def handle(self, envelope: EventManager.Envelope, event_listener_descriptor: EventManager.EventListenerDescriptor):
-        self.manager.dispatch_event(event_listener_descriptor, envelope.event)

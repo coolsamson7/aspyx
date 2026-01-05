@@ -49,7 +49,7 @@ class LocalProvider(EventManager.Provider):
         super().__init__(LocalProvider.LocalEnvelopeFactory())
 
         self.environment : Optional[Environment] = None
-        self.listeners : list[EventManager.EventListenerDescriptor] = []
+        self.subscription : list[EventManager.EventSubscription] = []
 
     # inject
 
@@ -59,15 +59,10 @@ class LocalProvider(EventManager.Provider):
 
     # implement Provider
 
-    def listen_to(self, listener: EventManager.EventListenerDescriptor) -> None:
-        self.listeners.append(listener)
+    def listen_to_subscription(self, subscription: EventManager.EventSubscription):
+        self.subscription.append(subscription)
 
     # implement EnvelopePipeline
 
     async def send(self, envelope: EventManager.Envelope, event_descriptor: EventManager.EventDescriptor):
-        for listener in self.listeners:
-            if listener.event is event_descriptor:
-                self.manager.pipeline.handle(envelope, listener)
-
-    def handle(self, envelope: EventManager.Envelope, event_listener_descriptor: EventManager.EventListenerDescriptor):
-        self.manager.dispatch_event(event_listener_descriptor, envelope.event)
+        self.manager.dispatch_event(event_descriptor.name, envelope.event)

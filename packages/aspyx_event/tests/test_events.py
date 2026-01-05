@@ -9,9 +9,7 @@ from typing import Optional
 
 from aspyx.exception import ExceptionManager, handle
 from aspyx.util import Logger
-from packages.aspyx_event.tests.provider import LocalProvider
-
-#from .provider import LocalProvider
+from .provider import LocalProvider
 
 Logger.configure(default_level=logging.INFO, levels={
     "httpx": logging.ERROR,
@@ -56,11 +54,6 @@ class SessionPipeline(AbstractEnvelopePipeline):
         envelope.set("session", "session")
 
         await self.proceed_send(envelope, event_descriptor)
-
-    def handle(self, envelope: EventManager.Envelope, event_listener_descriptor: EventManager.EventListenerDescriptor):
-        session = envelope.get("session")
-
-        self.proceed_handle(envelope, event_listener_descriptor)
 
 
 sync_event_received  : Optional[asyncio.Event] = None

@@ -97,13 +97,15 @@ class StompProvider(EventManager.Provider, stomp.ConnectionListener):
     #def create_envelope(self, body="", headers = None) -> EventManager.Envelope:
     #TODO    return StompProvider.StompEnvelope(body=body, headers=headers)
 
-    def listen_to(self, listener: EventManager.EventListenerDescriptor) -> None:
-        self.connection.subscribe(destination=f"/queue/{listener.event.name}", id=f"id-{listener.event.name}", ack="auto")
+    def listen_to_subscription(self, subscription: EventManager.EventSubscription) -> None:
+        """
+        Setup Stomp subscription for an event subscription.
+        """
+        destination = f"/queue/{subscription.event_descriptor.name}"
+        subscription_id = f"id-{subscription.subscription_id}"
+        self.connection.subscribe(destination=destination, id=subscription_id, ack="auto")
 
     # implement EnvelopePipeline
 
     def send(self, envelope: EventManager.Envelope, event_descriptor: EventManager.EventDescriptor):
         self.connection.send(body=envelope.get_body(), destination=f"/queue/{event_descriptor.name}")
-
-    def handle(self, envelope: EventManager.Envelope, event_listener_descriptor: EventManager.EventListenerDescriptor):
-        self.manager.dispatch_event(event_listener_descriptor, envelope.get_body())
