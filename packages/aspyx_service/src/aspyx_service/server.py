@@ -22,6 +22,7 @@ from fastapi.encoders import jsonable_encoder
 
 from fastapi.responses import JSONResponse
 from fastapi import Body as FastAPI_Body, Path as FastAPI_Path, Query as FastAPI_Query
+from fastapi.routing import APIRoute
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from aspyx.di import Environment, on_init, inject_environment, on_destroy
@@ -279,7 +280,7 @@ class FastAPIServer(Server):
         self.deserializers = CopyOnWriteCache[str, list[Callable]]()
 
         # dispatch endpoint
-        self.router.post("/invoke")(self.invoke)
+        self.router.post("/invoke", summary="generic method dispatcher", description="this endpoint is used to invoke any service method based on service, method and parameter info")(self.invoke)
 
     @inject_environment()
     def set_environment(self, environment: Environment):
@@ -292,9 +293,10 @@ class FastAPIServer(Server):
         self.fast_api.include_router(self.router)
 
         # debug: print routes
-        # print("=== Registered FastAPI routes ===")
-        # for r in self.fast_api.routes:
-        #     print(r.name, r.path, sorted(r.methods))
+        print("=== Registered FastAPI routes ===")
+        for r in self.fast_api.routes:
+            if isinstance(r, APIRoute):
+                print(r.name, r.path, sorted(r.methods))
 
         def cleanup():
             self.service_manager.shutdown()

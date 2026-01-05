@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from pydantic import BaseModel
 
-from aspyx_service import ServiceModule, delete, post, put, get, rest, Body
+from aspyx_service import ServiceModule, delete, post, put, get, rest, Body, PathParam, QueryParam
 from aspyx_service.service import  component, Component, Service, service
 
 from aspyx.di import module
@@ -93,6 +93,11 @@ class TestAsyncService(Service):
 @service(name="test-rest-service", description="cool")
 @rest("/api")
 class TestRestService(Service):
+    @get("get/{param}", description="get description", summary="get summary", tags=["portal"])
+    def test_get(self, param: PathParam(str, description="param is cool", example="param example"),
+                 qp: QueryParam(str, description="query apram descritopn", example="qp example")) -> str:
+        pass
+
     @abstractmethod
     @get("/hello/{message}")
     def get(self, message: str) -> str:
@@ -113,6 +118,9 @@ class TestRestService(Service):
     @delete("/hello/{message}")
     def delete(self, message: str) -> str:
         pass
+
+
+
 
 @service(name="test-async-rest-service", description="cool")
 @rest("/async-api")

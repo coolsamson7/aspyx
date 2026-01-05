@@ -9,7 +9,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 import jwt
-from aspyx_service.restchannel import BodyMarker
+from aspyx_service.restchannel import BodyMarker, PathParam
 from fastapi import HTTPException, FastAPI
 
 from abc import abstractmethod
@@ -28,7 +28,7 @@ from aspyx_service import service, Service, component, Component, \
     implementation, health, AbstractComponent, ChannelAddress, inject_service, \
     FastAPIServer, Server, ServiceModule, ServiceManager, \
     HealthCheckManager, get, post, rest, put, delete, Body, SessionManager, RequestContext, \
-    TokenContextMiddleware, ProtobufManager
+    TokenContextMiddleware, ProtobufManager, QueryParam
 from aspyx.di.aop import advice, error, Invocation
 from aspyx.exception import ExceptionManager, handle
 from aspyx.util import Logger
@@ -225,6 +225,13 @@ def requires_response():
 @service(name="test-rest-service", description="cool")
 @rest("/api")
 class TestRestService(Service):
+    __test__ = False  # prevent pytest from collecting service methods as tests
+    @get("/test_get/{param}", description="get description", summary="get summary", tags=["portal"])
+    def test_get(self, param: PathParam(str, description="param is cool", example="param example"),
+                 qp: QueryParam(str, description="query apram descritopn", example="qp example")) -> str:
+        pass
+
+
     @abstractmethod
     @get("/get/{message}")
     @requires_response()
@@ -236,11 +243,11 @@ class TestRestService(Service):
         pass
 
     @post("/post_pydantic/{message}")
-    def post_pydantic(self, message: str, data: Body(Pydantic)) -> Pydantic:
+    def post_pydantic(self, message: str, data: Body(Pydantic, description="foo")) -> Pydantic:
         pass
 
     @post("/post_data/{message}")
-    def post_data(self, message: str, data:Body(Data)) -> Data:
+    def post_data(self, message: str, data: Body(Data, description="bar")) -> Data:
         pass
 
     @delete("/delete/{message}")
@@ -250,6 +257,7 @@ class TestRestService(Service):
 @service(name="test-async-rest-service", description="cool")
 @rest("/async-api")
 class TestAsyncRestService(Service):
+    __test__ = False  # prevent pytest from collecting service methods as tests
     @abstractmethod
     @get("/get/{message}")
     async def get(self, message: str) -> str:
@@ -309,6 +317,13 @@ class TestAsyncServiceImpl(TestAsyncService):
 
 @implementation()
 class TestRestServiceImpl(TestRestService):
+    @get("get/{param}", description="get description", summary="get summary", tags=["portal"])
+    def test_get(self, param: str,
+                 qp: str) -> str:
+        print(f"###### test_get/{param}/{qp}")
+        return param + qp
+
+
     @requires_response()
     def get(self, message: str) -> str:
         #TODO response = ResponseContext.get()

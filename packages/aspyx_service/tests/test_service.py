@@ -99,14 +99,17 @@ class TestSyncRemoteService:
     def test_dispatch_rest(self, service_manager):
         test_service = service_manager.get_service(TestRestService, preferred_channel="rest")
 
-        #result = test_service.get("hello")
-        #assert result == "hello"
+        result = test_service.test_get("p", "qp")
+        assert result == "pqp"
 
-        #result = test_service.put("hello")
-        #assert result == "hello"
+        result = test_service.get("hello")
+        assert result == "hello"
 
-        #result = test_service.delete("hello")
-        #assert result == "hello"
+        result = test_service.put("hello")
+        assert result == "hello"
+
+        result = test_service.delete("hello")
+        assert result == "hello"
 
         # data and pydantic
 

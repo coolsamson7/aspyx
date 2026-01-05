@@ -56,6 +56,9 @@ class TestRestServiceImpl(TestRestService):
     def __init__(self):
         pass
 
+    def test_get(self, param:str, qp:str) -> str:
+        return param + qp
+
     def get(self, message: str) -> str:
         return message
 
@@ -156,7 +159,7 @@ class ServerModule:
 
     @create()
     def create_server(self, service_manager: ServiceManager, component_registry: ComponentRegistry, protobuf_manager: ProtobufManager) -> FastAPIServer:
-        return FastAPIServer(self.fastapi, service_manager, component_registry, protobuf_manager)
+        return FastAPIServer(self.fastapi, service_manager, component_registry)
 
     @create()
     def create_session_storage(self) -> SessionManager.Storage:
