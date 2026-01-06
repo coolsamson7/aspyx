@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from typing import Optional, Any, Callable, List
+from typing import Optional, Any, Callable, List, TypeVar, overload
 from typing import Generic, Type, TypeVar
 
 from sqlalchemy.orm import declarative_base
@@ -16,6 +16,7 @@ from .transactional import _current_session
 
 Base = declarative_base()
 
+R = TypeVar("R")
 T = TypeVar("T")
 
 def query():
@@ -75,15 +76,43 @@ class BaseRepository(Generic[T]):
 
     # query stuff
 
-    def find(self, id_, mapper: Optional[Mapper] = None) -> T | None:
+    @overload
+    def find(self, id_, mapper: None = None) -> T | None:
+        ...
+
+    @overload
+    def find(self, id_, mapper: Mapper[T, R]) -> R | None:
+        ...
+
+    def find(self, id_, mapper: Optional[Mapper] = None):
         result = self.get_current_session().get(self.model, id_)
         if result is not None:
             return mapper.map(result) if mapper is not None else result
+        else:
+            return None
+
+    @overload
+    def get(self, id_, mapper: None = None) -> T:
+        ...
+
+    @overload
+    def get(self, id_, mapper: Mapper[T, R]) -> R:
+        ...
 
     def get(self, id_, mapper: Optional[Mapper] = None) -> T:
         result = self.get_current_session().get(self.model, id_)
         if result is not None:
             return mapper.map(result) if mapper is not None else result
+        else:
+            return None
+
+    @overload
+    def find_all(self, mapper: None = None) -> List[T]:
+        ...
+
+    @overload
+    def find_all(self, mapper: Mapper[T, R]) -> List[R]:
+        ...
 
     def find_all(self, mapper: Optional[Mapper] = None) -> List[T]:
         result = list(self.get_current_session().query(self.model))
