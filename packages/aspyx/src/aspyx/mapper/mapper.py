@@ -2,7 +2,7 @@
 
 """
 
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type, TypeVar, Generic
 from dataclasses import dataclass
 
 from .convert import Convert
@@ -10,6 +10,8 @@ from .operation_builder import MapperException, MapperProperty, IntermediateResu
 from .transformer import Transformer
 from ..reflection.reflection import TypeDescriptor, is_list_type, get_list_element_type
 
+S = TypeVar("S")  # Source type
+T = TypeVar("T")  # Target type
 
 # Property implementations used by Accessors
 
@@ -247,10 +249,10 @@ class MapAccessor(MapOperation):
 def path(*args: str):
     return [x for x in args if x is not None]
 
-class MappingDefinition:
-    def __init__(self, source: Type=None, target: Type=None):
-        self.source_class = source
-        self.target_class = target
+class MappingDefinition(Generic[S, T]):
+    def __init__(self, source: Type[S] = None, target: Type[T] = None):
+        self.source_class: Type[S] = source
+        self.target_class: Type[T] = target
         self.operations: List[MapOperation] = []
         self.intermediate_result_definitions = []
         self.finalizer = None
@@ -324,8 +326,8 @@ class MappingDefinition:
         self.finalizer = finalizer_func
         return self
 
-def mapping():
-    return MappingDefinition()
+def mapping(source: Type[S] = None, target: Type[T] = None) -> MappingDefinition[S, T]:
+    return MappingDefinition(source=source, target=target)
 
 class MappingState:
     def __init__(self, context):
@@ -388,8 +390,8 @@ class MappingKey:
     def __hash__(self):
         return 0
 
-class Mapping(Transformer[MappingContext]):
-    def __init__(self, mapper, definition, constructor, stack_size, intermediate_result_definitions, operations, finalizer):
+class Mapping(Generic[S, T], Transformer[MappingContext]):
+    def __init__(self, mapper, definition: MappingDefinition[S, T], constructor, stack_size, intermediate_result_definitions, operations, finalizer):
         super().__init__(operations=operations)
 
         self.mapper = mapper
@@ -405,18 +407,20 @@ class Mapping(Transformer[MappingContext]):
         context.setup(self.intermediate_result_definitions, self.stack_size)
         return state
 
-    def new_instance(self):
+    def new_instance(self) -> T:
         return self.constructor()
-    def transform_target(self, source, target, context: MappingContext):
+
+    def transform_target(self, source: S, target: T, context: MappingContext):
         for op in self.operations:
             op.set_target(source, target, context)
 
-class Mapper:
+
+class Mapper(Generic[S, T]):
 
     def __init__(self, *definitions: MappingDefinition, config: Optional[dict]=None):
         self.mapping_definitions = list(definitions)
-        self.mappings: Dict[MappingKey, Mapping] = {}
-        self.by_source_type_mappings: Dict[Type, Mapping] = {}
+        self.mappings: Dict[MappingKey, Mapping[Any, Any]] = {}
+        self.by_source_type_mappings: Dict[Type, Mapping[Any, Any]] = {}
         self.check_cycles = False
         for definition in definitions:
             mapping = definition.create_mapping(self)
@@ -449,7 +453,7 @@ class Mapper:
             raise MapperException(f"No mapping found for <{source}, {target}>")
         return m
 
-    def map(self, source, target: Optional[Any] = None, context: Optional[MappingContext]=None, mapping: Optional[Mapping]=None):
+    def map(self, source: S, target: Optional[T] = None, context: Optional[MappingContext]=None, mapping: Optional[Mapping[S, T]]=None) -> Optional[T]:
         if source is None:
             return None
         # if mapping not provided, try to infer by source runtime type and a registered mapping
