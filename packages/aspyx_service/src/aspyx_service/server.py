@@ -507,7 +507,8 @@ class FastAPIServer(Server):
                             response_model=method.return_type,
                             summary=summary,
                             description=description,
-                            tags=decorator.kwargs.get("tags"),
+                            tags=decorator.kwargs.get("tags") or [descriptor.type.__name__],
+                            operation_id=method.get_name(),
                         )
 
     # -------------------------
