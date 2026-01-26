@@ -9,7 +9,7 @@ from typing import Optional
 
 from aspyx.exception import ExceptionManager, handle
 from aspyx.util import Logger
-from .provider import LocalProvider
+#from .provider import LocalProvider
 
 Logger.configure(default_level=logging.INFO, levels={
     "httpx": logging.ERROR,
@@ -180,8 +180,8 @@ class Module:
 
     @create()
     def create_event_manager(self) -> EventManager:
-        return EventManager(LocalProvider(), exception_manager=self.create_exception_manager())
-        #return EventManager(NSQProvider(nsqd_address="127.0.0.1:4150", encoding="cbor"))
+        #return EventManager(LocalProvider(), exception_manager=self.create_exception_manager())
+        return EventManager(NSQProvider(nsqd_address="127.0.0.1:4150", encoding="cbor"))
         # EventManager(StompProvider(host="localhost", port=61616, user="artemis", password="artemis"))
         # EventManager(AMQPProvider("server-id", host="localhost", port=5672, user="artemis", password="artemis"))
 
@@ -192,12 +192,11 @@ class TestLocalService:
 
         global sync_event_received, async_event_received
 
-        await environment.get(EventManager).setup()
+        event_manager = environment.get(EventManager)
+        await event_manager.setup()
 
         sync_event_received  = asyncio.Event()
         async_event_received = asyncio.Event()
-
-        event_manager = environment.get(EventManager)
 
         await asyncio.sleep(0.5)
 
@@ -213,6 +212,12 @@ class TestLocalService:
         #assert event == SyncListener.received, "events not =="
         assert event == AsyncListener.received, "events not =="
 
+        # Cleanup using Environment.destroy()
+        environment.destroy()
+        # Wait for the async lifecycle tasks created by destroy()
+        if environment._lifecycle_tasks:
+            await asyncio.gather(*environment._lifecycle_tasks, return_exceptions=True)
+
     async def test_api_based_subscription(self):
         """
         Test API-based event subscription using EventManager.subscribe()
@@ -224,14 +229,14 @@ class TestLocalService:
         global api_event_received
 
         # Setup the EventManager (processes decorator-based listeners)
-        await environment.get(EventManager).setup()
+        event_manager = environment.get(EventManager)
+        await event_manager.setup()
 
         api_event_received = asyncio.Event()
 
         # Get the API subscriber - its @on_running callback will have executed
         # and subscribed to HelloEvent
         api_subscriber = environment.get(ApiEventSubscriber)
-        event_manager = environment.get(EventManager)
 
         # Give @on_running callbacks time to complete
         await asyncio.sleep(0.2)
@@ -280,6 +285,12 @@ class TestLocalService:
         assert api_subscription_after is None, "API subscription should be removed after unsubscribe"
 
         logger.info("✓ API-based subscription test passed!")
+
+        # Cleanup using Environment.destroy()
+        environment.destroy()
+        # Wait for the async lifecycle tasks created by destroy()
+        if environment._lifecycle_tasks:
+            await asyncio.gather(*environment._lifecycle_tasks, return_exceptions=True)
 
     async def test_multiple_async_subscribers(self):
         """
@@ -382,3 +393,9 @@ class TestLocalService:
         await event_manager.unsubscribe(sub_id_1)
         await event_manager.unsubscribe(sub_id_2)
         await event_manager.unsubscribe(sub_id_3)
+
+        # Cleanup using Environment.destroy()
+        environment.destroy()
+        # Wait for the async lifecycle tasks created by destroy()
+        if environment._lifecycle_tasks:
+            await asyncio.gather(*environment._lifecycle_tasks, return_exceptions=True)

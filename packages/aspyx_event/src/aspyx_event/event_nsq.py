@@ -3,7 +3,7 @@ from typing import Any, Dict, Optional
 import cbor2
 import ansq
 from ansq.tcp.types import NSQMessage
-from nsq import Writer
+from ansq.tcp.writer import NSQConnection
 
 from .event import EventManager
 
@@ -71,7 +71,7 @@ class NSQProvider(EventManager.Provider):
 
     # slots
 
-    __slots__ = ["host", "port", "writer", "readers", "reader_tasks", "loop"]
+    __slots__ = ["host", "port", "writer", "readers", "reader_tasks", "loop", "writer_connections"]
 
     # constructor
 
@@ -81,10 +81,11 @@ class NSQProvider(EventManager.Provider):
         host, port = nsqd_address.split(":")
         self.host = host
         self.port = int(port)
-        self.writer : Optional[Writer] = None
+        self.writer : Optional[NSQConnection] = None
         self.readers = []
         self.reader_tasks = []
         self.loop = None
+        self.writer_connections = []
 
     # lifecycle
     # Note: start() and stop() are called by EventManager, not via lifecycle decorators
@@ -96,27 +97,76 @@ class NSQProvider(EventManager.Provider):
         self.writer = await ansq.create_writer(nsqd_tcp_addresses=[f"{self.host}:{self.port}"])
 
     async def stop(self):
-        # Cancel all reader loop tasks
+        import logging
+        logger = logging.getLogger("aspyx.event.nsq")
+        logger.info("Stopping NSQ provider...")
+
+        # Cancel all reader loop tasks first
         for task in self.reader_tasks:
             if not task.done():
                 task.cancel()
 
-        # Wait for tasks to be cancelled
+        # Close all readers (this will cause reader loops to exit)
+        for reader, _ in self.readers:
+            try:
+                await reader.close()
+            except Exception as e:
+                logger.warning(f"Error closing reader: {e}")
+
+        # Wait for tasks to be cancelled with a short timeout
         if self.reader_tasks:
-            await asyncio.gather(*self.reader_tasks, return_exceptions=True)
+            try:
+                await asyncio.wait_for(
+                    asyncio.gather(*self.reader_tasks, return_exceptions=True),
+                    timeout=2.0
+                )
+            except asyncio.TimeoutError:
+                logger.warning("Timeout waiting for reader tasks to complete")
 
         self.reader_tasks.clear()
-
-        # Close all readers
-        for reader, _ in self.readers:
-            await reader.close()
-
         self.readers.clear()
 
-        # Close writer
+        # Close writer and clean up its internal connection tasks
         if self.writer:
-            await self.writer.close()
+            try:
+                # Collect internal tasks from writer connections before closing
+                connection_tasks = []
+                if hasattr(self.writer, 'connections'):
+                    for conn in self.writer.connections:
+                        if hasattr(conn, '_reader_task') and conn._reader_task:
+                            connection_tasks.append(conn._reader_task)
+                            logger.debug(f"Found writer connection task: {conn._reader_task}")
+
+                # Close the writer (this should signal tasks to stop)
+                await self.writer.close()
+
+                # Wait for tasks to complete or timeout, then cancel remaining
+                if connection_tasks:
+                    # Wait up to 1 second for tasks to finish naturally
+                    try:
+                        await asyncio.wait_for(
+                            asyncio.gather(*connection_tasks, return_exceptions=True),
+                            timeout=1.0
+                        )
+                        logger.debug("All writer connection tasks completed cleanly")
+                    except asyncio.TimeoutError:
+                        logger.debug("Timeout waiting for writer tasks, cancelling remaining")
+                        # Cancel any tasks that didn't finish
+                        for task in connection_tasks:
+                            if not task.done():
+                                task.cancel()
+                        # Wait for cancellations to complete
+                        await asyncio.gather(*connection_tasks, return_exceptions=True)
+
+                    # Give the event loop a final cycle to fully clean up the tasks
+                    await asyncio.sleep(0.01)
+
+            except Exception as e:
+                logger.warning(f"Error closing writer: {e}")
             self.writer = None
+
+        self.writer_connections.clear()
+        logger.info("NSQ provider stopped")
 
     # implement Provider
 
