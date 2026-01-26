@@ -9,7 +9,7 @@ from typing import Optional
 
 from aspyx.exception import ExceptionManager, handle
 from aspyx.util import Logger
-#from .provider import LocalProvider
+from .provider import LocalProvider
 
 Logger.configure(default_level=logging.INFO, levels={
     "httpx": logging.ERROR,
