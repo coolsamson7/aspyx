@@ -2,14 +2,14 @@
 
 [project]
 name = "aspyx_event"
-version = "0.9.7"
+version = "0.9.8"
 description = "Aspyx event framework"
 authors = [{ name = "Andreas Ernst", email = "andreas.ernst7@gmail.com" }]
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.9"
 dependencies = [
-    "aspyx>=1.9.7",
+    "aspyx>=1.9.8",
     "python-qpid-proton >=0.40.0",
     "ansq>=0.3.0",
     "cbor2>=5.4.0",
