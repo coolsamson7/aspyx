@@ -6,7 +6,6 @@ from ansq.tcp.types import NSQMessage
 from nsq import Writer
 
 from .event import EventManager
-from aspyx.di import on_running, on_destroy, inject
 
 from aspyx.util import get_deserializer, get_serializer
 
@@ -88,15 +87,14 @@ class NSQProvider(EventManager.Provider):
         self.loop = None
 
     # lifecycle
+    # Note: start() and stop() are called by EventManager, not via lifecycle decorators
 
-    @on_running()
     async def start(self):
         if self.loop is None:
             self.loop = asyncio.get_running_loop()
 
         self.writer = await ansq.create_writer(nsqd_tcp_addresses=[f"{self.host}:{self.port}"])
 
-    @on_destroy()
     async def stop(self):
         # Cancel all reader loop tasks
         for task in self.reader_tasks:

@@ -6,8 +6,6 @@ from __future__ import annotations
 from typing import Optional
 import stomp
 
-from aspyx.di import on_destroy
-
 from .event import EventManager
 
 
@@ -74,9 +72,14 @@ class StompProvider(EventManager.Provider, stomp.ConnectionListener):
         self.manager.pipeline.handle(envelope, event_descriptor)
 
     # lifecycle
+    # Note: start() and stop() are called by EventManager, not via lifecycle decorators
 
-    @on_destroy()
-    def on_destroy(self):
+    async def start(self):
+        """Start the stomp provider (connection is already established in __init__)"""
+        pass
+
+    async def stop(self):
+        """Stop the stomp provider and disconnect"""
         if self.connection:
             self.connection.disconnect()
             self.connection = None
@@ -107,5 +110,5 @@ class StompProvider(EventManager.Provider, stomp.ConnectionListener):
 
     # implement EnvelopePipeline
 
-    def send(self, envelope: EventManager.Envelope, event_descriptor: EventManager.EventDescriptor):
+    async def send(self, envelope: EventManager.Envelope, event_descriptor: EventManager.EventDescriptor):
         self.connection.send(body=envelope.get_body(), destination=f"/queue/{event_descriptor.name}")

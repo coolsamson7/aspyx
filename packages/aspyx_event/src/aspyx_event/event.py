@@ -15,7 +15,7 @@ from typing import Type, TypeVar, Generic, Any, Optional, Coroutine, Dict, Calla
 from aspyx.exception import ExceptionManager
 from aspyx.reflection import Decorators
 
-from aspyx.di import Environment, inject_environment, Providers, ClassInstanceProvider, on_destroy
+from aspyx.di import Environment, inject_environment, Providers, ClassInstanceProvider, on_destroy, on_running
 
 from aspyx.util import get_deserializer, get_serializer
 
@@ -199,7 +199,7 @@ class EventManager:
         async def start(self):
             pass
 
-        def stop(self):
+        async def stop(self):
             pass
 
         def create_sender_envelope(self, event: Any) -> EventManager.Envelope:
@@ -309,6 +309,10 @@ class EventManager:
     @on_destroy()
     async def on_destroy(self):
         await self.provider.stop()
+
+    async def _start_provider(self):
+        """Start the provider during setup"""
+        await self.provider.start()
 
     # internal
 
@@ -434,10 +438,17 @@ class EventManager:
         else:
             return list(self.subscriptions.values())
 
+    @on_running()
     async def setup(self):
-        # start
+        """
+        Setup the EventManager:
+        1. Start the provider (connect to message broker)
+        2. Convert decorator-based listeners to subscriptions
 
-        await self.provider.start()
+        This is called automatically via @on_running() lifecycle hook.
+        """
+        # Start the provider
+        await self._start_provider()
 
         # Convert decorator-based listeners to unified subscriptions
 

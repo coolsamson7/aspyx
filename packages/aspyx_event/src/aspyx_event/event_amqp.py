@@ -186,7 +186,7 @@ class AMQPProvider(MessagingHandler, EventManager.Provider):
 
         self.container.stop()
 
-    def stop(self):
+    async def stop(self):
         # local class
 
         class CloseHandler(AMQPProvider.AMQHandler):
@@ -199,12 +199,7 @@ class AMQPProvider(MessagingHandler, EventManager.Provider):
         self.container.schedule(0, CloseHandler(self))
 
     # lifecycle
-
-    @on_destroy()
-    def on_destroy(self):
-        self.stop()
-
-    # implement Provider
+    # Note: start() and stop() are called by EventManager, not via lifecycle decorators
 
     async def start(self):
         self.thread.start()
