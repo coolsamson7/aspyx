@@ -694,6 +694,11 @@ class LifecycleProcessor(ABC):
     def process_lifecycle(self, lifecycle: Lifecycle, instance: object, environment: Environment) -> object:
         pass
 
+    async def process_lifecycle_async(self, lifecycle: Lifecycle, instance: object, environment: Environment) -> object:
+        """Async version of process_lifecycle. Override in subclasses that need async processing."""
+        # Default implementation calls the sync version
+        return self.process_lifecycle(lifecycle, instance, environment)
+
 class PostProcessor(LifecycleProcessor):
     """
     Base class for custom post processors that are executed after object creation.
@@ -1279,8 +1284,7 @@ class Environment:
         "lifecycle_processors",
         "parent",
         "features",
-        "instances",
-        "_lifecycle_tasks"
+        "instances"
     ]
 
     # constructor
@@ -1314,7 +1318,6 @@ class Environment:
         self.providers: Dict[Type, AbstractInstanceProvider] = {}
         self.instances = []
         self.lifecycle_processors: list[LifecycleProcessor] = []
-        self._lifecycle_tasks = []
 
         if self.parent is not None:
             # inherit providers from parent
@@ -1513,10 +1516,12 @@ class Environment:
                 if not descriptor.has_decorator(module) and provider.get_type() not in deferred_dependencies:
                     provider.create(self)
 
-        # running callback
-
+        # Phase 6: Execute ON_RUNNING for all instances (sync only - async methods will raise error)
         for instance in self.instances:
             self.execute_processors(Lifecycle.ON_RUNNING, instance)
+
+        # NOTE: Async @on_running methods will raise an error during __init__
+        # Call await environment.start() after creating the environment for async @on_running
 
         # done
 
@@ -1544,6 +1549,13 @@ class Environment:
 
         return instance
 
+    async def execute_processors_async(self, lifecycle: Lifecycle, instance: T) -> T:
+        """Execute lifecycle processors asynchronously, properly awaiting async methods."""
+        for processor in self.lifecycle_processors:
+            await processor.process_lifecycle_async(lifecycle, instance, self)
+
+        return instance
+
     def created(self, instance: T) -> T:
         # remember lifecycle processors
 
@@ -1558,7 +1570,9 @@ class Environment:
 
         self.instances.append(instance)
 
-        # execute processors
+        # execute processors (ON_INJECT and ON_INIT during creation)
+        # ON_INIT must be synchronous only (no async allowed)
+        # ON_RUNNING will be executed in start() method and can be async
 
         self.execute_processors(Lifecycle.ON_INJECT, instance)
         self.execute_processors(Lifecycle.ON_INIT, instance)
@@ -1610,31 +1624,67 @@ class Environment:
 
         return result
 
+    async def start(self):
+        """
+        Start the environment by executing ON_RUNNING lifecycle phase.
+        This method properly handles async @on_running methods.
+
+        Call this after creating the environment if you have async @on_running methods.
+
+        Note: @on_init methods are called during get() and must be synchronous.
+              Use @on_running for async initialization (DB connections, etc.)
+
+        Example:
+            environment = Environment(MyModule)
+            await environment.start()
+        """
+        Environment.logger.info("starting environment %s", self.type.__qualname__)
+
+        # Execute ON_RUNNING phase for all instances (can be async)
+        for instance in self.instances:
+            await self.execute_processors_async(Lifecycle.ON_RUNNING, instance)
+
+        Environment.logger.info("environment %s started successfully", self.type.__qualname__)
+
+    async def stop(self):
+        """
+        Stop the environment by executing ON_DESTROY lifecycle phase.
+        This method properly handles async lifecycle methods.
+
+        Call this before discarding the environment to ensure proper cleanup.
+
+        Example:
+            await environment.stop()
+        """
+        Environment.logger.info("stopping environment %s", self.type.__qualname__)
+
+        # Execute ON_DESTROY phase for all instances (in reverse order)
+        for instance in reversed(self.instances):
+            await self.execute_processors_async(Lifecycle.ON_DESTROY, instance)
+
+        self.instances.clear()
+
+        Environment.logger.info("environment %s stopped successfully", self.type.__qualname__)
+
     def destroy(self):
         """
-        destroy all managed instances by calling the appropriate lifecycle methods
+        Destroy all managed instances by calling the appropriate lifecycle methods (synchronous version).
+
+        IMPORTANT: If you have async lifecycle methods, use 'await environment.stop()' instead.
+        This method will raise an error if called from within an async context.
         """
         import asyncio
 
-        # Clear any previous lifecycle tasks
-        self._lifecycle_tasks.clear()
-
-        for instance in self.instances:
-            self.execute_processors(Lifecycle.ON_DESTROY, instance)
-
-        # Wait for any async destroy tasks if we're in an async context
-        if self._lifecycle_tasks:
-            try:
-                loop = asyncio.get_running_loop()
-                # Schedule gathering of tasks in the background
-                async def _wait_for_tasks():
-                    await asyncio.gather(*self._lifecycle_tasks, return_exceptions=True)
-                asyncio.create_task(_wait_for_tasks())
-            except RuntimeError:
-                # No running loop, run synchronously
-                asyncio.run(asyncio.gather(*self._lifecycle_tasks, return_exceptions=True))
-
-        self.instances.clear() # make the cy happy
+        try:
+            loop = asyncio.get_running_loop()
+            raise RuntimeError(
+                "Cannot call destroy() from async context. Use 'await environment.stop()' instead."
+            )
+        except RuntimeError as e:
+            if "Cannot call destroy()" in str(e):
+                raise
+            # No running loop - safe to run synchronously
+            asyncio.run(self.stop())
 
     def get(self, type: Type[T]) -> T:
         """
@@ -1694,20 +1744,36 @@ class AbstractCallableProcessor(LifecycleProcessor):
             self.method = method
             self.lifecycle_callable = lifecycle_callable
 
+        def is_async(self):
+            """Check if this method is async."""
+            return inspect.iscoroutinefunction(self.method.method)
+
         def execute(self, instance, environment: Environment):
+            """Execute lifecycle method synchronously (only for sync methods)."""
+            # Check if method is async before calling
+            if self.is_async():
+                phase = self.lifecycle_callable.lifecycle.name
+                if phase == "ON_INIT":
+                    raise RuntimeError(
+                        f"Async @on_init method '{self.method.method.__name__}' is not allowed. "
+                        f"@on_init must be synchronous (called during get()). "
+                        f"Use @on_running for async initialization instead."
+                    )
+                else:
+                    # For ON_RUNNING and ON_DESTROY, skip during sync execution
+                    # These will be called later via await start() or await stop()
+                    return None
+
+            # Execute sync method
             result = self.method.method(instance, *self.lifecycle_callable.args(self.decorator, self.method, environment))
-            # If the method is async, we need to handle it
+            return result
+
+        async def execute_async(self, instance, environment: Environment):
+            """Execute lifecycle method, awaiting if async."""
+            result = self.method.method(instance, *self.lifecycle_callable.args(self.decorator, self.method, environment))
             if inspect.iscoroutinefunction(self.method.method):
-                import asyncio
-                try:
-                    loop = asyncio.get_running_loop()
-                    # We're in an async context, create a task and track it
-                    task = asyncio.create_task(result)
-                    environment._lifecycle_tasks.append(task)
-                    return task
-                except RuntimeError:
-                    # No running loop, run synchronously (will block)
-                    asyncio.run(result)
+                return await result
+            return result
 
         def __str__(self):
             return f"MethodCall({self.method.method.__name__})"
@@ -1775,6 +1841,13 @@ class AbstractCallableProcessor(LifecycleProcessor):
 
             for callable in callables[lifecycle.value]:
                 callable.execute(instance, environment)
+
+    async def process_lifecycle_async(self, lifecycle: Lifecycle, instance: object, environment: Environment) -> object:
+        if lifecycle is self.lifecycle:
+            callables = self.callables_for(type(instance))
+
+            for callable in callables[lifecycle.value]:
+                await callable.execute_async(instance, environment)
 
 @injectable()
 @order(1)
