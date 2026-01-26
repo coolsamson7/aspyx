@@ -180,8 +180,8 @@ class Module:
 
     @create()
     def create_event_manager(self) -> EventManager:
-        #return EventManager(LocalProvider(), exception_manager=self.create_exception_manager())
-        return EventManager(NSQProvider(nsqd_address="127.0.0.1:4150", encoding="cbor"))
+        return EventManager(LocalProvider(), exception_manager=self.create_exception_manager())
+        #return EventManager(NSQProvider(nsqd_address="127.0.0.1:4150", encoding="cbor"))
         # EventManager(StompProvider(host="localhost", port=61616, user="artemis", password="artemis"))
         # EventManager(AMQPProvider("server-id", host="localhost", port=5672, user="artemis", password="artemis"))
 
@@ -192,8 +192,10 @@ class TestLocalService:
 
         global sync_event_received, async_event_received
 
+        # Start environment to execute @on_running callbacks (including EventManager.setup())
+        await environment.start()
+
         event_manager = environment.get(EventManager)
-        await event_manager.setup()
 
         sync_event_received  = asyncio.Event()
         async_event_received = asyncio.Event()
@@ -212,11 +214,8 @@ class TestLocalService:
         #assert event == SyncListener.received, "events not =="
         assert event == AsyncListener.received, "events not =="
 
-        # Cleanup using Environment.destroy()
-        environment.destroy()
-        # Wait for the async lifecycle tasks created by destroy()
-        if environment._lifecycle_tasks:
-            await asyncio.gather(*environment._lifecycle_tasks, return_exceptions=True)
+        # Cleanup using Environment.stop()
+        await environment.stop()
 
     async def test_api_based_subscription(self):
         """
@@ -228,14 +227,13 @@ class TestLocalService:
 
         global api_event_received
 
-        # Setup the EventManager (processes decorator-based listeners)
-        event_manager = environment.get(EventManager)
-        await event_manager.setup()
+        # Start the environment to execute @on_running callbacks (including EventManager.setup())
+        await environment.start()
 
+        event_manager = environment.get(EventManager)
         api_event_received = asyncio.Event()
 
-        # Get the API subscriber - its @on_running callback will have executed
-        # and subscribed to HelloEvent
+        # Get the API subscriber
         api_subscriber = environment.get(ApiEventSubscriber)
 
         # Give @on_running callbacks time to complete
@@ -286,11 +284,8 @@ class TestLocalService:
 
         logger.info("✓ API-based subscription test passed!")
 
-        # Cleanup using Environment.destroy()
-        environment.destroy()
-        # Wait for the async lifecycle tasks created by destroy()
-        if environment._lifecycle_tasks:
-            await asyncio.gather(*environment._lifecycle_tasks, return_exceptions=True)
+        # Cleanup using Environment.stop()
+        await environment.stop()
 
     async def test_multiple_async_subscribers(self):
         """
@@ -304,13 +299,14 @@ class TestLocalService:
 
         global multi_subscriber_1_received, multi_subscriber_2_received, multi_subscriber_3_received
 
-        await environment.get(EventManager).setup()
+        # Start environment to execute @on_running callbacks (including EventManager.setup())
+        await environment.start()
+
+        event_manager = environment.get(EventManager)
 
         multi_subscriber_1_received = asyncio.Event()
         multi_subscriber_2_received = asyncio.Event()
         multi_subscriber_3_received = asyncio.Event()
-
-        event_manager = environment.get(EventManager)
 
         # Track execution order and timing
         execution_log = []
@@ -394,8 +390,5 @@ class TestLocalService:
         await event_manager.unsubscribe(sub_id_2)
         await event_manager.unsubscribe(sub_id_3)
 
-        # Cleanup using Environment.destroy()
-        environment.destroy()
-        # Wait for the async lifecycle tasks created by destroy()
-        if environment._lifecycle_tasks:
-            await asyncio.gather(*environment._lifecycle_tasks, return_exceptions=True)
+        # Cleanup using Environment.stop()
+        await environment.stop()
